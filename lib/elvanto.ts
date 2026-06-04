@@ -60,41 +60,38 @@ export async function getHousehold(email?: string): Promise<Household> {
       JSON.stringify(primaryResult, null, 2),
     );
 
-    const primaryPeople: ElvantoPerson[] =
-      primaryResult?.people?.person ?? [];
+    const primaryPeople: ElvantoPerson[] = primaryResult?.people?.person ?? [];
 
     const primaryPerson =
       primaryPeople.find(
         (person) => person.family_relationship === "Primary Contact",
       ) ?? primaryPeople[0];
 
-    if (!primaryPerson) return sampleHousehold;
+    if (!primaryPerson?.id) return sampleHousehold;
 
-    let householdPeople: ElvantoPerson[] = [primaryPerson];
+    const detailResult = await getPersonInfo(
+      connection.access_token,
+      primaryPerson.id,
+    );
 
-    if (primaryPerson.family_id) {
-      const familyResult = await searchPeople(connection.access_token, {
-        "search[family_id]": primaryPerson.family_id,
-      });
+    console.log(
+      "Elvanto person detail result:",
+      JSON.stringify(detailResult, null, 2),
+    );
 
-      console.log(
-        "Elvanto family search result:",
-        JSON.stringify(familyResult, null, 2),
-      );
+    const detailPerson = detailResult?.person ?? primaryPerson;
 
-      householdPeople = familyResult?.people?.person ?? [primaryPerson];
-    }
-
-    const family = householdPeople
-      .filter((person) => person.id !== primaryPerson.id)
-      .map(mapElvantoPerson);
+    const familyPeople: ElvantoPerson[] =
+      detailPerson?.family?.person ??
+      detailPerson?.family ??
+      [];
 
     return {
       primary: {
-        ...mapElvantoPerson(primaryPerson),
+        ...mapElvantoPerson(detailPerson),
         address: "Address not listed",
       },
-      family,
+      family: familyPeople.map(mapElvantoPerson),
     };
   } catch (error) {
     console.error("Elvanto API error:", error);
@@ -118,6 +115,26 @@ async function searchPeople(
         page: "1",
         page_size: "20",
         ...searchParams,
+      }),
+      cache: "no-store",
+    },
+  );
+
+  return response.json();
+}
+
+async function getPersonInfo(accessToken: string, personId: string) {
+  const response = await fetch(
+    "https://api.elvanto.com/v1/people/getInfo.json",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        id: personId,
+        "fields[0]": "family",
       }),
       cache: "no-store",
     },
