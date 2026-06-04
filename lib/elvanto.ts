@@ -78,11 +78,7 @@ export async function getHousehold(email?: string): Promise<Household> {
 
     const detailPerson = detailResult?.person?.[0] ?? primaryPerson;
 
-    console.log(
-      "Elvanto detail person:",
-      JSON.stringify(detailPerson, null, 2),
-    );
-
+ 
     const familyMembers: ElvantoFamilyMember[] =
       detailPerson?.family?.family_member ?? [];
 
@@ -97,10 +93,6 @@ export async function getHousehold(email?: string): Promise<Household> {
 
           const personDetail = memberDetail?.person?.[0];
 
-          console.log(
-            "Family member detail:",
-            JSON.stringify(personDetail, null, 2),
-          );
 
           return mapElvantoPerson({
             ...personDetail,
