@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { sampleHousehold } from "./sample-household";
 
 type ElvantoPerson = {
+  id?: string;
   firstname?: string;
   preferred_name?: string;
   lastname?: string;
