@@ -38,22 +38,38 @@ export async function getHousehold(email?: string): Promise<Household> {
     .single();
 
   if (error || !connection?.access_token) {
+    console.error("No Elvanto connection found", error);
     return sampleHousehold;
   }
 
-  const response = await fetch("https://api.elvanto.com/v1/people/search.json", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${connection.access_token}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-    },
-      body: new URLSearchParams({
-        search: email,
-      }),
+  try {
+    const response = await fetch(
+      "https://api.elvanto.com/v1/people/search.json",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${connection.access_token}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          search: email,
+        }),
+        cache: "no-store",
+      }
+    );
 
-  const data = await response.json();
+    const data = await response.json();
 
-  console.log("Elvanto people search result:", JSON.stringify(data, null, 2));
+    console.log(
+      "Elvanto people search result:",
+      JSON.stringify(data, null, 2)
+    );
 
-  return sampleHousehold;
+    // For now we're only testing connectivity.
+    // We'll map the actual Elvanto response into the household object next.
+    return sampleHousehold;
+  } catch (error) {
+    console.error("Elvanto API error:", error);
+    return sampleHousehold;
+  }
 }
