@@ -28,9 +28,7 @@ type Household = {
 };
 
 export async function getHousehold(email?: string): Promise<Household> {
-  if (!email) {
-    return sampleHousehold;
-  }
+  if (!email) return sampleHousehold;
 
   const supabase = await createClient();
 
@@ -38,9 +36,7 @@ export async function getHousehold(email?: string): Promise<Household> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return sampleHousehold;
-  }
+  if (!user) return sampleHousehold;
 
   const { data: connection, error } = await supabase
     .from("elvanto_connections")
@@ -54,42 +50,42 @@ export async function getHousehold(email?: string): Promise<Household> {
   }
 
   try {
-    const response = await fetch(
-      "https://api.elvanto.com/v1/people/search.json",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${connection.access_token}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          page: "1",
-          page_size: "10",
-          "search[email]": email,
-        }),
-        cache: "no-store",
-      },
-    );
-
-    const data = await response.json();
+    const primaryResult = await searchPeople(connection.access_token, {
+      "search[email]": email,
+    });
 
     console.log(
-      "Elvanto people search result:",
-      JSON.stringify(data, null, 2),
+      "Elvanto primary search result:",
+      JSON.stringify(primaryResult, null, 2),
     );
 
-    const people: ElvantoPerson[] = data?.people?.person ?? [];
-
-    if (!people.length) {
-      return sampleHousehold;
-    }
+    const primaryPeople: ElvantoPerson[] =
+      primaryResult?.people?.person ?? [];
 
     const primaryPerson =
-      people.find((person) => person.family_relationship !== "Child") ??
-      people[0];
+      primaryPeople.find(
+        (person) => person.family_relationship === "Primary Contact",
+      ) ?? primaryPeople[0];
 
-    const family = people
-      .filter((person) => person !== primaryPerson)
+    if (!primaryPerson) return sampleHousehold;
+
+    let householdPeople: ElvantoPerson[] = [primaryPerson];
+
+    if (primaryPerson.family_id) {
+      const familyResult = await searchPeople(connection.access_token, {
+        "search[family_id]": primaryPerson.family_id,
+      });
+
+      console.log(
+        "Elvanto family search result:",
+        JSON.stringify(familyResult, null, 2),
+      );
+
+      householdPeople = familyResult?.people?.person ?? [primaryPerson];
+    }
+
+    const family = householdPeople
+      .filter((person) => person.id !== primaryPerson.id)
       .map(mapElvantoPerson);
 
     return {
@@ -103,6 +99,30 @@ export async function getHousehold(email?: string): Promise<Household> {
     console.error("Elvanto API error:", error);
     return sampleHousehold;
   }
+}
+
+async function searchPeople(
+  accessToken: string,
+  searchParams: Record<string, string>,
+) {
+  const response = await fetch(
+    "https://api.elvanto.com/v1/people/search.json",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        page: "1",
+        page_size: "20",
+        ...searchParams,
+      }),
+      cache: "no-store",
+    },
+  );
+
+  return response.json();
 }
 
 function mapElvantoPerson(person: ElvantoPerson): HouseholdPerson {
