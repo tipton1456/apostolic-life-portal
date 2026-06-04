@@ -13,7 +13,7 @@ export default async function ContactPage() {
 		  redirect("/login");
 		}
 		
-		const household = await getHousehold();
+		const household = await getHousehold(user.email ?? undefined);
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
