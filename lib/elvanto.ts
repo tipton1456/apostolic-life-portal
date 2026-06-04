@@ -45,13 +45,11 @@ export async function getHousehold(email?: string): Promise<Household> {
     method: "POST",
     headers: {
       Authorization: `Bearer ${connection.access_token}`,
-      "Content-Type": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: JSON.stringify({
-      search: email,
-    }),
-    cache: "no-store",
-  });
+      body: new URLSearchParams({
+        search: email,
+      }),
 
   const data = await response.json();
 
