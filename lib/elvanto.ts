@@ -9,8 +9,24 @@ type ElvantoPerson = {
   email?: string;
   phone?: string;
   mobile?: string;
+  picture?: string;
   family_relationship?: string;
   family_id?: string;
+  family?: {
+    family_member?: ElvantoFamilyMember[];
+  };
+  mailing_address?: string;
+  mailing_address2?: string;
+  mailing_city?: string;
+  mailing_state?: string;
+  mailing_postcode?: string;
+  mailing_country?: string;
+  home_address?: string;
+  home_address2?: string;
+  home_city?: string;
+  home_state?: string;
+  home_postcode?: string;
+  home_country?: string;
 };
 
 type ElvantoFamilyMember = {
@@ -26,14 +42,30 @@ type HouseholdPerson = {
   relationship?: string;
   email: string;
   phone: string;
+  mobile: string;
+  picture?: string;
 };
 
 type Household = {
-  primary: HouseholdPerson & {
-    address: string;
-  };
+  primary: HouseholdPerson & { address: string };
   family: HouseholdPerson[];
 };
+
+const PERSON_DETAIL_FIELDS = [
+  "family",
+  "mailing_address",
+  "mailing_address2",
+  "mailing_city",
+  "mailing_state",
+  "mailing_postcode",
+  "mailing_country",
+  "home_address",
+  "home_address2",
+  "home_city",
+  "home_state",
+  "home_postcode",
+  "home_country",
+];
 
 export async function getHousehold(email?: string): Promise<Household> {
   if (!email) return sampleHousehold;
@@ -78,7 +110,6 @@ export async function getHousehold(email?: string): Promise<Household> {
 
     const detailPerson = detailResult?.person?.[0] ?? primaryPerson;
 
- 
     const familyMembers: ElvantoFamilyMember[] =
       detailPerson?.family?.family_member ?? [];
 
@@ -93,7 +124,6 @@ export async function getHousehold(email?: string): Promise<Household> {
 
           const personDetail = memberDetail?.person?.[0];
 
-
           return mapElvantoPerson({
             ...personDetail,
             family_relationship:
@@ -105,7 +135,7 @@ export async function getHousehold(email?: string): Promise<Household> {
     return {
       primary: {
         ...mapElvantoPerson(detailPerson),
-        address: "Address not listed",
+        address: formatAddress(detailPerson),
       },
       family: familyDetails,
     };
@@ -148,10 +178,7 @@ async function getPersonInfoWithFamily(accessToken: string, personId: string) {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({
-        id: personId,
-        "fields[0]": "family",
-      }),
+      body: buildGetInfoBody(personId),
       cache: "no-store",
     },
   );
@@ -168,14 +195,21 @@ async function getPersonInfo(accessToken: string, personId: string) {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({
-        id: personId,
-      }),
+      body: buildGetInfoBody(personId),
       cache: "no-store",
     },
   );
 
   return response.json();
+}
+
+function buildGetInfoBody(personId: string) {
+  return new URLSearchParams({
+    id: personId,
+    ...Object.fromEntries(
+      PERSON_DETAIL_FIELDS.map((field, index) => [`fields[${index}]`, field]),
+    ),
+  });
 }
 
 function mapElvantoPerson(person: Partial<ElvantoPerson>): HouseholdPerson {
@@ -184,6 +218,39 @@ function mapElvantoPerson(person: Partial<ElvantoPerson>): HouseholdPerson {
     lastName: person.lastname || "",
     relationship: person.family_relationship || "Family Member",
     email: person.email || "Not listed",
-    phone: person.mobile || person.phone || "Not listed",
+    phone: person.phone || "Not listed",
+    mobile: person.mobile || "Not listed",
+    picture: person.picture,
   };
+}
+
+function formatAddress(person: Partial<ElvantoPerson>) {
+  const mailingAddress = joinAddress([
+    person.mailing_address,
+    person.mailing_address2,
+    person.mailing_city,
+    person.mailing_state,
+    person.mailing_postcode,
+    person.mailing_country,
+  ]);
+
+  if (mailingAddress) return mailingAddress;
+
+  return (
+    joinAddress([
+      person.home_address,
+      person.home_address2,
+      person.home_city,
+      person.home_state,
+      person.home_postcode,
+      person.home_country,
+    ]) || "Address not listed"
+  );
+}
+
+function joinAddress(parts: Array<string | undefined>) {
+  return parts
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(", ");
 }

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getHousehold } from "@/lib/elvanto";
 import { createClient } from "@/lib/supabase/server";
 
@@ -14,19 +15,27 @@ export default async function ContactPage() {
   }
 
   const { data: mapping } = await supabase
-  .from("member_mappings")
-  .select("elvanto_email")
-  .eq("user_id", user.id)
-  .single();
+    .from("member_mappings")
+    .select("elvanto_email")
+    .eq("user_id", user.id)
+    .single();
 
-const household = await getHousehold(mapping?.elvanto_email ?? user.email ?? undefined);
+  const household = await getHousehold(
+    mapping?.elvanto_email ?? user.email ?? undefined,
+  );
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
       <div className="mx-auto max-w-5xl">
-        <a href="/" className="text-sm text-lime-400 hover:text-lime-300">
+        <Link href="/" className="text-sm text-lime-400 hover:text-lime-300">
           ← Back to Dashboard
-        </a>
+        </Link>
+        <Link
+          href="/contact/request-update"
+          className="mt-4 inline-flex rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:border-lime-400/60"
+        >
+          Request Contact Update
+        </Link>
 
         <header className="mt-8 border-b border-white/10 pb-6">
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
@@ -59,6 +68,7 @@ const household = await getHousehold(mapping?.elvanto_email ?? user.email ?? und
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <Info label="Email" value={household.primary.email} />
             <Info label="Phone" value={household.primary.phone} />
+            <Info label="Mobile" value={household.primary.mobile} />
             <Info label="Address" value={household.primary.address} />
           </div>
         </section>
@@ -72,15 +82,27 @@ const household = await getHousehold(mapping?.elvanto_email ?? user.email ?? und
                 key={`${person.firstName}-${person.lastName}`}
                 className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
               >
-                <p className="text-lg font-semibold">
-                  {person.firstName} {person.lastName}
-                </p>
-                <p className="mt-1 text-sm text-lime-400">
-                  {person.relationship}
-                </p>
+                <div className="flex items-start gap-4">
+                  {person.picture ? (
+                    <img
+                      src={person.picture}
+                      alt={`${person.firstName} ${person.lastName}`}
+                      className="h-16 w-16 shrink-0 rounded-full object-cover"
+                    />
+                  ) : null}
+                  <div>
+                    <p className="text-lg font-semibold">
+                      {person.firstName} {person.lastName}
+                    </p>
+                    <p className="mt-1 text-sm text-lime-400">
+                      {person.relationship}
+                    </p>
+                  </div>
+                </div>
                 <div className="mt-4 space-y-3">
-                  <Info label="Email" value={person.email || "Not listed"} />
-                  <Info label="Phone" value={person.phone || "Not listed"} />
+                  <Info label="Email" value={person.email} />
+                  <Info label="Phone" value={person.phone} />
+                  <Info label="Mobile" value={person.mobile} />
                 </div>
               </div>
             ))}
