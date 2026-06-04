@@ -1,6 +1,6 @@
-import { sampleHousehold } from "@/lib/sample-household";
+import { getHousehold } from "@/lib/elvanto";
 
-export default function ContactPage() {
+const household = await getHousehold();
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
       <div className="mx-auto max-w-5xl">
@@ -22,13 +22,13 @@ export default function ContactPage() {
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
           <h2 className="text-2xl font-semibold">
-            {sampleHousehold.primary.firstName} {sampleHousehold.primary.lastName}
+            {household.primary.firstName} {household.primary.lastName}
           </h2>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <Info label="Email" value={sampleHousehold.primary.email} />
-            <Info label="Phone" value={sampleHousehold.primary.phone} />
-            <Info label="Address" value={sampleHousehold.primary.address} />
+            <Info label="Email" value={household.primary.email} />
+            <Info label="Phone" value={household.primary.phone} />
+            <Info label="Address" value={household.primary.address} />
           </div>
         </section>
 
@@ -36,7 +36,7 @@ export default function ContactPage() {
           <h2 className="text-2xl font-semibold">Family Members</h2>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {sampleHousehold.family.map((person) => (
+            {household.family.map((person) => (
               <div
                 key={`${person.firstName}-${person.lastName}`}
                 className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
