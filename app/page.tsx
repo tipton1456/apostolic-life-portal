@@ -16,12 +16,15 @@ export default function Home() {
         </header>
 
         <section className="grid gap-6 md:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+          <a
+			  href="/contact"
+			  className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-lime-400/60 hover:bg-white/[0.06]"
+			>
             <h2 className="text-xl font-semibold">Contact Information</h2>
             <p className="mt-3 text-sm leading-6 text-neutral-400">
               View your contact details and submit update requests.
             </p>
-          </div>
+          </a>
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
             <h2 className="text-xl font-semibold">Family Members</h2>
