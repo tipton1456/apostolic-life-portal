@@ -43,30 +43,31 @@ export async function getHousehold(email?: string): Promise<Household> {
   }
 
   try {
-    const searchUrl = new URL(
-      "https://api.elvanto.com/v1/people/search.json"
-    );
-
-    searchUrl.searchParams.set("search", email);
-
-    const response = await fetch(searchUrl.toString(), {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${connection.access_token}`,
+    const response = await fetch(
+      "https://api.elvanto.com/v1/people/search.json",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${connection.access_token}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          page: "1",
+          page_size: "10",
+          "search[email]": email,
+          "fields[0]": "family_id",
+          "fields[1]": "family_relationship",
+        }),
+        cache: "no-store",
       },
-      cache: "no-store",
-    });
+    );
 
     const data = await response.json();
 
     console.log(
       "Elvanto people search result:",
-      JSON.stringify(data, null, 2)
+      JSON.stringify(data, null, 2),
     );
-
-    // We are only testing connectivity right now.
-    // Once we see a successful response, we'll map
-    // the real Elvanto fields into the household model.
 
     return sampleHousehold;
   } catch (error) {
