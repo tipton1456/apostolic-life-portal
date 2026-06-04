@@ -96,6 +96,10 @@ export async function getHousehold(email?: string): Promise<Household> {
           );
 
           const personDetail = memberDetail?.person?.[0];
+                console.log(
+        "Family member detail:",
+        JSON.stringify(personDetail, null, 2),
+      );
 
           return mapElvantoPerson(
             {
@@ -154,11 +158,11 @@ async function getPersonInfo(accessToken: string, personId: string) {
         "Content-Type": "application/x-www-form-urlencoded",
       },
     body: new URLSearchParams({
-      id: personId,
-      "fields[0]": "family",
-      "fields[1]": "fields",
-    }),
-      cache: "no-store",
+    id: personId,
+    "fields[0]": "family",
+    "fields[1]": "custom_fields",
+  }),
+        cache: "no-store",
     },
   );
 
