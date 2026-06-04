@@ -10,9 +10,11 @@ export async function GET() {
 
   const authUrl = new URL("https://api.elvanto.com/oauth");
 
+  authUrl.searchParams.set("type", "web_server");
   authUrl.searchParams.set("client_id", clientId);
   authUrl.searchParams.set("redirect_uri", redirectUri);
-  authUrl.searchParams.set("response_type", "code");
+  authUrl.searchParams.set("scope", "ManagePeople");
+  authUrl.searchParams.set("state", "connect-elvanto");
 
   redirect(authUrl.toString());
 }
