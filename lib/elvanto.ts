@@ -10,6 +10,9 @@ type ElvantoPerson = {
   phone?: string;
   mobile?: string;
   family_relationship?: string;
+
+  address?: string;
+  mailing_address?: string;
 };
 
 type ElvantoFamilyMember = {
@@ -76,7 +79,10 @@ export async function getHousehold(email?: string): Promise<Household> {
     );
 
     const detailPerson = detailResult?.person?.[0] ?? primaryPerson;
-
+      console.log(
+        "Elvanto detail person:",
+        JSON.stringify(detailPerson, null, 2)
+      );
     const familyMembers: ElvantoFamilyMember[] =
       detailPerson?.family?.family_member ?? [];
 
