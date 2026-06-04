@@ -32,7 +32,12 @@ export default async function ContactPage() {
          <p className="mt-4 rounded-xl border border-lime-400/20 bg-lime-400/10 px-4 py-3 text-sm text-lime-200">
 		  Signed in as {user.email}
 		</p>
-		        
+		  <a
+			  href="/api/elvanto/connect"
+			  className="mt-4 inline-flex rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
+			>
+			  Connect Elvanto
+			</a>      
 		</header>
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
