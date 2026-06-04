@@ -55,20 +55,20 @@ export async function getHousehold(email?: string): Promise<Household> {
           page: "1",
           page_size: "10",
           "search[email]": email,
-          "fields[0]": "family_id",
-          "fields[1]": "family_relationship",
         }),
         cache: "no-store",
-      },
+      }
     );
 
     const data = await response.json();
 
     console.log(
       "Elvanto people search result:",
-      JSON.stringify(data, null, 2),
+      JSON.stringify(data, null, 2)
     );
 
+    // Still returning sample data until we inspect
+    // the real Elvanto response structure.
     return sampleHousehold;
   } catch (error) {
     console.error("Elvanto API error:", error);
