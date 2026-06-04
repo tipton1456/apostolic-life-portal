@@ -5,20 +5,19 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
 
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    setMessage("Sending login link...");
+    setMessage("Signing in...");
 
     const supabase = createClient();
 
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/contact`,
-      },
+      password,
     });
 
     if (error) {
@@ -26,7 +25,7 @@ export default function LoginForm() {
       return;
     }
 
-    setMessage("Check your email for the login link.");
+    window.location.href = "/contact";
   }
 
   return (
@@ -46,14 +45,33 @@ export default function LoginForm() {
         />
       </div>
 
+      <div>
+        <label className="text-sm font-medium text-neutral-300">
+          Password
+        </label>
+
+        <input
+          type="password"
+          required
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
+          placeholder="Enter password"
+        />
+      </div>
+
       <button
         type="submit"
         className="w-full rounded-xl bg-lime-400 px-4 py-3 font-semibold text-neutral-950 transition hover:bg-lime-300"
       >
-        Send Login Link
+        Sign In
       </button>
 
-      {message && <p className="text-sm text-neutral-300">{message}</p>}
+      {message && (
+        <p className="text-sm text-neutral-300">
+          {message}
+        </p>
+      )}
     </form>
   );
 }
