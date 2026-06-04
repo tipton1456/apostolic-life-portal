@@ -80,16 +80,33 @@ export async function getHousehold(email?: string): Promise<Household> {
     const familyMembers: ElvantoFamilyMember[] =
       detailPerson?.family?.family_member ?? [];
 
-    const family = familyMembers
-      .filter((person) => person.id !== detailPerson.id)
-      .map(mapElvantoFamilyMember);
+    const familyDetails = await Promise.all(
+      familyMembers
+        .filter((member) => member.id && member.id !== detailPerson.id)
+        .map(async (member) => {
+          const memberDetail = await getPersonInfo(
+            connection.access_token,
+            member.id!,
+          );
+
+          const personDetail = memberDetail?.person?.[0];
+
+          return mapElvantoPerson(
+            {
+              ...personDetail,
+              family_relationship:
+                member.relationship ?? personDetail?.family_relationship,
+            },
+          );
+        }),
+    );
 
     return {
       primary: {
         ...mapElvantoPerson(detailPerson),
         address: "Address not listed",
       },
-      family,
+      family: familyDetails,
     };
   } catch (error) {
     console.error("Elvanto API error:", error);
@@ -148,15 +165,5 @@ function mapElvantoPerson(person: ElvantoPerson): HouseholdPerson {
     relationship: person.family_relationship || "Family Member",
     email: person.email || "Not listed",
     phone: person.mobile || person.phone || "Not listed",
-  };
-}
-
-function mapElvantoFamilyMember(person: ElvantoFamilyMember): HouseholdPerson {
-  return {
-    firstName: person.firstname || "",
-    lastName: person.lastname || "",
-    relationship: person.relationship || "Family Member",
-    email: "Not listed",
-    phone: "Not listed",
   };
 }
