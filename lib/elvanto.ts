@@ -1,6 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 import { sampleHousehold } from "./sample-household";
 
+type ElvantoPerson = {
+  firstname?: string;
+  preferred_name?: string;
+  lastname?: string;
+  email?: string;
+  phone?: string;
+  mobile?: string;
+  family_relationship?: string;
+  family_id?: string;
+};
+
 type HouseholdPerson = {
   firstName: string;
   lastName: string;
@@ -57,21 +68,49 @@ export async function getHousehold(email?: string): Promise<Household> {
           "search[email]": email,
         }),
         cache: "no-store",
-      }
+      },
     );
 
     const data = await response.json();
 
     console.log(
       "Elvanto people search result:",
-      JSON.stringify(data, null, 2)
+      JSON.stringify(data, null, 2),
     );
 
-    // Still returning sample data until we inspect
-    // the real Elvanto response structure.
-    return sampleHousehold;
+    const people: ElvantoPerson[] = data?.people?.person ?? [];
+
+    if (!people.length) {
+      return sampleHousehold;
+    }
+
+    const primaryPerson =
+      people.find((person) => person.family_relationship !== "Child") ??
+      people[0];
+
+    const family = people
+      .filter((person) => person !== primaryPerson)
+      .map(mapElvantoPerson);
+
+    return {
+      primary: {
+        ...mapElvantoPerson(primaryPerson),
+        address: "Address not listed",
+      },
+      family,
+    };
   } catch (error) {
     console.error("Elvanto API error:", error);
     return sampleHousehold;
   }
+}
+
+function mapElvantoPerson(person: ElvantoPerson): HouseholdPerson {
+  return {
+    firstName: person.preferred_name || person.firstname || "",
+    lastName: person.lastname || "",
+    relationship: person.family_relationship || "Family Member",
+    email: person.email || "Not listed",
+    phone: person.mobile || person.phone || "Not listed",
+  };
 }
