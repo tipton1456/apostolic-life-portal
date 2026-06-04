@@ -7,25 +7,43 @@ export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    setIsLoading(true);
     setMessage("Signing in...");
 
-    const supabase = createClient();
+    try {
+      const supabase = createClient();
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      setMessage(error.message);
-      return;
+      if (error) {
+        setMessage(`Error: ${error.message}`);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!data.session) {
+        setMessage("Error: No session was returned from Supabase.");
+        setIsLoading(false);
+        return;
+      }
+
+      window.location.href = "/contact";
+    } catch (error) {
+      setMessage(
+        `Unexpected error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      );
+      setIsLoading(false);
     }
-
-    window.location.href = "/contact";
   }
 
   return (
@@ -62,16 +80,13 @@ export default function LoginForm() {
 
       <button
         type="submit"
-        className="w-full rounded-xl bg-lime-400 px-4 py-3 font-semibold text-neutral-950 transition hover:bg-lime-300"
+        disabled={isLoading}
+        className="w-full rounded-xl bg-lime-400 px-4 py-3 font-semibold text-neutral-950 transition hover:bg-lime-300 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        Sign In
+        {isLoading ? "Signing In..." : "Sign In"}
       </button>
 
-      {message && (
-        <p className="text-sm text-neutral-300">
-          {message}
-        </p>
-      )}
+      {message && <p className="text-sm text-neutral-300">{message}</p>}
     </form>
   );
 }
