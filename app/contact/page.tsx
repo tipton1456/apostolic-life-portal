@@ -5,15 +5,15 @@ import { createClient } from "@/lib/supabase/server";
 export default async function ContactPage() {
   const supabase = await createClient();
 
-		const {
-		  data: { user },
-		} = await supabase.auth.getUser();
-		
-		if (!user) {
-		  redirect("/login");
-		}
-		
-		const household = await getHousehold(user.email ?? undefined);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const household = await getHousehold("s.tipton@apostoliclifeupci.com");
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
@@ -29,16 +29,21 @@ export default async function ContactPage() {
           <h1 className="mt-3 text-4xl font-bold tracking-tight">
             My Household
           </h1>
-         <p className="mt-4 rounded-xl border border-lime-400/20 bg-lime-400/10 px-4 py-3 text-sm text-lime-200">
-		  Signed in as {user.email}
-		</p>
-		  <a
-			  href="/api/elvanto/connect"
-			  className="mt-4 inline-flex rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
-			>
-			  Connect Elvanto
-			</a>      
-		</header>
+          <p className="mt-3 max-w-2xl text-neutral-400">
+            Review the contact information connected to your household.
+          </p>
+
+          <p className="mt-4 rounded-xl border border-lime-400/20 bg-lime-400/10 px-4 py-3 text-sm text-lime-200">
+            Signed in as {user.email}
+          </p>
+
+          <a
+            href="/api/elvanto/connect"
+            className="mt-4 inline-flex rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
+          >
+            Connect Elvanto
+          </a>
+        </header>
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
           <h2 className="text-2xl font-semibold">
