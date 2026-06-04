@@ -16,6 +16,21 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Contact Update Email Notifications
+
+Contact update requests are saved to Supabase first. To also email the church
+office when a request is submitted, configure these environment variables in
+Vercel:
+
+```bash
+RESEND_API_KEY=
+CONTACT_UPDATE_NOTIFICATION_EMAIL=office@example.com
+CONTACT_UPDATE_FROM_EMAIL="Apostolic Life Portal <updates@example.com>"
+```
+
+If any of those values are missing, the request is still saved, but no email is
+sent.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

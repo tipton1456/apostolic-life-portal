@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { sendContactUpdateNotification } from "@/lib/contact-update-notifications";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function RequestUpdatePage() {
@@ -31,9 +32,20 @@ export default async function RequestUpdatePage() {
       redirect("/login");
     }
 
-    await supabase.from("contact_update_requests").insert({
+    const { error } = await supabase.from("contact_update_requests").insert({
       user_id: user.id,
       request,
+    });
+
+    if (error) {
+      console.error("Contact update request insert failed:", error);
+      throw new Error("Unable to submit contact update request.");
+    }
+
+    await sendContactUpdateNotification({
+      request,
+      userEmail: user.email,
+      userId: user.id,
     });
 
     redirect("/contact?request=submitted");
