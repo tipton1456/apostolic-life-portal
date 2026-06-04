@@ -10,7 +10,13 @@ type ElvantoPerson = {
   phone?: string;
   mobile?: string;
   family_relationship?: string;
-  family_id?: string;
+};
+
+type ElvantoFamilyMember = {
+  id?: string;
+  firstname?: string;
+  lastname?: string;
+  relationship?: string;
 };
 
 type HouseholdPerson = {
@@ -55,11 +61,6 @@ export async function getHousehold(email?: string): Promise<Household> {
       "search[email]": email,
     });
 
-    console.log(
-      "Elvanto primary search result:",
-      JSON.stringify(primaryResult, null, 2),
-    );
-
     const primaryPeople: ElvantoPerson[] = primaryResult?.people?.person ?? [];
 
     const primaryPerson =
@@ -74,24 +75,21 @@ export async function getHousehold(email?: string): Promise<Household> {
       primaryPerson.id,
     );
 
-    console.log(
-      "Elvanto person detail result:",
-      JSON.stringify(detailResult, null, 2),
-    );
+    const detailPerson = detailResult?.person?.[0] ?? primaryPerson;
 
-    const detailPerson = detailResult?.person ?? primaryPerson;
+    const familyMembers: ElvantoFamilyMember[] =
+      detailPerson?.family?.family_member ?? [];
 
-    const familyPeople: ElvantoPerson[] =
-      detailPerson?.family?.person ??
-      detailPerson?.family ??
-      [];
+    const family = familyMembers
+      .filter((person) => person.id !== detailPerson.id)
+      .map(mapElvantoFamilyMember);
 
     return {
       primary: {
         ...mapElvantoPerson(detailPerson),
         address: "Address not listed",
       },
-      family: familyPeople.map(mapElvantoPerson),
+      family,
     };
   } catch (error) {
     console.error("Elvanto API error:", error);
@@ -150,5 +148,15 @@ function mapElvantoPerson(person: ElvantoPerson): HouseholdPerson {
     relationship: person.family_relationship || "Family Member",
     email: person.email || "Not listed",
     phone: person.mobile || person.phone || "Not listed",
+  };
+}
+
+function mapElvantoFamilyMember(person: ElvantoFamilyMember): HouseholdPerson {
+  return {
+    firstName: person.firstname || "",
+    lastName: person.lastname || "",
+    relationship: person.relationship || "Family Member",
+    email: "Not listed",
+    phone: "Not listed",
   };
 }
