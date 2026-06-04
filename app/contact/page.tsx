@@ -30,12 +30,6 @@ export default async function ContactPage() {
         <Link href="/" className="text-sm text-lime-400 hover:text-lime-300">
           ← Back to Dashboard
         </Link>
-        <Link
-          href="/contact/request-update"
-          className="mt-4 inline-flex rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:border-lime-400/60"
-        >
-          Request Contact Update
-        </Link>
 
         <header className="mt-8 border-b border-white/10 pb-6">
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
@@ -52,12 +46,20 @@ export default async function ContactPage() {
             Signed in as {user.email}
           </p>
 
-          <a
-            href="/api/elvanto/connect"
-            className="mt-4 inline-flex rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
-          >
-            Connect Elvanto
-          </a>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/contact/request-update"
+              className="inline-flex rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
+            >
+              Request Contact Update
+            </Link>
+            <a
+              href="/api/elvanto/connect"
+              className="inline-flex rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
+            >
+              Connect Elvanto
+            </a>
+          </div>
         </header>
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
