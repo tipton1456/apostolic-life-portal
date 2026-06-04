@@ -153,10 +153,11 @@ async function getPersonInfo(accessToken: string, personId: string) {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({
-        id: personId,
-        "fields[0]": "family",
-      }),
+    body: new URLSearchParams({
+      id: personId,
+      "fields[0]": "family",
+      "fields[1]": "fields",
+    }),
       cache: "no-store",
     },
   );
