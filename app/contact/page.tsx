@@ -61,9 +61,18 @@ export default async function ContactPage() {
         </header>
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <h2 className="text-2xl font-semibold">
-            {household.primary.firstName} {household.primary.lastName}
-          </h2>
+          <div className="flex items-start gap-4">
+            {household.primary.picture ? (
+              <img
+                src={household.primary.picture}
+                alt={`${household.primary.firstName} ${household.primary.lastName}`}
+                className="h-20 w-20 shrink-0 rounded-full object-cover"
+              />
+            ) : null}
+            <h2 className="text-2xl font-semibold">
+              {household.primary.firstName} {household.primary.lastName}
+            </h2>
+          </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <Info label="Email" value={household.primary.email} />
