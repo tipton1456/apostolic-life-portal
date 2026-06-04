@@ -13,7 +13,13 @@ export default async function ContactPage() {
     redirect("/login");
   }
 
-  const household = await getHousehold("s.tipton@apostoliclifeupci.com");
+  const { data: mapping } = await supabase
+  .from("member_mappings")
+  .select("elvanto_email")
+  .eq("user_id", user.id)
+  .single();
+
+const household = await getHousehold(mapping?.elvanto_email ?? user.email ?? undefined);
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
