@@ -10,9 +10,7 @@ type ElvantoPerson = {
   phone?: string;
   mobile?: string;
   family_relationship?: string;
-
-  address?: string;
-  mailing_address?: string;
+  family_id?: string;
 };
 
 type ElvantoFamilyMember = {
@@ -64,14 +62,17 @@ export async function getHousehold(email?: string): Promise<Household> {
       "search[email]": email,
     });
 
-    const primaryPeople: ElvantoPerson[] = primaryResult?.people?.person ?? [];
+    const primaryPeople: ElvantoPerson[] =
+      primaryResult?.people?.person ?? [];
 
     const primaryPerson =
       primaryPeople.find(
         (person) => person.family_relationship === "Primary Contact",
       ) ?? primaryPeople[0];
 
-    if (!primaryPerson?.id) return sampleHousehold;
+    if (!primaryPerson?.id) {
+      return sampleHousehold;
+    }
 
     const detailResult = await getPersonInfo(
       connection.access_token,
@@ -79,10 +80,12 @@ export async function getHousehold(email?: string): Promise<Household> {
     );
 
     const detailPerson = detailResult?.person?.[0] ?? primaryPerson;
-      console.log(
-        "Elvanto detail person:",
-        JSON.stringify(detailPerson, null, 2)
-      );
+
+    console.log(
+      "Elvanto detail person:",
+      JSON.stringify(detailPerson, null, 2),
+    );
+
     const familyMembers: ElvantoFamilyMember[] =
       detailPerson?.family?.family_member ?? [];
 
@@ -96,18 +99,18 @@ export async function getHousehold(email?: string): Promise<Household> {
           );
 
           const personDetail = memberDetail?.person?.[0];
-                console.log(
-        "Family member detail:",
-        JSON.stringify(personDetail, null, 2),
-      );
 
-          return mapElvantoPerson(
-            {
-              ...personDetail,
-              family_relationship:
-                member.relationship ?? personDetail?.family_relationship,
-            },
+          console.log(
+            "Family member detail:",
+            JSON.stringify(personDetail, null, 2),
           );
+
+          return mapElvantoPerson({
+            ...personDetail,
+            family_relationship:
+              member.relationship ??
+              personDetail?.family_relationship,
+          });
         }),
     );
 
@@ -148,7 +151,10 @@ async function searchPeople(
   return response.json();
 }
 
-async function getPersonInfo(accessToken: string, personId: string) {
+async function getPersonInfo(
+  accessToken: string,
+  personId: string,
+) {
   const response = await fetch(
     "https://api.elvanto.com/v1/people/getInfo.json",
     {
@@ -157,24 +163,34 @@ async function getPersonInfo(accessToken: string, personId: string) {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-    body: new URLSearchParams({
-    id: personId,
-    "fields[0]": "family",
-    "fields[1]": "custom_fields",
-  }),
-        cache: "no-store",
+      body: new URLSearchParams({
+        id: personId,
+        "fields[0]": "family",
+        "fields[1]": "custom_fields",
+      }),
+      cache: "no-store",
     },
   );
 
   return response.json();
 }
 
-function mapElvantoPerson(person: ElvantoPerson): HouseholdPerson {
+function mapElvantoPerson(
+  person: Partial<ElvantoPerson>,
+): HouseholdPerson {
   return {
-    firstName: person.preferred_name || person.firstname || "",
+    firstName:
+      person.preferred_name ||
+      person.firstname ||
+      "",
     lastName: person.lastname || "",
-    relationship: person.family_relationship || "Family Member",
+    relationship:
+      person.family_relationship ||
+      "Family Member",
     email: person.email || "Not listed",
-    phone: person.mobile || person.phone || "Not listed",
+    phone:
+      person.mobile ||
+      person.phone ||
+      "Not listed",
   };
 }
