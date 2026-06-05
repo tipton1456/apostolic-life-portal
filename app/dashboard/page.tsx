@@ -84,36 +84,63 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
             {assignments.length > 0 ? (
-              assignments.map((assignment) => (
-                <Link
-                  key={assignment.id}
-                  href={assignment.detailHref}
-                  className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 transition hover:border-lime-400/60 hover:bg-white/[0.07]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-lime-300">
-                        {assignment.dates}
-                      </p>
-                      <h3 className="mt-2 text-xl font-semibold">
-                        {assignment.serviceTypeName}
-                      </h3>
-                    </div>
-                    <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-neutral-300">
-                      {assignment.status}
-                    </span>
-                  </div>
-                  <div className="mt-5 space-y-3 text-sm">
-                    <InfoLine label="Team" value={assignment.team} />
-                    <InfoLine label="Position" value={assignment.position} />
-                    <InfoLine label="Times" value={assignment.times} />
-                  </div>
-                </Link>
-              ))
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[680px] text-left text-sm">
+                  <thead className="border-b border-white/10 text-xs uppercase tracking-[0.18em] text-neutral-500">
+                    <tr>
+                      <th className="px-5 py-3 font-medium">Date</th>
+                      <th className="px-5 py-3 font-medium">Plan</th>
+                      <th className="px-5 py-3 font-medium">Team</th>
+                      <th className="px-5 py-3 font-medium">Position</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10">
+                    {assignments.map((assignment) => (
+                      <tr
+                        key={assignment.id}
+                        className="transition hover:bg-white/[0.06]"
+                      >
+                        <td className="px-5 py-4 font-semibold text-lime-300">
+                          <Link
+                            href={`/schedule/${assignment.serviceTypeId}/${assignment.planId}/teams`}
+                            className="block"
+                          >
+                            {assignment.dates}
+                          </Link>
+                        </td>
+                        <td className="px-5 py-4 text-neutral-100">
+                          <Link
+                            href={`/schedule/${assignment.serviceTypeId}/${assignment.planId}/teams`}
+                            className="block"
+                          >
+                            {assignment.serviceTypeName}
+                          </Link>
+                        </td>
+                        <td className="px-5 py-4 text-neutral-300">
+                          <Link
+                            href={`/schedule/${assignment.serviceTypeId}/${assignment.planId}/teams`}
+                            className="block"
+                          >
+                            {assignment.team}
+                          </Link>
+                        </td>
+                        <td className="px-5 py-4 text-neutral-300">
+                          <Link
+                            href={`/schedule/${assignment.serviceTypeId}/${assignment.planId}/teams`}
+                            className="block"
+                          >
+                            {assignment.position}
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 md:col-span-3">
+              <div className="p-6">
                 <h3 className="text-xl font-semibold">No assignments found</h3>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-400">
                   We could not find upcoming Planning Center assignments for
@@ -157,17 +184,6 @@ export default async function DashboardPage() {
         </section>
       </div>
     </main>
-  );
-}
-
-function InfoLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-        {label}
-      </p>
-      <p className="mt-1 text-neutral-200">{value}</p>
-    </div>
   );
 }
 

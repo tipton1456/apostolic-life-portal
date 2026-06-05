@@ -53,34 +53,67 @@ export default async function ScheduleOrderPage({ params }: PageProps) {
         <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
           {detail.items.length > 0 ? (
             <div className="divide-y divide-white/10">
-              {detail.items.map((item, index) => (
-                <article key={item.id} className="grid gap-4 p-5 md:grid-cols-[4rem_1fr_8rem]">
-                  <div className="text-sm font-semibold text-lime-300">
-                    {String(index + 1).padStart(2, "0")}
-                  </div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="text-xl font-semibold">{item.title}</h2>
-                      <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-neutral-300">
-                        {item.type}
-                      </span>
+              {detail.items.map((item, index) => {
+                const isHeader = item.type.toLowerCase() === "header";
+
+                return (
+                  <article
+                    key={item.id}
+                    className="grid gap-4 p-5 md:grid-cols-[4rem_1fr_8rem]"
+                  >
+                    <div
+                      className={
+                        isHeader
+                          ? "text-sm font-semibold text-lime-300"
+                          : "text-xs font-medium text-neutral-500"
+                      }
+                    >
+                      {String(index + 1).padStart(2, "0")}
                     </div>
-                    {item.description ? (
-                      <p className="mt-2 text-sm leading-6 text-neutral-400">
-                        {item.description}
-                      </p>
-                    ) : null}
-                    {item.servicePosition ? (
-                      <p className="mt-3 text-xs uppercase tracking-[0.18em] text-neutral-500">
-                        {item.servicePosition}
-                      </p>
-                    ) : null}
-                  </div>
-                  <p className="text-sm text-neutral-300 md:text-right">
-                    {item.length}
-                  </p>
-                </article>
-              ))}
+                    <div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h2
+                          className={
+                            isHeader
+                              ? "text-lg font-semibold text-lime-300"
+                              : "text-sm font-medium text-neutral-300"
+                          }
+                        >
+                          {item.title}
+                        </h2>
+                        <span
+                          className={
+                            isHeader
+                              ? "rounded-full border border-lime-400/20 px-3 py-1 text-xs text-lime-300"
+                              : "rounded-full border border-white/10 px-3 py-1 text-xs text-neutral-500"
+                          }
+                        >
+                          {item.type}
+                        </span>
+                      </div>
+                      {item.description ? (
+                        <p className="mt-2 text-sm leading-6 text-neutral-400">
+                          {item.description}
+                        </p>
+                      ) : null}
+                      {item.servicePosition ? (
+                        <p className="mt-3 text-xs uppercase tracking-[0.18em] text-neutral-500">
+                          {item.servicePosition}
+                        </p>
+                      ) : null}
+                    </div>
+                    <p
+                      className={
+                        isHeader
+                          ? "text-sm text-lime-300 md:text-right"
+                          : "text-xs text-neutral-500 md:text-right"
+                      }
+                    >
+                      {item.length}
+                    </p>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div className="p-6">
