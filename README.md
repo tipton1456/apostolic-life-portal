@@ -30,6 +30,28 @@ The contact page searches Elvanto using the member's Supabase login email. The
 portal does not use `member_mappings` for the normal trusted lookup, so the
 Supabase login email must match the member's Elvanto email.
 
+## Planning Center Schedule Lookup
+
+The dashboard shows the next three Planning Center Services assignments for the
+logged-in member. Configure these server-only environment variables in Vercel:
+
+```bash
+PLANNING_CENTER_CLIENT_ID=
+PLANNING_CENTER_CLIENT_SECRET=
+PLANNING_CENTER_USER_AGENT=Apostolic Life Portal (admin@apostoliclifeupc.com)
+```
+
+The client ID and secret should come from a Planning Center Personal Access
+Token. The lookup first matches the Supabase login email against Planning Center
+People email records, then uses that person ID to fetch Services schedules,
+team members, and plan order details. If the credentials are missing, sample
+assignments are shown in local development so the pages can still be reviewed.
+To force sample data in another environment, set:
+
+```bash
+PLANNING_CENTER_USE_SAMPLE_DATA=true
+```
+
 ## Contact Update Email Notifications
 
 Contact update requests are saved to Supabase first. To also email the church

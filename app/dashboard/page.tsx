@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getHousehold } from "@/lib/elvanto";
+import { getUpcomingAssignments } from "@/lib/planning-center";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardPage() {
@@ -15,7 +16,10 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const household = await getHousehold(user.email ?? undefined);
+  const [household, assignments] = await Promise.all([
+    getHousehold(user.email ?? undefined),
+    getUpcomingAssignments(user.email ?? undefined),
+  ]);
   const loggedInPerson = household?.primary;
   const displayName = loggedInPerson
     ? `${loggedInPerson.firstName} ${loggedInPerson.lastName}`
@@ -68,6 +72,58 @@ export default async function DashboardPage() {
           </div>
         </header>
 
+        <section className="mb-10">
+          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
+                Upcoming Schedule
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold">
+                Next 3 Assignments
+              </h2>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {assignments.length > 0 ? (
+              assignments.map((assignment) => (
+                <Link
+                  key={assignment.id}
+                  href={assignment.detailHref}
+                  className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 transition hover:border-lime-400/60 hover:bg-white/[0.07]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-lime-300">
+                        {assignment.dates}
+                      </p>
+                      <h3 className="mt-2 text-xl font-semibold">
+                        {assignment.serviceTypeName}
+                      </h3>
+                    </div>
+                    <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-neutral-300">
+                      {assignment.status}
+                    </span>
+                  </div>
+                  <div className="mt-5 space-y-3 text-sm">
+                    <InfoLine label="Team" value={assignment.team} />
+                    <InfoLine label="Position" value={assignment.position} />
+                    <InfoLine label="Times" value={assignment.times} />
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 md:col-span-3">
+                <h3 className="text-xl font-semibold">No assignments found</h3>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-400">
+                  We could not find upcoming Planning Center assignments for
+                  this login email yet.
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
         <section className="grid gap-6 md:grid-cols-3">
           <Link
             href="/contact"
@@ -101,6 +157,17 @@ export default async function DashboardPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+        {label}
+      </p>
+      <p className="mt-1 text-neutral-200">{value}</p>
+    </div>
   );
 }
 
