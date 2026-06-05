@@ -53,6 +53,10 @@ type Household = {
   family: HouseholdPerson[];
 };
 
+type ElvantoAuth = {
+  authorization: string;
+};
+
 const PERSON_DETAIL_FIELDS = [
   "family",
   "birthday",
@@ -70,7 +74,11 @@ const PERSON_DETAIL_FIELDS = [
   "home_country",
 ];
 
-export async function getHousehold(email?: string): Promise<Household> {
+export function hasSharedElvantoApiKey() {
+  return Boolean(process.env.ELVANTO_API_KEY);
+}
+
+export async function getHousehold(email?: string): Promise<Household | null> {
   if (!email) return sampleHousehold;
 
   const supabase = await createClient();
@@ -81,19 +89,17 @@ export async function getHousehold(email?: string): Promise<Household> {
 
   if (!user) return sampleHousehold;
 
-  const { data: connection, error } = await supabase
-    .from("elvanto_connections")
-    .select("access_token")
-    .eq("user_id", user.id)
-    .single();
-
-  if (error || !connection?.access_token) {
-    console.error("No Elvanto connection found", error);
-    return sampleHousehold;
+  if (!user.email || user.email.toLowerCase() !== email.toLowerCase()) {
+    console.error("Elvanto lookup blocked because login email did not match.");
+    return null;
   }
 
+  const auth = await getElvantoAuth(user.id);
+
+  if (!auth) return null;
+
   try {
-    const primaryResult = await searchPeople(connection.access_token, {
+    const primaryResult = await searchPeople(auth.authorization, {
       "search[email]": email,
     });
 
@@ -104,10 +110,10 @@ export async function getHousehold(email?: string): Promise<Household> {
         (person) => person.family_relationship === "Primary Contact",
       ) ?? primaryPeople[0];
 
-    if (!primaryPerson?.id) return sampleHousehold;
+    if (!primaryPerson?.id) return null;
 
     const detailResult = await getPersonInfoWithFamily(
-      connection.access_token,
+      auth.authorization,
       primaryPerson.id,
     );
 
@@ -121,7 +127,7 @@ export async function getHousehold(email?: string): Promise<Household> {
         .filter((member) => member.id && member.id !== detailPerson.id)
         .map(async (member) => {
           const memberDetail = await getPersonInfo(
-            connection.access_token,
+            auth.authorization,
             member.id!,
           );
 
@@ -144,12 +150,38 @@ export async function getHousehold(email?: string): Promise<Household> {
     };
   } catch (error) {
     console.error("Elvanto API error:", error);
-    return sampleHousehold;
+    return null;
   }
 }
 
+async function getElvantoAuth(userId: string): Promise<ElvantoAuth | null> {
+  const apiKey = process.env.ELVANTO_API_KEY;
+
+  if (apiKey) {
+    return {
+      authorization: `Basic ${Buffer.from(`${apiKey}:x`).toString("base64")}`,
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: connection, error } = await supabase
+    .from("elvanto_connections")
+    .select("access_token")
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !connection?.access_token) {
+    console.error("No Elvanto connection found", error);
+    return null;
+  }
+
+  return {
+    authorization: `Bearer ${connection.access_token}`,
+  };
+}
+
 async function searchPeople(
-  accessToken: string,
+  authorization: string,
   searchParams: Record<string, string>,
 ) {
   const response = await fetch(
@@ -157,7 +189,7 @@ async function searchPeople(
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: authorization,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
@@ -172,13 +204,13 @@ async function searchPeople(
   return response.json();
 }
 
-async function getPersonInfoWithFamily(accessToken: string, personId: string) {
+async function getPersonInfoWithFamily(authorization: string, personId: string) {
   const response = await fetch(
     "https://api.elvanto.com/v1/people/getInfo.json",
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: authorization,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: buildGetInfoBody(personId),
@@ -189,13 +221,13 @@ async function getPersonInfoWithFamily(accessToken: string, personId: string) {
   return response.json();
 }
 
-async function getPersonInfo(accessToken: string, personId: string) {
+async function getPersonInfo(authorization: string, personId: string) {
   const response = await fetch(
     "https://api.elvanto.com/v1/people/getInfo.json",
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: authorization,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: buildGetInfoBody(personId),

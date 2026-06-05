@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getHousehold } from "@/lib/elvanto";
+import { getHousehold, hasSharedElvantoApiKey } from "@/lib/elvanto";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ContactPage() {
@@ -14,15 +14,8 @@ export default async function ContactPage() {
     redirect("/login");
   }
 
-  const { data: mapping } = await supabase
-    .from("member_mappings")
-    .select("elvanto_email")
-    .eq("user_id", user.id)
-    .single();
-
-  const household = await getHousehold(
-    mapping?.elvanto_email ?? user.email ?? undefined,
-  );
+  const household = await getHousehold(user.email ?? undefined);
+  const usesSharedElvantoApiKey = hasSharedElvantoApiKey();
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
@@ -53,74 +46,89 @@ export default async function ContactPage() {
             >
               Request Contact Update
             </Link>
-            <a
-              href="/api/elvanto/connect"
-              className="inline-flex rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
-            >
-              Connect Elvanto
-            </a>
+            {!usesSharedElvantoApiKey ? (
+              <a
+                href="/api/elvanto/connect"
+                className="inline-flex rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
+              >
+                Connect Elvanto
+              </a>
+            ) : null}
           </div>
         </header>
 
-        <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <div className="flex items-start gap-4">
-            {household.primary.picture ? (
-              <img
-                src={household.primary.picture}
-                alt={`${household.primary.firstName} ${household.primary.lastName}`}
-                className="h-20 w-20 shrink-0 rounded-full object-cover"
-              />
-            ) : null}
-            <h2 className="text-2xl font-semibold">
-              {household.primary.firstName} {household.primary.lastName}
-            </h2>
-          </div>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <Info label="Email" value={household.primary.email} />
-            <Info label="Phone" value={household.primary.phone} />
-            <Info label="Mobile" value={household.primary.mobile} />
-            <Info label="Birthdate" value={household.primary.birthday} />
-            <Info label="Address" value={household.primary.address} />
-          </div>
-        </section>
-
-        <section className="mt-8">
-          <h2 className="text-2xl font-semibold">Family Members</h2>
-
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {household.family.map((person) => (
-              <div
-                key={`${person.firstName}-${person.lastName}`}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
-              >
-                <div className="flex items-start gap-4">
-                  {person.picture ? (
-                    <img
-                      src={person.picture}
-                      alt={`${person.firstName} ${person.lastName}`}
-                      className="h-16 w-16 shrink-0 rounded-full object-cover"
-                    />
-                  ) : null}
-                  <div>
-                    <p className="text-lg font-semibold">
-                      {person.firstName} {person.lastName}
-                    </p>
-                    <p className="mt-1 text-sm text-lime-400">
-                      {person.relationship}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 space-y-3">
-                  <Info label="Email" value={person.email} />
-                  <Info label="Phone" value={person.phone} />
-                  <Info label="Mobile" value={person.mobile} />
-                  <Info label="Birthdate" value={person.birthday} />
-                </div>
+        {household ? (
+          <>
+            <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+              <div className="flex items-start gap-4">
+                {household.primary.picture ? (
+                  <img
+                    src={household.primary.picture}
+                    alt={`${household.primary.firstName} ${household.primary.lastName}`}
+                    className="h-20 w-20 shrink-0 rounded-full object-cover"
+                  />
+                ) : null}
+                <h2 className="text-2xl font-semibold">
+                  {household.primary.firstName} {household.primary.lastName}
+                </h2>
               </div>
-            ))}
-          </div>
-        </section>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <Info label="Email" value={household.primary.email} />
+                <Info label="Phone" value={household.primary.phone} />
+                <Info label="Mobile" value={household.primary.mobile} />
+                <Info label="Birthdate" value={household.primary.birthday} />
+                <Info label="Address" value={household.primary.address} />
+              </div>
+            </section>
+
+            <section className="mt-8">
+              <h2 className="text-2xl font-semibold">Family Members</h2>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                {household.family.map((person) => (
+                  <div
+                    key={`${person.firstName}-${person.lastName}`}
+                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
+                  >
+                    <div className="flex items-start gap-4">
+                      {person.picture ? (
+                        <img
+                          src={person.picture}
+                          alt={`${person.firstName} ${person.lastName}`}
+                          className="h-16 w-16 shrink-0 rounded-full object-cover"
+                        />
+                      ) : null}
+                      <div>
+                        <p className="text-lg font-semibold">
+                          {person.firstName} {person.lastName}
+                        </p>
+                        <p className="mt-1 text-sm text-lime-400">
+                          {person.relationship}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      <Info label="Email" value={person.email} />
+                      <Info label="Phone" value={person.phone} />
+                      <Info label="Mobile" value={person.mobile} />
+                      <Info label="Birthdate" value={person.birthday} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </>
+        ) : (
+          <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <h2 className="text-2xl font-semibold">No household found</h2>
+            <p className="mt-3 max-w-2xl text-neutral-400">
+              We could not find an Elvanto contact using your portal login
+              email. Contact the church office if your portal email needs to be
+              updated.
+            </p>
+          </section>
+        )}
       </div>
     </main>
   );

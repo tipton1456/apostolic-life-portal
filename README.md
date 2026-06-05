@@ -16,6 +16,21 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Elvanto Household Lookup
+
+The portal can use a church-owned Elvanto API key to retrieve household
+information without requiring each member to connect Elvanto separately. Configure
+this server-only environment variable in Vercel:
+
+```bash
+ELVANTO_API_KEY=
+```
+
+When `ELVANTO_API_KEY` is present, the contact page searches Elvanto using the
+member's Supabase login email. The portal does not use `member_mappings` for the
+normal trusted lookup, so the Supabase login email must match the member's
+Elvanto email.
+
 ## Contact Update Email Notifications
 
 Contact update requests are saved to Supabase first. To also email the church
