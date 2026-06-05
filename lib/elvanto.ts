@@ -235,12 +235,29 @@ function formatBirthday(birthday?: string) {
 
   if (!year || !month || !day) return birthday;
 
-  return new Intl.DateTimeFormat("en-US", {
+  const birthDate = new Date(Date.UTC(year, month - 1, day));
+  const formattedBirthday = new Intl.DateTimeFormat("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
     timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, day)));
+  }).format(birthDate);
+
+  return `${formattedBirthday} (Age ${calculateAge(year, month, day)})`;
+}
+
+function calculateAge(year: number, month: number, day: number) {
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const hasBirthdayPassedThisYear =
+    today.getMonth() + 1 > month ||
+    (today.getMonth() + 1 === month && today.getDate() >= day);
+
+  if (!hasBirthdayPassedThisYear) {
+    age -= 1;
+  }
+
+  return age;
 }
 
 function formatAddress(person: Partial<ElvantoPerson>) {
