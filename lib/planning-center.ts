@@ -314,6 +314,7 @@ async function getPlanTeamMembers(serviceTypeId: string, planId: string) {
     `/services/v2/service_types/${serviceTypeId}/plans/${planId}/team_members`,
     {
       include: "team",
+      filter: "not_deleted",
       per_page: "100",
     },
   );
