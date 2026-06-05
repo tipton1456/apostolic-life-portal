@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { sendContactUpdateNotification } from "@/lib/contact-update-notifications";
 import { createClient } from "@/lib/supabase/server";
+import SubmitButton from "./submit-button";
 
 export default async function RequestUpdatePage() {
   const supabase = await createClient();
@@ -80,12 +81,7 @@ export default async function RequestUpdatePage() {
             placeholder="Example: Please update Kyla's phone number to..."
           />
 
-          <button
-            type="submit"
-            className="rounded-xl bg-lime-400 px-5 py-3 font-semibold text-neutral-950 transition hover:bg-lime-300"
-          >
-            Submit Request
-          </button>
+          <SubmitButton />
         </form>
       </div>
     </main>
