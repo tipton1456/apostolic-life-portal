@@ -99,7 +99,9 @@ export async function getHousehold(email?: string): Promise<Household | null> {
       "search[email]": email,
     });
 
-    const primaryPeople: ElvantoPerson[] = primaryResult?.people?.person ?? [];
+    const primaryPeople = normalizeArray<ElvantoPerson>(
+      primaryResult?.people?.person,
+    );
 
     const primaryPerson =
       primaryPeople.find(
@@ -113,10 +115,12 @@ export async function getHousehold(email?: string): Promise<Household | null> {
       primaryPerson.id,
     );
 
-    const detailPerson = detailResult?.person?.[0] ?? primaryPerson;
+    const detailPerson =
+      normalizeArray<ElvantoPerson>(detailResult?.person)[0] ?? primaryPerson;
 
-    const familyMembers: ElvantoFamilyMember[] =
-      detailPerson?.family?.family_member ?? [];
+    const familyMembers = normalizeArray<ElvantoFamilyMember>(
+      detailPerson?.family?.family_member,
+    );
 
     const familyDetails = await Promise.all(
       familyMembers
@@ -124,7 +128,9 @@ export async function getHousehold(email?: string): Promise<Household | null> {
         .map(async (member) => {
           const memberDetail = await getPersonInfo(authorization, member.id!);
 
-          const personDetail = memberDetail?.person?.[0];
+          const personDetail = normalizeArray<ElvantoPerson>(
+            memberDetail?.person,
+          )[0];
 
           return mapElvantoPerson({
             ...personDetail,
@@ -156,6 +162,12 @@ function getElvantoAuthorization() {
   }
 
   return `Basic ${Buffer.from(`${apiKey}:x`).toString("base64")}`;
+}
+
+function normalizeArray<T>(value: T | T[] | null | undefined): T[] {
+  if (!value) return [];
+
+  return Array.isArray(value) ? value : [value];
 }
 
 async function searchPeople(

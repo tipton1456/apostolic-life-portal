@@ -79,38 +79,47 @@ export default async function ContactPage() {
             <section className="mt-8">
               <h2 className="text-2xl font-semibold">Family Members</h2>
 
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                {household.family.map((person) => (
-                  <div
-                    key={`${person.firstName}-${person.lastName}`}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
-                  >
-                    <div className="flex items-start gap-4">
-                      {person.picture ? (
-                        <img
-                          src={person.picture}
-                          alt={`${person.firstName} ${person.lastName}`}
-                          className="h-16 w-16 shrink-0 rounded-full object-cover"
-                        />
-                      ) : null}
-                      <div>
-                        <p className="text-lg font-semibold">
-                          {person.firstName} {person.lastName}
-                        </p>
-                        <p className="mt-1 text-sm text-lime-400">
-                          {person.relationship}
-                        </p>
+              {household.family.length > 0 ? (
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  {household.family.map((person) => (
+                    <div
+                      key={`${person.firstName}-${person.lastName}-${person.relationship}`}
+                      className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
+                    >
+                      <div className="flex items-start gap-4">
+                        {person.picture ? (
+                          <img
+                            src={person.picture}
+                            alt={`${person.firstName} ${person.lastName}`}
+                            className="h-16 w-16 shrink-0 rounded-full object-cover"
+                          />
+                        ) : null}
+                        <div>
+                          <p className="text-lg font-semibold">
+                            {person.firstName} {person.lastName}
+                          </p>
+                          <p className="mt-1 text-sm text-lime-400">
+                            {person.relationship}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-4 space-y-3">
+                        <Info label="Email" value={person.email} />
+                        <Info label="Phone" value={person.phone} />
+                        <Info label="Mobile" value={person.mobile} />
+                        <Info label="Birthdate" value={person.birthday} />
                       </div>
                     </div>
-                    <div className="mt-4 space-y-3">
-                      <Info label="Email" value={person.email} />
-                      <Info label="Phone" value={person.phone} />
-                      <Info label="Mobile" value={person.mobile} />
-                      <Info label="Birthdate" value={person.birthday} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+                  <p className="text-neutral-300">
+                    No additional household members are currently connected to
+                    this Elvanto profile.
+                  </p>
+                </div>
+              )}
             </section>
           </>
         ) : (
