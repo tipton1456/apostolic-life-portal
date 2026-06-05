@@ -129,17 +129,20 @@ export type PlanOrderDetail = {
 
 export async function getUpcomingAssignments(
   email?: string,
+  limit = 3,
 ): Promise<UpcomingAssignment[]> {
   const personId = await getPlanningCenterPersonId(email);
 
-  if (!personId) return shouldUseSampleData() ? sampleAssignments : [];
+  if (!personId) {
+    return shouldUseSampleData() ? sampleAssignments.slice(0, limit) : [];
+  }
 
   const response = await pcoFetch<PcoScheduleAttributes>(
     `/services/v2/people/${personId}/schedules`,
     {
       filter: "future",
       order: "starts_at",
-      per_page: "3",
+      per_page: String(limit),
     },
   );
 

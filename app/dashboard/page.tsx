@@ -151,37 +151,6 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        <section className="grid gap-6 md:grid-cols-3">
-          <Link
-            href="/contact"
-            className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-lime-400/60 hover:bg-white/[0.06]"
-          >
-            <h2 className="text-xl font-semibold">Contact Information</h2>
-            <p className="mt-3 text-sm leading-6 text-neutral-400">
-              View your contact details and submit update requests.
-            </p>
-          </Link>
-
-          <Link
-            href="/contact"
-            className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-lime-400/60 hover:bg-white/[0.06]"
-          >
-            <h2 className="text-xl font-semibold">Family Members</h2>
-            <p className="mt-3 text-sm leading-6 text-neutral-400">
-              See household information connected through Elvanto.
-            </p>
-          </Link>
-
-          <Link
-            href="/contact/request-update"
-            className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-lime-400/60 hover:bg-white/[0.06]"
-          >
-            <h2 className="text-xl font-semibold">Request Changes</h2>
-            <p className="mt-3 text-sm leading-6 text-neutral-400">
-              Send updated phone, email, address, or family details for review.
-            </p>
-          </Link>
-        </section>
       </div>
     </main>
   );
