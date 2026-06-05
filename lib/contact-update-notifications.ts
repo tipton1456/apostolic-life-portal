@@ -52,7 +52,14 @@ export async function sendContactUpdateNotification({
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Contact update email failed:", errorText);
+    return;
   }
+
+  const result = (await response.json()) as { id?: string };
+  console.log("Contact update email sent:", {
+    id: result.id,
+    to,
+  });
 }
 
 function buildEmailHtml({
