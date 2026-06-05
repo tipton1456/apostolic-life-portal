@@ -27,6 +27,12 @@ export default function SiteNavigation() {
         >
           Planning Center Assignments
         </Link>
+        <Link
+          href="/events"
+          className="block rounded-lg px-3 py-3 text-sm font-medium text-neutral-100 transition hover:bg-white/10 hover:text-lime-300"
+        >
+          Events
+        </Link>
       </nav>
     </details>
   );

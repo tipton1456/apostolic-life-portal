@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getHousehold } from "@/lib/elvanto";
+import { getUpcomingEvents } from "@/lib/events";
 import { getUpcomingAssignments } from "@/lib/planning-center";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,9 +17,10 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const [household, assignments] = await Promise.all([
+  const [household, assignments, events] = await Promise.all([
     getHousehold(user.email ?? undefined),
     getUpcomingAssignments(user.email ?? undefined),
+    getUpcomingEvents(3),
   ]);
   const loggedInPerson = household?.primary;
   const displayName = loggedInPerson
@@ -151,6 +153,64 @@ export default async function DashboardPage() {
           </div>
         </section>
 
+        <section className="mb-10">
+          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
+                Upcoming Events
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold">Next 3 Events</h2>
+            </div>
+            <Link
+              href="/events"
+              className="text-sm font-semibold text-lime-400 hover:text-lime-300"
+            >
+              View All
+            </Link>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {events.length > 0 ? (
+              events.map((event) => (
+                <Link
+                  key={event.id}
+                  href="/events"
+                  className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition hover:border-lime-400/60 hover:bg-white/[0.06]"
+                >
+                  {event.imageUrl ? (
+                    <img
+                      src={event.imageUrl}
+                      alt={event.title}
+                      className="h-28 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-28 w-full items-center justify-center bg-white/[0.08] text-sm text-neutral-400">
+                      No image
+                    </div>
+                  )}
+                  <div className="p-4">
+                    <p className="text-sm font-semibold text-lime-300">
+                      {event.dateLabel} · {event.timeLabel}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold text-neutral-100">
+                      {event.title}
+                    </h3>
+                    <p className="mt-2 text-sm text-neutral-400">
+                      {event.location}
+                    </p>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 md:col-span-3">
+                <h3 className="text-xl font-semibold">No events found</h3>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-400">
+                  The public events calendar did not return upcoming events.
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </main>
   );
