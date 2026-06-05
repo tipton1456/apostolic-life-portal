@@ -24,10 +24,10 @@ export default function LoginPage() {
         <LoginForm />
 
         <Link
-          href="/login/magic"
-          className="mt-6 inline-flex text-sm text-lime-400 hover:text-lime-300"
+          href="/create-account"
+          className="mt-6 inline-flex w-full justify-center rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:border-lime-400/60"
         >
-          Member magic-link login
+          Create Account
         </Link>
       </div>
     </main>
