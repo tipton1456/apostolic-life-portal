@@ -252,18 +252,48 @@ function shouldUseSampleData() {
 async function getPlanningCenterPersonId(email?: string) {
   if (!email || !hasPlanningCenterCredentials()) return null;
 
-  const response = await pcoFetch(
-    "/people/v2/emails",
-    {
-      "where[address]": email,
+  for (const lookupEmail of getPlanningCenterLookupEmails(email)) {
+    const response = await pcoFetch("/people/v2/emails", {
+      "where[address]": lookupEmail,
       per_page: "1",
-    },
-  );
+    });
 
-  const emailRecord = normalizeResources(response.data)[0];
-  const person = getRelationship(emailRecord, "person");
+    const emailRecord = normalizeResources(response.data)[0];
+    const person = getRelationship(emailRecord, "person");
 
-  return person?.id ?? null;
+    if (person?.id) return person.id;
+  }
+
+  return null;
+}
+
+function getPlanningCenterLookupEmails(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const mappedEmail = getPlanningCenterEmailAliases().get(normalizedEmail);
+  const emails = mappedEmail
+    ? [normalizedEmail, mappedEmail.trim().toLowerCase()]
+    : [normalizedEmail];
+
+  return Array.from(new Set(emails));
+}
+
+function getPlanningCenterEmailAliases() {
+  const aliases = new Map<string, string>();
+  const rawAliases = process.env.PLANNING_CENTER_EMAIL_ALIASES;
+
+  if (!rawAliases) return aliases;
+
+  for (const pair of rawAliases.split(",")) {
+    const [portalEmail, planningCenterEmail] = pair
+      .split("=")
+      .map((value) => value.trim().toLowerCase());
+
+    if (portalEmail && planningCenterEmail) {
+      aliases.set(portalEmail, planningCenterEmail);
+    }
+  }
+
+  return aliases;
 }
 
 async function getPlanSummary(serviceTypeId: string, planId: string) {

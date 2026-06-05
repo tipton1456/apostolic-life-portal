@@ -117,7 +117,7 @@ export default async function DashboardPage() {
                 <h3 className="text-xl font-semibold">No assignments found</h3>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-400">
                   We could not find upcoming Planning Center assignments for
-                  this login email yet.
+                  {user.email ? ` ${user.email}` : " this login email"} yet.
                 </p>
               </div>
             )}

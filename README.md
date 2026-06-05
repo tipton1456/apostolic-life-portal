@@ -39,6 +39,7 @@ logged-in member. Configure these server-only environment variables in Vercel:
 PLANNING_CENTER_CLIENT_ID=
 PLANNING_CENTER_CLIENT_SECRET=
 PLANNING_CENTER_USER_AGENT=Apostolic Life Portal (admin@apostoliclifeupc.com)
+PLANNING_CENTER_EMAIL_ALIASES=
 ```
 
 The client ID and secret should come from a Planning Center Personal Access
@@ -46,6 +47,13 @@ Token. The lookup first matches the Supabase login email against Planning Center
 People email records, then uses that person ID to fetch Services schedules,
 team members, and plan order details. If the credentials are missing, sample
 assignments are shown in local development so the pages can still be reviewed.
+If a member logs in with a different email than their Planning Center profile,
+add comma-separated alias pairs:
+
+```bash
+PLANNING_CENTER_EMAIL_ALIASES=portal-login@example.com=planning-center@example.com
+```
+
 To force sample data in another environment, set:
 
 ```bash
