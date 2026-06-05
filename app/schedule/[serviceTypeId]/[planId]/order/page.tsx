@@ -52,52 +52,36 @@ export default async function ScheduleOrderPage({ params }: PageProps) {
 
         <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
           {detail.items.length > 0 ? (
-            <div className="divide-y divide-white/10">
-              {detail.items.map((item, index) => {
+            <div className="space-y-1 p-2">
+              {detail.items.map((item) => {
                 const isHeader = item.type.toLowerCase() === "header";
 
                 return (
                   <article
                     key={item.id}
-                    className="grid gap-4 p-5 md:grid-cols-[4rem_1fr_8rem]"
+                    className={
+                      isHeader
+                        ? "grid gap-2 px-3 py-2 md:grid-cols-[1fr_7rem]"
+                        : "grid gap-2 rounded-lg bg-white/[0.14] px-3 py-2 md:grid-cols-[1fr_7rem]"
+                    }
                   >
-                    <div
-                      className={
-                        isHeader
-                          ? "text-sm font-semibold text-lime-300"
-                          : "text-xs font-medium text-neutral-500"
-                      }
-                    >
-                      {String(index + 1).padStart(2, "0")}
-                    </div>
                     <div>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <h2
-                          className={
-                            isHeader
-                              ? "text-lg font-semibold text-lime-300"
-                              : "text-sm font-medium text-neutral-300"
-                          }
-                        >
-                          {item.title}
-                        </h2>
-                        <span
-                          className={
-                            isHeader
-                              ? "rounded-full border border-lime-400/20 px-3 py-1 text-xs text-lime-300"
-                              : "rounded-full border border-white/10 px-3 py-1 text-xs text-neutral-500"
-                          }
-                        >
-                          {item.type}
-                        </span>
-                      </div>
+                      <h2
+                        className={
+                          isHeader
+                            ? "text-base font-semibold text-lime-300"
+                            : "text-sm font-medium text-neutral-50"
+                        }
+                      >
+                        {item.title}
+                      </h2>
                       {item.description ? (
-                        <p className="mt-2 text-sm leading-6 text-neutral-400">
+                        <p className="mt-1 text-xs leading-5 text-neutral-300">
                           {item.description}
                         </p>
                       ) : null}
                       {item.servicePosition ? (
-                        <p className="mt-3 text-xs uppercase tracking-[0.18em] text-neutral-500">
+                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-neutral-400">
                           {item.servicePosition}
                         </p>
                       ) : null}
