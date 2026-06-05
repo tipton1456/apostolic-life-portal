@@ -132,15 +132,44 @@ function TeamMemberGrid({
           key={member.id}
           className="rounded-xl border border-white/10 bg-neutral-950/40 p-4"
         >
-          <p className="font-semibold text-neutral-100">{member.name}</p>
-          <p className="mt-1 text-sm text-lime-300">{member.position}</p>
-          <p className="mt-3 text-xs uppercase tracking-[0.18em] text-neutral-500">
-            {member.status}
+          <p
+            className={
+              isDeclined(member.status)
+                ? "font-semibold text-red-300 line-through decoration-red-300/70"
+                : "font-semibold text-neutral-100"
+            }
+          >
+            {member.name}
+          </p>
+          <p className="mt-1 flex items-center gap-2 text-sm text-lime-300">
+            <StatusDot status={member.status} />
+            <span>{member.position}</span>
           </p>
         </div>
       ))}
     </div>
   );
+}
+
+function StatusDot({ status }: { status: string }) {
+  return (
+    <span
+      aria-label={`${status} status`}
+      title={status}
+      className={`h-2.5 w-2.5 shrink-0 rounded-full ${getStatusColor(status)}`}
+    />
+  );
+}
+
+function getStatusColor(status: string) {
+  if (isDeclined(status)) return "bg-red-400";
+  if (status.toLowerCase() === "confirmed") return "bg-green-400";
+
+  return "bg-yellow-300";
+}
+
+function isDeclined(status: string) {
+  return status.toLowerCase() === "declined";
 }
 
 function Info({ label, value }: { label: string; value: string }) {
