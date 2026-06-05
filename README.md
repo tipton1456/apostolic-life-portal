@@ -24,12 +24,21 @@ Vercel:
 
 ```bash
 RESEND_API_KEY=
-CONTACT_UPDATE_NOTIFICATION_EMAIL=office@example.com
-CONTACT_UPDATE_FROM_EMAIL="Apostolic Life Portal <updates@example.com>"
+CONTACT_UPDATE_NOTIFICATION_EMAIL=tipton1456@gmail.com
+CONTACT_UPDATE_FROM_EMAIL=onboarding@resend.dev
 ```
 
 If any of those values are missing, the request is still saved, but no email is
 sent.
+
+The `onboarding@resend.dev` sender is only for temporary testing and can usually
+only deliver to the email address tied to the Resend account. After
+`apostoliclifeupci.com` is verified in Resend, switch production to:
+
+```bash
+CONTACT_UPDATE_NOTIFICATION_EMAIL=s.tipton@apostoliclifeupci.com
+CONTACT_UPDATE_FROM_EMAIL=Apostolic Life Portal <updates@apostoliclifeupci.com>
+```
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

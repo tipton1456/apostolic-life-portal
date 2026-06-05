@@ -12,8 +12,8 @@ export async function sendContactUpdateNotification({
   userId,
 }: ContactUpdateNotification) {
   const apiKey = process.env.RESEND_API_KEY;
-  const to = process.env.CONTACT_UPDATE_NOTIFICATION_EMAIL;
-  const from = process.env.CONTACT_UPDATE_FROM_EMAIL;
+  const to = normalizeEmailEnv(process.env.CONTACT_UPDATE_NOTIFICATION_EMAIL);
+  const from = normalizeEmailEnv(process.env.CONTACT_UPDATE_FROM_EMAIL);
 
   if (!apiKey || !to || !from) {
     console.warn(
@@ -84,4 +84,8 @@ function escapeHtml(value: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function normalizeEmailEnv(value?: string) {
+  return value?.trim().replace(/^["'“”]+|["'“”]+$/g, "");
 }
