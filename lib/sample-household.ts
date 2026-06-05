@@ -5,6 +5,7 @@ export const sampleHousehold = {
     email: "tipton1456@gmail.com",
     phone: "(662) 555-1234",
     mobile: "(662) 555-1234",
+    birthday: "Not listed",
     address: "123 Sample Street, Tupelo, MS 38801",
   },
   family: [
@@ -15,6 +16,7 @@ export const sampleHousehold = {
       email: "kyla@example.com",
       phone: "(662) 555-5678",
       mobile: "(662) 555-5678",
+      birthday: "Not listed",
     },
     {
       firstName: "Kailynn",
@@ -23,6 +25,7 @@ export const sampleHousehold = {
       email: "",
       phone: "",
       mobile: "",
+      birthday: "Not listed",
     },
     {
       firstName: "Kenna",
@@ -31,6 +34,7 @@ export const sampleHousehold = {
       email: "",
       phone: "",
       mobile: "",
+      birthday: "Not listed",
     },
   ],
 };

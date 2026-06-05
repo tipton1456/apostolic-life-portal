@@ -9,6 +9,7 @@ type ElvantoPerson = {
   email?: string;
   phone?: string;
   mobile?: string;
+  birthday?: string;
   picture?: string;
   family_relationship?: string;
   family_id?: string;
@@ -43,6 +44,7 @@ type HouseholdPerson = {
   email: string;
   phone: string;
   mobile: string;
+  birthday: string;
   picture?: string;
 };
 
@@ -53,6 +55,7 @@ type Household = {
 
 const PERSON_DETAIL_FIELDS = [
   "family",
+  "birthday",
   "mailing_address",
   "mailing_address2",
   "mailing_city",
@@ -220,8 +223,24 @@ function mapElvantoPerson(person: Partial<ElvantoPerson>): HouseholdPerson {
     email: person.email || "Not listed",
     phone: person.phone || "Not listed",
     mobile: person.mobile || "Not listed",
+    birthday: formatBirthday(person.birthday),
     picture: person.picture,
   };
+}
+
+function formatBirthday(birthday?: string) {
+  if (!birthday) return "Not listed";
+
+  const [year, month, day] = birthday.split("-").map(Number);
+
+  if (!year || !month || !day) return birthday;
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 function formatAddress(person: Partial<ElvantoPerson>) {

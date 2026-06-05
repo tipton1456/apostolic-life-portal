@@ -80,6 +80,7 @@ export default async function ContactPage() {
             <Info label="Email" value={household.primary.email} />
             <Info label="Phone" value={household.primary.phone} />
             <Info label="Mobile" value={household.primary.mobile} />
+            <Info label="Birthdate" value={household.primary.birthday} />
             <Info label="Address" value={household.primary.address} />
           </div>
         </section>
@@ -114,6 +115,7 @@ export default async function ContactPage() {
                   <Info label="Email" value={person.email} />
                   <Info label="Phone" value={person.phone} />
                   <Info label="Mobile" value={person.mobile} />
+                  <Info label="Birthdate" value={person.birthday} />
                 </div>
               </div>
             ))}
