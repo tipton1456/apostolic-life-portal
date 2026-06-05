@@ -35,7 +35,7 @@ export default function LoginForm() {
         return;
       }
 
-      window.location.href = "/contact";
+      window.location.href = "/dashboard";
     } catch (error) {
       setMessage(
         `Unexpected error: ${

@@ -19,7 +19,10 @@ export default async function ContactPage() {
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
       <div className="mx-auto max-w-5xl">
-        <Link href="/" className="text-sm text-lime-400 hover:text-lime-300">
+        <Link
+          href="/dashboard"
+          className="text-sm text-lime-400 hover:text-lime-300"
+        >
           ← Back to Dashboard
         </Link>
 
