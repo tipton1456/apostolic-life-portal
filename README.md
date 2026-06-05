@@ -30,6 +30,12 @@ The contact page searches Elvanto using the member's Supabase login email. The
 portal does not use `member_mappings` for the normal trusted lookup, so the
 Supabase login email must match the member's Elvanto email.
 
+## Elvanto Giving Lookup
+
+The giving records page uses the same `ELVANTO_API_KEY` to call Elvanto
+Financial Transactions. The Elvanto API user/key must have financial access.
+Tithe.ly Giving records need to be synced into Elvanto for them to appear here.
+
 ## Planning Center Schedule Lookup
 
 The dashboard shows the next three Planning Center Services assignments for the
