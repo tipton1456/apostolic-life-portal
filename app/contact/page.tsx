@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getHousehold, hasSharedElvantoApiKey } from "@/lib/elvanto";
+import { getHousehold } from "@/lib/elvanto";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ContactPage() {
@@ -15,7 +15,6 @@ export default async function ContactPage() {
   }
 
   const household = await getHousehold(user.email ?? undefined);
-  const usesSharedElvantoApiKey = hasSharedElvantoApiKey();
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
@@ -46,14 +45,6 @@ export default async function ContactPage() {
             >
               Request Contact Update
             </Link>
-            {!usesSharedElvantoApiKey ? (
-              <a
-                href="/api/elvanto/connect"
-                className="inline-flex rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
-              >
-                Connect Elvanto
-              </a>
-            ) : null}
           </div>
         </header>
 
@@ -124,8 +115,9 @@ export default async function ContactPage() {
             <h2 className="text-2xl font-semibold">No household found</h2>
             <p className="mt-3 max-w-2xl text-neutral-400">
               We could not find an Elvanto contact using your portal login
-              email. Contact the church office if your portal email needs to be
-              updated.
+              email, or the shared Elvanto connection is not configured yet.
+              Contact the church office if your portal email needs to be
+              updated in either system.
             </p>
           </section>
         )}

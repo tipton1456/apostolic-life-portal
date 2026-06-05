@@ -53,10 +53,6 @@ type Household = {
   family: HouseholdPerson[];
 };
 
-type ElvantoAuth = {
-  authorization: string;
-};
-
 const PERSON_DETAIL_FIELDS = [
   "family",
   "birthday",
@@ -94,12 +90,12 @@ export async function getHousehold(email?: string): Promise<Household | null> {
     return null;
   }
 
-  const auth = await getElvantoAuth(user.id);
+  const authorization = getElvantoAuthorization();
 
-  if (!auth) return null;
+  if (!authorization) return null;
 
   try {
-    const primaryResult = await searchPeople(auth.authorization, {
+    const primaryResult = await searchPeople(authorization, {
       "search[email]": email,
     });
 
@@ -113,7 +109,7 @@ export async function getHousehold(email?: string): Promise<Household | null> {
     if (!primaryPerson?.id) return null;
 
     const detailResult = await getPersonInfoWithFamily(
-      auth.authorization,
+      authorization,
       primaryPerson.id,
     );
 
@@ -126,10 +122,7 @@ export async function getHousehold(email?: string): Promise<Household | null> {
       familyMembers
         .filter((member) => member.id && member.id !== detailPerson.id)
         .map(async (member) => {
-          const memberDetail = await getPersonInfo(
-            auth.authorization,
-            member.id!,
-          );
+          const memberDetail = await getPersonInfo(authorization, member.id!);
 
           const personDetail = memberDetail?.person?.[0];
 
@@ -154,30 +147,15 @@ export async function getHousehold(email?: string): Promise<Household | null> {
   }
 }
 
-async function getElvantoAuth(userId: string): Promise<ElvantoAuth | null> {
+function getElvantoAuthorization() {
   const apiKey = process.env.ELVANTO_API_KEY;
 
-  if (apiKey) {
-    return {
-      authorization: `Basic ${Buffer.from(`${apiKey}:x`).toString("base64")}`,
-    };
-  }
-
-  const supabase = await createClient();
-  const { data: connection, error } = await supabase
-    .from("elvanto_connections")
-    .select("access_token")
-    .eq("user_id", userId)
-    .single();
-
-  if (error || !connection?.access_token) {
-    console.error("No Elvanto connection found", error);
+  if (!apiKey) {
+    console.error("ELVANTO_API_KEY is not configured.");
     return null;
   }
 
-  return {
-    authorization: `Bearer ${connection.access_token}`,
-  };
+  return `Basic ${Buffer.from(`${apiKey}:x`).toString("base64")}`;
 }
 
 async function searchPeople(
