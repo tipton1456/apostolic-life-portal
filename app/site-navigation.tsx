@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getLeaderGroupsForEmail } from "@/lib/elvanto-groups";
 import { getHousehold } from "@/lib/elvanto";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,7 +13,10 @@ export default async function SiteNavigation() {
 
   if (!user) return null;
 
-  const household = await getHousehold(user.email ?? undefined);
+  const [household, leaderGroups] = await Promise.all([
+    getHousehold(user.email ?? undefined),
+    getLeaderGroupsForEmail(user.email ?? undefined),
+  ]);
   const memberName = household?.primary
     ? `${household.primary.firstName} ${household.primary.lastName}`
     : user.email ?? "Member";
@@ -81,6 +85,14 @@ export default async function SiteNavigation() {
         >
           Prayer Board
         </Link>
+        {leaderGroups.length > 0 ? (
+          <Link
+            href="/groups"
+            className="block rounded-lg px-3 py-3 text-sm font-medium text-neutral-100 transition hover:bg-white/10 hover:text-lime-300"
+          >
+            Group Management
+          </Link>
+        ) : null}
         <form action={logout} className="border-t border-white/10 pt-2">
           <button
             type="submit"

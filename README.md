@@ -36,6 +36,14 @@ The giving records page uses the same `ELVANTO_API_KEY` to call Elvanto
 Financial Transactions. The Elvanto API user/key must have financial access.
 Tithe.ly Giving records need to be synced into Elvanto for them to appear here.
 
+## Elvanto Group Management
+
+The group management page uses `ELVANTO_API_KEY` to show groups where the logged
+in email matches a group leader. Shared-email households are supported by
+deduplicating groups across all people who match the email. Group leaders can
+view members, search people, add people, and remove people from groups through
+Elvanto.
+
 ## GroupMe Prayer Board
 
 The prayer board page reads recent messages from a GroupMe conversation. It is
