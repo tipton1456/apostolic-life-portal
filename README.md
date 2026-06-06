@@ -36,6 +36,18 @@ The giving records page uses the same `ELVANTO_API_KEY` to call Elvanto
 Financial Transactions. The Elvanto API user/key must have financial access.
 Tithe.ly Giving records need to be synced into Elvanto for them to appear here.
 
+## GroupMe Prayer Board
+
+The prayer board page reads recent messages from a GroupMe conversation. It is
+read-only inside the portal; members use the GroupMe link to join or reply.
+Configure these server-only environment variables:
+
+```bash
+GROUPME_ACCESS_TOKEN=
+GROUPME_PRAYER_GROUP_ID=
+GROUPME_PRAYER_GROUP_URL=
+```
+
 ## Planning Center Schedule Lookup
 
 The dashboard shows the next three Planning Center Services assignments for the

@@ -39,6 +39,12 @@ export default function SiteNavigation() {
         >
           Giving Records
         </Link>
+        <Link
+          href="/prayer-board"
+          className="block rounded-lg px-3 py-3 text-sm font-medium text-neutral-100 transition hover:bg-white/10 hover:text-lime-300"
+        >
+          Prayer Board
+        </Link>
       </nav>
     </details>
   );
