@@ -37,10 +37,6 @@ export default async function ContactPage() {
             Review the contact information connected to your household.
           </p>
 
-          <p className="mt-4 rounded-xl border border-lime-400/20 bg-lime-400/10 px-4 py-3 text-sm text-lime-200">
-            Signed in as {user.email}
-          </p>
-
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href="/contact/request-update"
