@@ -140,7 +140,7 @@ function AssignmentCell({
       }
     >
       <Link
-        href={`/schedule/${assignment.serviceTypeId}/${assignment.planId}/teams`}
+        href={assignment.detailHref}
         className="block"
       >
         {children}

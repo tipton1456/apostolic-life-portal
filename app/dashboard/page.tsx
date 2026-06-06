@@ -73,7 +73,7 @@ export default async function DashboardPage() {
                       >
                         <td className="px-5 py-4 font-semibold text-lime-300">
                           <Link
-                            href={`/schedule/${assignment.serviceTypeId}/${assignment.planId}/teams`}
+                            href={assignment.detailHref}
                             className="block"
                           >
                             {assignment.dates}
@@ -81,7 +81,7 @@ export default async function DashboardPage() {
                         </td>
                         <td className="px-5 py-4 text-neutral-100">
                           <Link
-                            href={`/schedule/${assignment.serviceTypeId}/${assignment.planId}/teams`}
+                            href={assignment.detailHref}
                             className="block"
                           >
                             {assignment.serviceTypeName}
