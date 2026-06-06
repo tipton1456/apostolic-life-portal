@@ -127,7 +127,9 @@ function mapMessage(message: GroupMeApiMessage): PrayerBoardMessage {
 }
 
 function formatAuthorName(name?: string) {
-  if (name === "Danny Robbins 2") return "Pastor Robbins";
+  if (name?.trim().toLowerCase() === "danny robbins 2") {
+    return "Pastor Robbins";
+  }
 
   return name ?? "GroupMe Member";
 }
