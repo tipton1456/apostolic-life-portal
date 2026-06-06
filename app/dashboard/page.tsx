@@ -1,9 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUpcomingEvents } from "@/lib/events";
 import { getUpcomingAssignments } from "@/lib/planning-center";
 import { createClient } from "@/lib/supabase/server";
+import PortalLogo from "../portal-logo";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -25,14 +25,7 @@ export default async function DashboardPage() {
     <main className="min-h-screen bg-neutral-950 text-white">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-8">
         <header className="mb-10 border-b border-white/10 pb-6">
-          <Image
-            src="/apostolic-life-white.png"
-            alt="Apostolic Life Tupelo Mississippi"
-            width={1786}
-            height={535}
-            priority
-            className="h-auto w-72 max-w-full"
-          />
+          <PortalLogo />
           <h1 className="mt-3 text-4xl font-bold tracking-tight">
             Member Portal
           </h1>

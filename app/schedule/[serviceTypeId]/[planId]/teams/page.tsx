@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getFullTeamsDetail } from "@/lib/planning-center";
 import { createClient } from "@/lib/supabase/server";
+import PortalLogo from "../../../../portal-logo";
 
 type PageProps = {
   params: Promise<{
@@ -39,6 +40,7 @@ export default async function ScheduleTeamsPage({ params }: PageProps) {
         </Link>
 
         <header className="mt-8 border-b border-white/10 pb-6">
+          <PortalLogo />
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
             All Teams
           </p>

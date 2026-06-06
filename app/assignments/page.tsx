@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUpcomingAssignments } from "@/lib/planning-center";
 import { createClient } from "@/lib/supabase/server";
+import PortalLogo from "../portal-logo";
 import AssignmentCountSelect from "./assignment-count-select";
 
 type PageProps = {
@@ -38,6 +39,7 @@ export default async function AssignmentsPage({ searchParams }: PageProps) {
         </Link>
 
         <header className="mt-8 border-b border-white/10 pb-6">
+          <PortalLogo />
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div>
               <p className="text-sm uppercase tracking-[0.3em] text-lime-400">

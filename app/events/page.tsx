@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUpcomingEvents } from "@/lib/events";
 import { createClient } from "@/lib/supabase/server";
+import PortalLogo from "../portal-logo";
 
 export default async function EventsPage() {
   const supabase = await createClient();
@@ -27,6 +28,7 @@ export default async function EventsPage() {
         </Link>
 
         <header className="mt-8 border-b border-white/10 pb-6">
+          <PortalLogo />
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
             Apostolic Life
           </p>

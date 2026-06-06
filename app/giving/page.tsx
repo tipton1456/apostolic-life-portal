@@ -5,6 +5,7 @@ import {
   type GivingRange,
 } from "@/lib/giving";
 import { createClient } from "@/lib/supabase/server";
+import PortalLogo from "../portal-logo";
 
 type PageProps = {
   searchParams: Promise<{
@@ -40,6 +41,7 @@ export default async function GivingPage({ searchParams }: PageProps) {
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
       <div className="mx-auto max-w-5xl">
         <header className="border-b border-white/10 pb-6">
+          <PortalLogo />
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
             Giving
           </p>

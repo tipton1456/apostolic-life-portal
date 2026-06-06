@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { sendContactUpdateNotification } from "@/lib/contact-update-notifications";
 import { createClient } from "@/lib/supabase/server";
+import PortalLogo from "../../portal-logo";
 import SubmitButton from "./submit-button";
 
 export default async function RequestUpdatePage() {
@@ -60,6 +61,7 @@ export default async function RequestUpdatePage() {
         </a>
 
         <header className="mt-8 border-b border-white/10 pb-6">
+          <PortalLogo />
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
             Request Update
           </p>
