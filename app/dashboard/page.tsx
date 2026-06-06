@@ -113,7 +113,7 @@ export default async function DashboardPage() {
                 Prayer Board
               </p>
               <h2 className="mt-2 text-2xl font-semibold">
-                Most Recent Prayer Board Entries
+                Last 5 Prayer Board Entries
               </h2>
             </div>
             <Link

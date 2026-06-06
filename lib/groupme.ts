@@ -58,7 +58,7 @@ export async function getPrayerBoardMessages(limit = 30): Promise<PrayerBoard> {
     const url = new URL(
       `https://api.groupme.com/v3/groups/${groupId}/messages`,
     );
-    url.searchParams.set("limit", String(Math.min(limit, 100)));
+    url.searchParams.set("limit", String(getFetchLimit(limit)));
 
     const response = await fetch(url, {
       headers: {
@@ -80,6 +80,7 @@ export async function getPrayerBoardMessages(limit = 30): Promise<PrayerBoard> {
     const messages = (result.response?.messages ?? [])
       .filter((message) => !message.system)
       .filter((message) => !messageStartsWithPraying(message.text))
+      .slice(0, limit)
       .map(mapMessage)
       .reverse();
 
@@ -97,6 +98,10 @@ export async function getPrayerBoardMessages(limit = 30): Promise<PrayerBoard> {
       messages: [],
     };
   }
+}
+
+function getFetchLimit(limit: number) {
+  return Math.min(Math.max(limit * 4, limit), 100);
 }
 
 function messageStartsWithPraying(text?: string) {
