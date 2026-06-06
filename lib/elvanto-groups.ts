@@ -125,7 +125,10 @@ export async function getLeaderGroupDetail(
   const members = await Promise.all(
     dedupePeople(normalizeArray(group.people?.person)).map(async (person) => {
       const detail = person.id
-        ? await getPersonInfo(authorization, person.id)
+        ? await getPersonInfo(authorization, person.id).catch((error) => {
+            console.error("Elvanto group member detail lookup failed:", error);
+            return null;
+          })
         : null;
 
       return mapGroupMember({
@@ -315,7 +318,6 @@ async function getPersonInfo(authorization: string, personId: string) {
   const result = await postElvanto(authorization, "people/getInfo.json", {
     id: personId,
     "fields[0]": "birthday",
-    "fields[1]": "picture",
   });
 
   return normalizeArray<ElvantoPerson>(result?.person)[0] ?? null;
