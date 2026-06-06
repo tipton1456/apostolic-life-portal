@@ -10,6 +10,7 @@ type ElvantoGroupPerson = {
   email?: string;
   mobile?: string;
   birthday?: string;
+  picture?: string;
   position?: string;
 };
 
@@ -29,6 +30,7 @@ type ElvantoPerson = {
   email?: string;
   mobile?: string;
   birthday?: string;
+  picture?: string;
 };
 
 export type LeaderGroup = {
@@ -45,6 +47,7 @@ export type GroupMember = {
   email: string;
   position: string;
   isLeader: boolean;
+  picture?: string;
 };
 
 export type GroupDetail = {
@@ -312,6 +315,7 @@ async function getPersonInfo(authorization: string, personId: string) {
   const result = await postElvanto(authorization, "people/getInfo.json", {
     id: personId,
     "fields[0]": "birthday",
+    "fields[1]": "picture",
   });
 
   return normalizeArray<ElvantoPerson>(result?.person)[0] ?? null;
@@ -364,6 +368,7 @@ function mapGroupMember(person: Partial<ElvantoGroupPerson>): GroupMember {
     email: person.email || "Not listed",
     position,
     isLeader: isLeaderPosition(position),
+    picture: person.picture,
   };
 }
 
@@ -389,12 +394,28 @@ function formatBirthday(birthday?: string) {
 
   if (!year || !month || !day) return birthday;
 
-  return new Intl.DateTimeFormat("en-US", {
+  const formattedBirthday = new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(Date.UTC(year, month - 1, day)));
+
+  return `${formattedBirthday} (Age ${calculateAge(year, month, day)})`;
+}
+
+function calculateAge(year: number, month: number, day: number) {
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const hasBirthdayPassedThisYear =
+    today.getMonth() + 1 > month ||
+    (today.getMonth() + 1 === month && today.getDate() >= day);
+
+  if (!hasBirthdayPassedThisYear) {
+    age -= 1;
+  }
+
+  return age;
 }
 
 function isLeaderPosition(position?: string) {

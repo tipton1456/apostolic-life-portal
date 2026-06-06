@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getHousehold } from "@/lib/elvanto";
 import { createClient } from "@/lib/supabase/server";
-import PortalLogo from "../portal-logo";
 
 export default async function ContactPage() {
   const supabase = await createClient();
@@ -20,15 +19,7 @@ export default async function ContactPage() {
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
       <div className="mx-auto max-w-5xl">
-        <Link
-          href="/dashboard"
-          className="text-sm text-lime-400 hover:text-lime-300"
-        >
-          ← Back to Dashboard
-        </Link>
-
-        <header className="mt-8 border-b border-white/10 pb-6">
-          <PortalLogo />
+        <header className="border-b border-white/10 pb-6">
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
             Contact Information
           </p>

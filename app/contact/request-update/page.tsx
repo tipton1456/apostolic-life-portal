@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { sendContactUpdateNotification } from "@/lib/contact-update-notifications";
 import { createClient } from "@/lib/supabase/server";
-import PortalLogo from "../../portal-logo";
 import SubmitButton from "./submit-button";
 
 export default async function RequestUpdatePage() {
@@ -56,12 +55,7 @@ export default async function RequestUpdatePage() {
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
       <div className="mx-auto max-w-3xl">
-        <a href="/contact" className="text-sm text-lime-400 hover:text-lime-300">
-          ← Back to Contact Information
-        </a>
-
-        <header className="mt-8 border-b border-white/10 pb-6">
-          <PortalLogo />
+        <header className="border-b border-white/10 pb-6">
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
             Request Update
           </p>

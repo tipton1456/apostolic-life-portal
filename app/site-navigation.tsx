@@ -4,7 +4,11 @@ import { getLeaderGroupsForEmail } from "@/lib/elvanto-groups";
 import { getHousehold } from "@/lib/elvanto";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function SiteNavigation() {
+export default async function SiteNavigation({
+  className = "",
+}: {
+  className?: string;
+}) {
   const supabase = await createClient();
 
   const {
@@ -31,8 +35,8 @@ export default async function SiteNavigation() {
   }
 
   return (
-    <details className="group relative z-50 mt-4 mr-4 self-end">
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-white/10 bg-neutral-950/95 px-4 py-3 text-sm font-semibold text-neutral-100 shadow-lg shadow-black/30 transition hover:border-lime-400/60 [&::-webkit-details-marker]:hidden">
+    <details className={`group relative z-50 ${className}`}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-white/10 bg-neutral-950/95 px-3 py-2 text-sm font-semibold text-neutral-100 shadow-lg shadow-black/30 transition hover:border-lime-400/60 sm:px-4 sm:py-3 [&::-webkit-details-marker]:hidden">
         {household?.primary.picture ? (
           <img
             src={household.primary.picture}

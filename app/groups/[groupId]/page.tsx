@@ -7,7 +7,6 @@ import {
   updateGroupMemberLeader,
 } from "@/lib/elvanto-groups";
 import { createClient } from "@/lib/supabase/server";
-import PortalLogo from "../../portal-logo";
 import GroupMemberSearch from "./group-member-search";
 import LeaderToggle from "./leader-toggle";
 
@@ -48,12 +47,7 @@ export default async function GroupDetailPage({
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
       <div className="mx-auto max-w-6xl">
-        <Link href="/groups" className="text-sm text-lime-400 hover:text-lime-300">
-          ← Back to Group Management
-        </Link>
-
-        <header className="mt-8 border-b border-white/10 pb-6">
-          <PortalLogo />
+        <header className="border-b border-white/10 pb-6">
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
             Group Management
           </p>
@@ -106,7 +100,20 @@ export default async function GroupDetailPage({
                 {group.members.map((member) => (
                   <tr key={member.id} className="transition hover:bg-white/[0.06]">
                     <td className="px-5 py-4 font-semibold text-neutral-100">
-                      {member.name}
+                      <div className="flex items-center gap-3">
+                        {member.picture ? (
+                          <img
+                            src={member.picture}
+                            alt={member.name}
+                            className="h-8 w-8 shrink-0 rounded-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-lime-400 text-xs font-bold text-neutral-950">
+                            {getInitials(member.name)}
+                          </span>
+                        )}
+                        <span>{member.name}</span>
+                      </div>
                     </td>
                     <td className="px-5 py-4">
                       {member.isLeader ? (
@@ -187,4 +194,13 @@ function TrashIcon() {
       <path d="M14 11v5" />
     </svg>
   );
+}
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
