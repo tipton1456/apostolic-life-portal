@@ -4,10 +4,12 @@ import {
   addPersonToGroup,
   getLeaderGroupDetail,
   removePersonFromGroup,
+  updateGroupMemberLeader,
 } from "@/lib/elvanto-groups";
 import { createClient } from "@/lib/supabase/server";
 import PortalLogo from "../../portal-logo";
 import GroupMemberSearch from "./group-member-search";
+import LeaderToggle from "./leader-toggle";
 
 type PageProps = {
   params: Promise<{
@@ -91,11 +93,12 @@ export default async function GroupDetailPage({
               <thead className="border-b border-white/10 text-xs uppercase tracking-[0.18em] text-neutral-500">
                 <tr>
                   <th className="px-5 py-3 font-medium">Name</th>
+                  <th className="px-5 py-3 font-medium">Leader</th>
                   <th className="px-5 py-3 font-medium">Birthdate</th>
                   <th className="px-5 py-3 font-medium">Mobile</th>
                   <th className="px-5 py-3 font-medium">Email</th>
                   {isEditing ? (
-                    <th className="px-5 py-3 text-right font-medium">Remove</th>
+                    <th className="px-5 py-3 text-right font-medium">Edit</th>
                   ) : null}
                 </tr>
               </thead>
@@ -104,6 +107,17 @@ export default async function GroupDetailPage({
                   <tr key={member.id} className="transition hover:bg-white/[0.06]">
                     <td className="px-5 py-4 font-semibold text-neutral-100">
                       {member.name}
+                    </td>
+                    <td className="px-5 py-4">
+                      {member.isLeader ? (
+                        <span
+                          aria-label="Leader"
+                          title="Leader"
+                          className="block h-2.5 w-2.5 rounded-full bg-green-400"
+                        />
+                      ) : (
+                        <span className="text-neutral-600">-</span>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-neutral-300">
                       {member.birthdate}
@@ -116,22 +130,31 @@ export default async function GroupDetailPage({
                     </td>
                     {isEditing ? (
                       <td className="px-5 py-4 text-right">
-                        <form action={removePersonFromGroup}>
-                          <input type="hidden" name="groupId" value={group.id} />
-                          <input
-                            type="hidden"
-                            name="personId"
-                            value={member.id}
+                        <div className="flex items-center justify-end gap-4">
+                          <LeaderToggle
+                            groupId={group.id}
+                            isLeader={member.isLeader}
+                            memberId={member.id}
+                            memberName={member.name}
+                            updateLeaderAction={updateGroupMemberLeader}
                           />
-                          <button
-                            type="submit"
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-red-300 transition hover:border-red-300/60 hover:bg-red-400/10"
-                            aria-label={`Remove ${member.name}`}
-                            title={`Remove ${member.name}`}
-                          >
-                            <TrashIcon />
-                          </button>
-                        </form>
+                          <form action={removePersonFromGroup}>
+                            <input type="hidden" name="groupId" value={group.id} />
+                            <input
+                              type="hidden"
+                              name="personId"
+                              value={member.id}
+                            />
+                            <button
+                              type="submit"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-red-300 transition hover:border-red-300/60 hover:bg-red-400/10"
+                              aria-label={`Remove ${member.name}`}
+                              title={`Remove ${member.name}`}
+                            >
+                              <TrashIcon />
+                            </button>
+                          </form>
+                        </div>
                       </td>
                     ) : null}
                   </tr>

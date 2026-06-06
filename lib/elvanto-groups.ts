@@ -44,6 +44,7 @@ export type GroupMember = {
   mobile: string;
   email: string;
   position: string;
+  isLeader: boolean;
 };
 
 export type GroupDetail = {
@@ -230,6 +231,43 @@ export async function removePersonFromGroup(formData: FormData) {
   revalidatePath(`/groups/${groupId}`);
 }
 
+export async function updateGroupMemberLeader(formData: FormData) {
+  "use server";
+
+  const groupId = String(formData.get("groupId") || "");
+  const personId = String(formData.get("personId") || "");
+  const makeLeader = formData.get("makeLeader") === "true";
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const leaderGroups = await getLeaderGroupsForEmail(user.email ?? undefined);
+  const canEditGroup = leaderGroups.some((group) => group.id === groupId);
+
+  if (!canEditGroup) throw new Error("You do not lead this group.");
+
+  const authorization = getElvantoAuthorization();
+
+  if (!authorization) throw new Error("Elvanto is not configured.");
+
+  const body: Record<string, string> = {
+    id: groupId,
+    person_id: personId,
+  };
+
+  if (makeLeader) {
+    body.position = "Leader";
+  }
+
+  await postElvanto(authorization, "groups/addPerson.json", body);
+
+  revalidatePath(`/groups/${groupId}`);
+}
+
 function getElvantoAuthorization() {
   const apiKey = process.env.ELVANTO_API_KEY;
 
@@ -316,13 +354,16 @@ async function postElvanto(
 }
 
 function mapGroupMember(person: Partial<ElvantoGroupPerson>): GroupMember {
+  const position = person.position || "Member";
+
   return {
     id: person.id ?? "",
     name: formatName(person),
     birthdate: formatBirthday(person.birthday),
     mobile: person.mobile || "Not listed",
     email: person.email || "Not listed",
-    position: person.position || "Member",
+    position,
+    isLeader: isLeaderPosition(position),
   };
 }
 
