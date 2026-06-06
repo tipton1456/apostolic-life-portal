@@ -87,10 +87,11 @@ export default async function GivingPage({ searchParams }: PageProps) {
 
           {summary.records.length > 0 ? (
             <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[420px] text-left text-sm">
+              <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className="border-b border-white/10 text-xs uppercase tracking-[0.18em] text-neutral-500">
                   <tr>
                     <th className="py-3 font-medium">Date</th>
+                    <th className="py-3 font-medium">Fund</th>
                     <th className="py-3 text-right font-medium">Amount</th>
                   </tr>
                 </thead>
@@ -100,6 +101,7 @@ export default async function GivingPage({ searchParams }: PageProps) {
                       <td className="py-4 text-neutral-200">
                         {record.dateLabel}
                       </td>
+                      <td className="py-4 text-neutral-300">{record.fund}</td>
                       <td className="py-4 text-right font-semibold text-neutral-100">
                         {record.amountLabel}
                       </td>

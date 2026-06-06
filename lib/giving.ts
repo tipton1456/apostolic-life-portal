@@ -12,6 +12,17 @@ type ElvantoTransaction = {
   transaction_date?: string;
   transaction_datetime?: string;
   transaction_total?: string | number;
+  amounts?: {
+    amount?: ElvantoTransactionAmount | ElvantoTransactionAmount[];
+  };
+};
+
+type ElvantoTransactionAmount = {
+  id?: string;
+  category?: {
+    name?: string;
+  };
+  total?: string | number;
 };
 
 export type GivingRange =
@@ -26,6 +37,7 @@ export type GivingRecord = {
   id: string;
   date: string;
   dateLabel: string;
+  fund: string;
   amount: number;
   amountLabel: string;
 };
@@ -86,7 +98,7 @@ export async function getGivingSummary(
   const transactions = await getTransactionsForRange(authorization, dateRange);
   const records = transactions
     .filter((transaction) => transactionBelongsToPerson(transaction, person, email))
-    .map(mapTransaction)
+    .flatMap(mapTransaction)
     .sort(
       (firstRecord, secondRecord) =>
         new Date(secondRecord.date).getTime() -
@@ -196,17 +208,39 @@ function transactionBelongsToPerson(
   );
 }
 
-function mapTransaction(transaction: ElvantoTransaction): GivingRecord {
+function mapTransaction(transaction: ElvantoTransaction): GivingRecord[] {
   const date = transaction.transaction_datetime ?? transaction.transaction_date ?? "";
-  const amount = Number(transaction.transaction_total ?? 0);
+  const amounts = normalizeArray<ElvantoTransactionAmount>(
+    transaction.amounts?.amount,
+  );
 
-  return {
-    id: transaction.id ?? `${date}-${amount}`,
-    date,
-    dateLabel: formatDate(date),
-    amount,
-    amountLabel: formatCurrency(amount),
-  };
+  if (amounts.length === 0) {
+    const amount = Number(transaction.transaction_total ?? 0);
+
+    return [
+      {
+        id: transaction.id ?? `${date}-${amount}`,
+        date,
+        dateLabel: formatDate(date),
+        fund: "Not listed",
+        amount,
+        amountLabel: formatCurrency(amount),
+      },
+    ];
+  }
+
+  return amounts.map((transactionAmount, index) => {
+    const amount = Number(transactionAmount.total ?? 0);
+
+    return {
+      id: transactionAmount.id ?? `${transaction.id}-${index}`,
+      date,
+      dateLabel: formatDate(date),
+      fund: transactionAmount.category?.name?.trim() || "Not listed",
+      amount,
+      amountLabel: formatCurrency(amount),
+    };
+  });
 }
 
 function buildSummary(
