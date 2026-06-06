@@ -4,10 +4,10 @@ import {
   addPersonToGroup,
   getLeaderGroupDetail,
   removePersonFromGroup,
-  searchPeopleForGroup,
 } from "@/lib/elvanto-groups";
 import { createClient } from "@/lib/supabase/server";
 import PortalLogo from "../../portal-logo";
+import GroupMemberSearch from "./group-member-search";
 
 type PageProps = {
   params: Promise<{
@@ -15,7 +15,6 @@ type PageProps = {
   }>;
   searchParams: Promise<{
     edit?: string;
-    q?: string;
   }>;
 };
 
@@ -24,9 +23,8 @@ export default async function GroupDetailPage({
   searchParams,
 }: PageProps) {
   const { groupId } = await params;
-  const { edit, q } = await searchParams;
+  const { edit } = await searchParams;
   const isEditing = edit === "true";
-  const query = q?.trim() ?? "";
   const supabase = await createClient();
 
   const {
@@ -37,18 +35,13 @@ export default async function GroupDetailPage({
     redirect("/login");
   }
 
-  const [group, searchResults] = await Promise.all([
-    getLeaderGroupDetail(groupId, user.email ?? undefined),
-    isEditing
-      ? searchPeopleForGroup(query, user.email ?? undefined)
-      : Promise.resolve([]),
-  ]);
+  const group = await getLeaderGroupDetail(groupId, user.email ?? undefined);
 
   if (!group) {
     notFound();
   }
 
-  const existingMemberIds = new Set(group.members.map((member) => member.id));
+  const existingMemberIds = group.members.map((member) => member.id);
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
@@ -85,69 +78,11 @@ export default async function GroupDetailPage({
         </header>
 
         {isEditing ? (
-          <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="text-2xl font-semibold">Add Person To Group</h2>
-            <form
-              action={`/groups/${group.id}`}
-              className="mt-4 flex flex-col gap-3 md:flex-row"
-            >
-              <input type="hidden" name="edit" value="true" />
-              <input
-                name="q"
-                defaultValue={query}
-                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
-                placeholder="Search by name, email, or mobile"
-              />
-              <button
-                type="submit"
-                className="rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
-              >
-                Search
-              </button>
-            </form>
-
-            {query ? (
-              <div className="mt-5 divide-y divide-white/10 overflow-hidden rounded-xl border border-white/10">
-                {searchResults.length > 0 ? (
-                  searchResults.map((person) => (
-                    <div
-                      key={person.id}
-                      className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between"
-                    >
-                      <div>
-                        <p className="font-semibold text-neutral-100">
-                          {person.name}
-                        </p>
-                        <p className="mt-1 text-sm text-neutral-400">
-                          {person.email} · {person.mobile}
-                        </p>
-                      </div>
-                      {existingMemberIds.has(person.id) ? (
-                        <span className="text-sm text-neutral-500">
-                          Already in group
-                        </span>
-                      ) : (
-                        <form action={addPersonToGroup}>
-                          <input type="hidden" name="groupId" value={group.id} />
-                          <input type="hidden" name="personId" value={person.id} />
-                          <button
-                            type="submit"
-                            className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:border-lime-400/60 hover:text-lime-300"
-                          >
-                            Add Person
-                          </button>
-                        </form>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <p className="px-4 py-3 text-sm text-neutral-400">
-                    No matching people found.
-                  </p>
-                )}
-              </div>
-            ) : null}
-          </section>
+          <GroupMemberSearch
+            addPersonAction={addPersonToGroup}
+            existingMemberIds={existingMemberIds}
+            groupId={group.id}
+          />
         ) : null}
 
         <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
