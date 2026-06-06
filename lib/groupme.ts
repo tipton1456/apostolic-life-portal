@@ -79,6 +79,7 @@ export async function getPrayerBoardMessages(limit = 30): Promise<PrayerBoard> {
     const result = (await response.json()) as GroupMeMessageResponse;
     const messages = (result.response?.messages ?? [])
       .filter((message) => !message.system)
+      .filter((message) => !messageStartsWithPraying(message.text))
       .map(mapMessage)
       .reverse();
 
@@ -96,6 +97,10 @@ export async function getPrayerBoardMessages(limit = 30): Promise<PrayerBoard> {
       messages: [],
     };
   }
+}
+
+function messageStartsWithPraying(text?: string) {
+  return text?.trimStart().toLowerCase().startsWith("praying") ?? false;
 }
 
 function mapMessage(message: GroupMeApiMessage): PrayerBoardMessage {
