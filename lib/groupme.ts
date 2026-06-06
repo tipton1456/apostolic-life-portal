@@ -127,11 +127,13 @@ function mapMessage(message: GroupMeApiMessage): PrayerBoardMessage {
 }
 
 function formatAuthorName(name?: string) {
-  if (name?.trim().toLowerCase() === "danny robbins 2") {
+  const trimmedName = name?.trim();
+
+  if (trimmedName?.toLowerCase() === "danny robbins 2") {
     return "Pastor Robbins";
   }
 
-  return name ?? "GroupMe Member";
+  return trimmedName?.replace(/\s+\d+$/, "") || "GroupMe Member";
 }
 
 function formatMessageTime(date: Date) {
