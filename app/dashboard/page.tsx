@@ -47,6 +47,12 @@ export default async function DashboardPage() {
                 Next 3 Assignments
               </h2>
             </div>
+            <Link
+              href="/assignments"
+              className="text-sm font-semibold text-lime-400 hover:text-lime-300"
+            >
+              View All
+            </Link>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">

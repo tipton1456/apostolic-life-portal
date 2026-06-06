@@ -115,7 +115,7 @@ function mapMessage(message: GroupMeApiMessage): PrayerBoardMessage {
 
   return {
     id: message.id ?? `${message.created_at}-${message.name}`,
-    author: message.name ?? "GroupMe Member",
+    author: formatAuthorName(message.name),
     avatarUrl: message.avatar_url,
     text: message.text?.trim() ?? "",
     createdAt: createdAt.toISOString(),
@@ -124,6 +124,12 @@ function mapMessage(message: GroupMeApiMessage): PrayerBoardMessage {
       .filter((attachment) => attachment.type === "image" && attachment.url)
       .map((attachment) => attachment.url!),
   };
+}
+
+function formatAuthorName(name?: string) {
+  if (name === "Danny Robbins 2") return "Pastor Robbins";
+
+  return name ?? "GroupMe Member";
 }
 
 function formatMessageTime(date: Date) {
