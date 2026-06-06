@@ -81,8 +81,7 @@ export async function getPrayerBoardMessages(limit = 30): Promise<PrayerBoard> {
       .filter((message) => !message.system)
       .filter((message) => !messageStartsWithPraying(message.text))
       .slice(0, limit)
-      .map(mapMessage)
-      .reverse();
+      .map(mapMessage);
 
     return {
       conversationUrl,
