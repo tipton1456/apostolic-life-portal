@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getLeaderGroupsForEmail } from "@/lib/elvanto-groups";
 import { getHousehold } from "@/lib/elvanto";
+import { getPlanningCenterProfilePicture } from "@/lib/planning-center";
 import { createClient } from "@/lib/supabase/server";
 import SiteNavigationMenu from "./site-navigation-menu";
 
@@ -17,9 +18,10 @@ export default async function SiteNavigation({
 
   if (!user) return null;
 
-  const [household, leaderGroups] = await Promise.all([
+  const [household, leaderGroups, planningCenterProfilePicture] = await Promise.all([
     getHousehold(user.email ?? undefined),
     getLeaderGroupsForEmail(user.email ?? undefined),
+    getPlanningCenterProfilePicture(user.email ?? undefined),
   ]);
   const memberName = household?.primary
     ? `${household.primary.firstName} ${household.primary.lastName}`
@@ -51,7 +53,7 @@ export default async function SiteNavigation({
       logoutAction={logout}
       memberName={memberName}
       navigationItems={navigationItems}
-      picture={household?.primary.picture}
+      picture={planningCenterProfilePicture ?? household?.primary.picture}
     />
   );
 }
