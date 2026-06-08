@@ -73,8 +73,14 @@ export default async function ContactPage({ searchParams }: PageProps) {
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <Info label="Email" value={household.primary.email} />
-                <Info label="Phone" value={household.primary.phone} />
-                <Info label="Mobile" value={household.primary.mobile} />
+                <Info
+                  label="Phone"
+                  value={formatUsPhone(household.primary.phone)}
+                />
+                <Info
+                  label="Mobile"
+                  value={formatUsPhone(household.primary.mobile)}
+                />
                 <Info label="Birthdate" value={household.primary.birthday} />
                 <Info label="Address" value={household.primary.address} />
               </div>
@@ -179,8 +185,11 @@ export default async function ContactPage({ searchParams }: PageProps) {
                       </div>
                       <div className="mt-4 space-y-3">
                         <Info label="Email" value={person.email} />
-                        <Info label="Phone" value={person.phone} />
-                        <Info label="Mobile" value={person.mobile} />
+                        <Info label="Phone" value={formatUsPhone(person.phone)} />
+                        <Info
+                          label="Mobile"
+                          value={formatUsPhone(person.mobile)}
+                        />
                         <Info label="Birthdate" value={person.birthday} />
                       </div>
 
@@ -357,6 +366,19 @@ function FileInput({ label, name }: { label: string; name: string }) {
 
 function editableValue(value: string) {
   return value === "Not listed" ? "" : value;
+}
+
+function formatUsPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  const normalizedDigits =
+    digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+
+  if (normalizedDigits.length !== 10) return value;
+
+  return `(${normalizedDigits.slice(0, 3)}) ${normalizedDigits.slice(
+    3,
+    6,
+  )}-${normalizedDigits.slice(6)}`;
 }
 
 function getPrimaryPicture(
