@@ -60,6 +60,48 @@ type PcoItemAttributes = {
   title?: string;
 };
 
+type PcoEmailAttributes = {
+  address?: string;
+  location?: string;
+  primary?: boolean;
+};
+
+type PcoPhoneNumberAttributes = {
+  location?: string;
+  number?: string;
+  primary?: boolean;
+};
+
+type PcoAddressAttributes = {
+  city?: string;
+  country_code?: string;
+  location?: string;
+  primary?: boolean;
+  state?: string;
+  street_line_1?: string;
+  street_line_2?: string;
+  zip?: string;
+};
+
+export type PlanningCenterContactUpdate = {
+  address?: {
+    city: string;
+    countryCode: string;
+    state: string;
+    streetLine1: string;
+    streetLine2: string;
+    zip: string;
+  };
+  birthdate?: string;
+  email?: string;
+  firstName: string;
+  lastName: string;
+  mobile?: string;
+  phone?: string;
+  pictureUrl?: string;
+  previousEmail?: string;
+};
+
 export type UpcomingAssignment = {
   id: string;
   dates: string;
@@ -241,6 +283,47 @@ export async function getPlanOrderDetail(
   };
 }
 
+export async function syncPlanningCenterContactUpdate(
+  update: PlanningCenterContactUpdate,
+) {
+  const personId = await findPlanningCenterPersonForContact(update);
+
+  if (!personId) {
+    return { matched: false };
+  }
+
+  const personAttributes: Record<string, string> = {};
+
+  if (update.birthdate) personAttributes.birthdate = update.birthdate;
+  if (update.pictureUrl) personAttributes.avatar = update.pictureUrl;
+
+  if (Object.keys(personAttributes).length > 0) {
+    await pcoJsonApiFetch(`/people/v2/people/${personId}`, "PATCH", {
+      type: "Person",
+      id: personId,
+      attributes: personAttributes,
+    });
+  }
+
+  if (update.email) {
+    await upsertPlanningCenterEmail(personId, update.email);
+  }
+
+  if (update.phone) {
+    await upsertPlanningCenterPhoneNumber(personId, update.phone, "Home");
+  }
+
+  if (update.mobile) {
+    await upsertPlanningCenterPhoneNumber(personId, update.mobile, "Mobile");
+  }
+
+  if (update.address) {
+    await upsertPlanningCenterAddress(personId, update.address);
+  }
+
+  return { matched: true };
+}
+
 function hasPlanningCenterCredentials() {
   return Boolean(getPlanningCenterClientId() && getPlanningCenterClientSecret());
 }
@@ -268,6 +351,159 @@ async function getPlanningCenterPersonId(email?: string) {
   }
 
   return null;
+}
+
+async function findPlanningCenterPersonForContact(
+  update: PlanningCenterContactUpdate,
+) {
+  const lookupEmails = [update.previousEmail, update.email].filter(
+    (email): email is string => Boolean(email?.trim()),
+  );
+
+  for (const email of lookupEmails) {
+    const personId = await getPlanningCenterPersonId(email);
+
+    if (personId) return personId;
+  }
+
+  if (!hasPlanningCenterCredentials()) return null;
+
+  const searchName = [update.firstName, update.lastName].filter(Boolean).join(" ");
+
+  if (!searchName) return null;
+
+  const response = await pcoFetch("/people/v2/people", {
+    "where[search_name]": searchName,
+    per_page: "2",
+  });
+  const people = normalizeResources(response.data);
+
+  return people.length === 1 ? people[0].id : null;
+}
+
+async function upsertPlanningCenterEmail(personId: string, email: string) {
+  const existingEmail = await getPrimaryPlanningCenterResource<PcoEmailAttributes>(
+    `/people/v2/people/${personId}/emails`,
+  );
+  const attributes = {
+    address: email,
+    location: "Home",
+    primary: true,
+  };
+
+  if (existingEmail) {
+    await pcoJsonApiFetch(`/people/v2/emails/${existingEmail.id}`, "PATCH", {
+      type: "Email",
+      id: existingEmail.id,
+      attributes,
+    });
+    return;
+  }
+
+  await pcoJsonApiFetch(`/people/v2/people/${personId}/emails`, "POST", {
+    type: "Email",
+    attributes,
+  });
+}
+
+async function upsertPlanningCenterPhoneNumber(
+  personId: string,
+  number: string,
+  location: "Home" | "Mobile",
+) {
+  const phoneNumbers = await getPlanningCenterResources<PcoPhoneNumberAttributes>(
+    `/people/v2/people/${personId}/phone_numbers`,
+  );
+  const existingPhone =
+    phoneNumbers.find(
+      (phoneNumber) =>
+        phoneNumber.attributes?.location?.toLowerCase() === location.toLowerCase(),
+    ) ?? (location === "Home" ? findPrimaryResource(phoneNumbers) : undefined);
+  const attributes = {
+    number,
+    location,
+    primary: location === "Home",
+  };
+
+  if (existingPhone) {
+    await pcoJsonApiFetch(
+      `/people/v2/phone_numbers/${existingPhone.id}`,
+      "PATCH",
+      {
+        type: "PhoneNumber",
+        id: existingPhone.id,
+        attributes,
+      },
+    );
+    return;
+  }
+
+  await pcoJsonApiFetch(`/people/v2/people/${personId}/phone_numbers`, "POST", {
+    type: "PhoneNumber",
+    attributes,
+  });
+}
+
+async function upsertPlanningCenterAddress(
+  personId: string,
+  address: NonNullable<PlanningCenterContactUpdate["address"]>,
+) {
+  const existingAddress =
+    await getPrimaryPlanningCenterResource<PcoAddressAttributes>(
+      `/people/v2/people/${personId}/addresses`,
+    );
+  const attributes = {
+    city: address.city,
+    state: address.state,
+    zip: address.zip,
+    country_code: address.countryCode || "US",
+    location: "Home",
+    primary: true,
+    street_line_1: address.streetLine1,
+    street_line_2: address.streetLine2,
+  };
+
+  if (existingAddress) {
+    await pcoJsonApiFetch(`/people/v2/addresses/${existingAddress.id}`, "PATCH", {
+      type: "Address",
+      id: existingAddress.id,
+      attributes,
+    });
+    return;
+  }
+
+  await pcoJsonApiFetch(`/people/v2/people/${personId}/addresses`, "POST", {
+    type: "Address",
+    attributes,
+  });
+}
+
+async function getPrimaryPlanningCenterResource<
+  TAttributes extends { primary?: boolean },
+>(path: string) {
+  const resources = await getPlanningCenterResources<TAttributes>(path);
+
+  return findPrimaryResource(resources);
+}
+
+async function getPlanningCenterResources<TAttributes = Record<string, unknown>>(
+  path: string,
+) {
+  const response = await pcoFetch<TAttributes>(path, {
+    per_page: "100",
+  });
+
+  return normalizeResources<TAttributes>(response.data);
+}
+
+function findPrimaryResource<TAttributes extends { primary?: boolean }>(
+  resources: Array<JsonApiResource<TAttributes>>,
+) {
+  return (
+    resources.find((resource) => resource.attributes?.primary) ??
+    resources[0] ??
+    null
+  );
 }
 
 function getPlanningCenterLookupEmails(email: string) {
@@ -371,6 +607,47 @@ async function pcoFetch<TAttributes = Record<string, unknown>>(
   }
 
   return (await response.json()) as JsonApiResponse<TAttributes>;
+}
+
+async function pcoJsonApiFetch(
+  path: string,
+  method: "PATCH" | "POST",
+  data: {
+    attributes: Record<string, unknown>;
+    id?: string;
+    type: string;
+  },
+) {
+  const clientId = getPlanningCenterClientId();
+  const clientSecret = getPlanningCenterClientSecret();
+
+  if (!clientId || !clientSecret) {
+    throw new Error("Planning Center credentials are not configured.");
+  }
+
+  const response = await fetch(`https://api.planningcenteronline.com${path}`, {
+    method,
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString(
+        "base64",
+      )}`,
+      "Content-Type": "application/vnd.api+json",
+      "User-Agent":
+        process.env.PLANNING_CENTER_USER_AGENT ??
+        "Apostolic Life Portal (admin@apostoliclifeupc.com)",
+    },
+    body: JSON.stringify({ data }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    console.error(
+      `Planning Center API write error ${response.status}: ${await response.text()}`,
+    );
+    throw new Error("Planning Center contact update failed.");
+  }
+
+  return response;
 }
 
 function getPlanningCenterClientId() {

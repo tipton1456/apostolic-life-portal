@@ -1,15 +1,26 @@
 export const sampleHousehold = {
   primary: {
+    id: "sample-primary",
     firstName: "Steve",
     lastName: "Tipton",
     email: "tipton1456@gmail.com",
     phone: "(662) 555-1234",
     mobile: "(662) 555-1234",
     birthday: "Not listed",
+    birthdayValue: "",
     address: "123 Sample Street, Tupelo, MS 38801",
+    addressFields: {
+      line1: "123 Sample Street",
+      line2: "",
+      city: "Tupelo",
+      state: "MS",
+      postcode: "38801",
+      country: "United States",
+    },
   },
   family: [
     {
+      id: "sample-kyla",
       firstName: "Kyla",
       lastName: "Tipton",
       relationship: "Spouse",
@@ -17,8 +28,10 @@ export const sampleHousehold = {
       phone: "(662) 555-5678",
       mobile: "(662) 555-5678",
       birthday: "Not listed",
+      birthdayValue: "",
     },
     {
+      id: "sample-kailynn",
       firstName: "Kailynn",
       lastName: "Tipton",
       relationship: "Child",
@@ -26,8 +39,10 @@ export const sampleHousehold = {
       phone: "",
       mobile: "",
       birthday: "Not listed",
+      birthdayValue: "",
     },
     {
+      id: "sample-kenna",
       firstName: "Kenna",
       lastName: "Tipton",
       relationship: "Child",
@@ -35,6 +50,7 @@ export const sampleHousehold = {
       phone: "",
       mobile: "",
       birthday: "Not listed",
+      birthdayValue: "",
     },
   ],
 };

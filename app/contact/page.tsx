@@ -1,9 +1,15 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { getHousehold } from "@/lib/elvanto";
+import { getHousehold, updateContactFromForm } from "@/lib/elvanto";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function ContactPage() {
+type PageProps = {
+  searchParams: Promise<{
+    updated?: string;
+  }>;
+};
+
+export default async function ContactPage({ searchParams }: PageProps) {
+  const { updated } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -27,22 +33,24 @@ export default async function ContactPage() {
             My Household
           </h1>
           <p className="mt-3 max-w-2xl text-neutral-400">
-            Review the contact information connected to your household.
+            Update contact details connected to your household.
           </p>
 
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link
-              href="/contact/request-update"
-              className="inline-flex rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
-            >
-              Request Contact Update
-            </Link>
-          </div>
+          {updated ? (
+            <p className="mt-4 rounded-xl border border-lime-400/30 bg-lime-400/10 px-4 py-3 text-sm font-semibold text-lime-300">
+              {getUpdateMessage(updated)}
+            </p>
+          ) : null}
         </header>
 
         {household ? (
           <>
-            <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <form
+              action={updateContactFromForm}
+              className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6"
+            >
+              <input type="hidden" name="personId" value={household.primary.id} />
+              <input type="hidden" name="personType" value="primary" />
               <div className="flex items-start gap-4">
                 {household.primary.picture ? (
                   <img
@@ -58,12 +66,68 @@ export default async function ContactPage() {
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <Info label="Email" value={household.primary.email} />
-                <Info label="Phone" value={household.primary.phone} />
-                <Info label="Mobile" value={household.primary.mobile} />
-                <Info label="Birthdate" value={household.primary.birthday} />
-                <Info label="Address" value={household.primary.address} />
+                <TextInput
+                  label="Phone"
+                  name="phone"
+                  defaultValue={editableValue(household.primary.phone)}
+                />
+                <TextInput
+                  label="Mobile"
+                  name="mobile"
+                  defaultValue={editableValue(household.primary.mobile)}
+                />
+                <DateInput
+                  label="Birthdate"
+                  name="birthday"
+                  defaultValue={household.primary.birthdayValue}
+                />
+                <TextInput
+                  label="Profile Picture URL"
+                  name="pictureUrl"
+                  defaultValue={household.primary.picture ?? ""}
+                />
               </div>
-            </section>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <TextInput
+                  label="Address"
+                  name="addressLine1"
+                  defaultValue={household.primary.addressFields.line1}
+                />
+                <TextInput
+                  label="Address 2"
+                  name="addressLine2"
+                  defaultValue={household.primary.addressFields.line2}
+                />
+                <TextInput
+                  label="City"
+                  name="city"
+                  defaultValue={household.primary.addressFields.city}
+                />
+                <TextInput
+                  label="State"
+                  name="state"
+                  defaultValue={household.primary.addressFields.state}
+                />
+                <TextInput
+                  label="Zip"
+                  name="postcode"
+                  defaultValue={household.primary.addressFields.postcode}
+                />
+                <TextInput
+                  label="Country"
+                  name="country"
+                  defaultValue={household.primary.addressFields.country}
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="mt-6 rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
+              >
+                Save My Contact Information
+              </button>
+            </form>
 
             <section className="mt-8">
               <h2 className="text-2xl font-semibold">Family Members</h2>
@@ -71,10 +135,13 @@ export default async function ContactPage() {
               {household.family.length > 0 ? (
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   {household.family.map((person) => (
-                    <div
+                    <form
                       key={`${person.firstName}-${person.lastName}-${person.relationship}`}
+                      action={updateContactFromForm}
                       className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
                     >
+                      <input type="hidden" name="personId" value={person.id} />
+                      <input type="hidden" name="personType" value="family" />
                       <div className="flex items-start gap-4">
                         {person.picture ? (
                           <img
@@ -93,12 +160,35 @@ export default async function ContactPage() {
                         </div>
                       </div>
                       <div className="mt-4 space-y-3">
-                        <Info label="Email" value={person.email} />
-                        <Info label="Phone" value={person.phone} />
-                        <Info label="Mobile" value={person.mobile} />
-                        <Info label="Birthdate" value={person.birthday} />
+                        <TextInput
+                          label="Email"
+                          name="email"
+                          type="email"
+                          defaultValue={editableValue(person.email)}
+                        />
+                        <TextInput
+                          label="Phone"
+                          name="phone"
+                          defaultValue={editableValue(person.phone)}
+                        />
+                        <TextInput
+                          label="Mobile"
+                          name="mobile"
+                          defaultValue={editableValue(person.mobile)}
+                        />
+                        <DateInput
+                          label="Birthdate"
+                          name="birthday"
+                          defaultValue={person.birthdayValue}
+                        />
                       </div>
-                    </div>
+                      <button
+                        type="submit"
+                        className="mt-5 rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
+                      >
+                        Save {person.firstName}
+                      </button>
+                    </form>
                   ))}
                 </div>
               ) : (
@@ -136,4 +226,65 @@ function Info({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-neutral-200">{value}</p>
     </div>
   );
+}
+
+function TextInput({
+  defaultValue,
+  label,
+  name,
+  type = "text",
+}: {
+  defaultValue: string;
+  label: string;
+  name: string;
+  type?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs uppercase tracking-[0.2em] text-neutral-500">
+        {label}
+      </span>
+      <input
+        type={type}
+        name={name}
+        defaultValue={defaultValue}
+        className="mt-1 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-neutral-100 outline-none ring-lime-400 transition focus:ring-2"
+      />
+    </label>
+  );
+}
+
+function DateInput({
+  defaultValue,
+  label,
+  name,
+}: {
+  defaultValue: string;
+  label: string;
+  name: string;
+}) {
+  return (
+    <TextInput
+      defaultValue={defaultValue}
+      label={label}
+      name={name}
+      type="date"
+    />
+  );
+}
+
+function editableValue(value: string) {
+  return value === "Not listed" ? "" : value;
+}
+
+function getUpdateMessage(updated: string) {
+  if (updated === "synced") {
+    return "Contact information saved in Elvanto and Planning Center.";
+  }
+
+  if (updated === "partial") {
+    return "Contact information saved in Elvanto. Planning Center did not complete the update.";
+  }
+
+  return "Contact information saved in Elvanto.";
 }
