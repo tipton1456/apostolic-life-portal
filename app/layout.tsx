@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Apostolic Life Portal",
+  title: "Apostolic Life Member Portal",
   description: "Member portal for Apostolic Life",
 };
 
