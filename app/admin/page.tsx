@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import {
-  createPortalUser,
   deletePortalUser,
   getCurrentPortalUser,
   listPortalUserAuditLogs,
@@ -8,6 +7,8 @@ import {
   updatePortalUser,
 } from "@/lib/portal-users";
 import { hasAdminClientConfig } from "@/lib/supabase/admin";
+import AdminFormButton from "./admin-form-button";
+import CreateUserForm from "./create-user-form";
 
 export default async function AdminPage() {
   if (!hasAdminClientConfig()) {
@@ -76,42 +77,7 @@ export default async function AdminPage() {
               Add User
             </span>
           </summary>
-          <form
-            action={createPortalUser}
-            className="mt-6 grid gap-4 border-t border-white/10 pt-5 lg:grid-cols-[1fr_1fr_1.3fr_1fr_auto]"
-          >
-            <Field label="First name" name="firstName" autoComplete="given-name" />
-            <Field label="Last name" name="lastName" autoComplete="family-name" />
-            <Field
-              label="Email"
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-            />
-            <Field
-              label="Temporary password"
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-            />
-            <label className="flex items-end gap-2 pb-3 text-sm text-neutral-300">
-              <input
-                type="checkbox"
-                name="isAdmin"
-                className="h-4 w-4 rounded border-white/20 bg-neutral-900 text-lime-400 accent-lime-400"
-              />
-              Admin
-            </label>
-            <button
-              type="submit"
-              className="rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300 lg:col-start-5"
-            >
-              Create User
-            </button>
-          </form>
+          <CreateUserForm />
         </details>
 
         <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
@@ -314,6 +280,9 @@ function UserRow({
             time they log in.
           </p>
           <label className="flex items-end gap-2 pb-3 text-sm text-neutral-300">
+            {user.id === currentUserId && user.isAdmin ? (
+              <input type="hidden" name="isAdmin" value="on" />
+            ) : null}
             <input
               type="checkbox"
               name="isAdmin"
@@ -328,19 +297,17 @@ function UserRow({
               Your admin access is locked here.
             </p>
           ) : null}
-          <button
-            type="submit"
-            className="rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300 md:w-fit"
-          >
+          <AdminFormButton pendingLabel="Saving..." className="md:w-fit">
             Save User
-          </button>
+          </AdminFormButton>
         </form>
         <form action={deletePortalUser} className="mt-3 flex justify-end">
           <input type="hidden" name="id" value={user.id} />
-          <button
-            type="submit"
+          <AdminFormButton
+            pendingLabel="Deleting..."
+            variant="danger"
             disabled={user.id === currentUserId}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-red-300 transition hover:border-red-300/60 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg px-3 py-2"
             title={
               user.id === currentUserId
                 ? "You cannot delete your own account"
@@ -349,7 +316,7 @@ function UserRow({
           >
             <TrashIcon />
             Delete User
-          </button>
+          </AdminFormButton>
         </form>
       </div>
     </details>

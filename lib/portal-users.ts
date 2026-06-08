@@ -25,6 +25,12 @@ export type PortalUserAuditLog = {
   createdAt: string;
 };
 
+export type PortalActionState = {
+  message: string;
+  status: "idle" | "success" | "error";
+  version: number;
+};
+
 type PortalUserProfile = {
   id: string;
   email: string;
@@ -194,6 +200,27 @@ export async function createPortalUser(formData: FormData) {
   });
 
   revalidatePath("/admin");
+}
+
+export async function createPortalUserWithState(
+  _previousState: PortalActionState,
+  formData: FormData,
+): Promise<PortalActionState> {
+  try {
+    await createPortalUser(formData);
+
+    return {
+      message: "User created. The temporary password reset is required at next login.",
+      status: "success",
+      version: Date.now(),
+    };
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "Unable to create user.",
+      status: "error",
+      version: Date.now(),
+    };
+  }
 }
 
 export async function updatePortalUser(formData: FormData) {
@@ -481,7 +508,6 @@ async function logPortalUserEvent({
 
   if (error) {
     console.error("Portal audit log insert failed:", error);
-    throw new Error("Unable to write portal audit log.");
   }
 }
 
