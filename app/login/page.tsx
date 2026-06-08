@@ -10,11 +10,7 @@ export default function LoginPage() {
           <PortalLogo className="h-auto w-64 max-w-full" />
         </div>
 
-        <h1 className="mt-4 text-3xl font-bold">Member Login</h1>
-
-        <p className="mt-3 text-sm leading-6 text-neutral-400">
-          Sign in with your email address to access your household information.
-        </p>
+        <h1 className="mt-4 text-3xl font-bold">Portal Login</h1>
 
         <LoginForm />
 
