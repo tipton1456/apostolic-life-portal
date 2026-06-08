@@ -54,6 +54,7 @@ function getBackLink(pathname: string) {
       "/assignments",
       "/contact",
       "/events",
+      "/give-now",
       "/giving",
       "/groups",
       "/prayer-board",

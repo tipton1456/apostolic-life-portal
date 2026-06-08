@@ -31,6 +31,7 @@ export default async function SiteNavigation({
     { href: "/contact", label: "Contact Information" },
     { href: "/assignments", label: "Planning Center Assignments" },
     { href: "/events", label: "Events" },
+    { href: "/give-now", label: "Give Now" },
     { href: "/giving", label: "Giving Records" },
     { href: "/prayer-board", label: "Prayer Board" },
     ...(leaderGroups.length > 0
