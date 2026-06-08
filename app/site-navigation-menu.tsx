@@ -11,7 +11,6 @@ type NavigationItem = {
 
 type SiteNavigationMenuProps = {
   className?: string;
-  logoutAction: () => void;
   memberName: string;
   navigationItems: NavigationItem[];
   picture?: string;
@@ -19,7 +18,6 @@ type SiteNavigationMenuProps = {
 
 export default function SiteNavigationMenu({
   className = "",
-  logoutAction,
   memberName,
   navigationItems,
   picture,
@@ -30,7 +28,6 @@ export default function SiteNavigationMenu({
     <SiteNavigationMenuContent
       key={pathname}
       className={className}
-      logoutAction={logoutAction}
       memberName={memberName}
       navigationItems={navigationItems}
       picture={picture}
@@ -40,13 +37,26 @@ export default function SiteNavigationMenu({
 
 function SiteNavigationMenuContent({
   className = "",
-  logoutAction,
   memberName,
   navigationItems,
   picture,
 }: SiteNavigationMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  async function handleLogout() {
+    setIsLoggingOut(true);
+    setIsOpen(false);
+
+    try {
+      await fetch("/auth/logout", {
+        method: "POST",
+      });
+    } finally {
+      window.location.href = "/login";
+    }
+  }
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -103,15 +113,22 @@ function SiteNavigationMenuContent({
               {item.label}
             </Link>
           ))}
-          <form action={logoutAction} className="border-t border-white/10 pt-2">
+          <div className="border-t border-white/10 pt-2">
             <button
-              type="submit"
-              onClick={() => setIsOpen(false)}
-              className="block w-full rounded-lg px-3 py-3 text-left text-sm font-medium text-neutral-100 transition hover:bg-white/10 hover:text-lime-300"
+              type="button"
+              disabled={isLoggingOut}
+              onClick={handleLogout}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-3 text-left text-sm font-medium text-neutral-100 transition hover:bg-white/10 hover:text-lime-300 disabled:cursor-wait disabled:opacity-70"
             >
-              Logout
+              {isLoggingOut ? (
+                <span
+                  aria-hidden="true"
+                  className="h-4 w-4 animate-spin rounded-full border-2 border-lime-300/30 border-t-lime-300"
+                />
+              ) : null}
+              {isLoggingOut ? "Logging out..." : "Logout"}
             </button>
-          </form>
+          </div>
         </nav>
       ) : null}
     </div>

@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { getLeaderGroupsForEmail } from "@/lib/elvanto-groups";
 import { getHousehold } from "@/lib/elvanto";
 import { isCurrentUserPortalAdmin } from "@/lib/portal-users";
@@ -42,19 +41,9 @@ export default async function SiteNavigation({
       : []),
   ];
 
-  async function logout() {
-    "use server";
-
-    const supabase = await createClient();
-
-    await supabase.auth.signOut();
-    redirect("/login");
-  }
-
   return (
     <SiteNavigationMenu
       className={className}
-      logoutAction={logout}
       memberName={memberName}
       navigationItems={navigationItems}
       picture={planningCenterProfilePicture ?? household?.primary.picture}
