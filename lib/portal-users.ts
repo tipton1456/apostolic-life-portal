@@ -11,8 +11,18 @@ export type PortalUser = {
   firstName: string;
   lastName: string;
   isAdmin: boolean;
+  mustResetPassword: boolean;
   createdAt: string;
   lastSignInAt: string | null;
+};
+
+export type PortalUserAuditLog = {
+  id: number;
+  action: string;
+  actorEmail: string;
+  targetEmail: string;
+  details: Record<string, unknown>;
+  createdAt: string;
 };
 
 type PortalUserProfile = {
@@ -21,6 +31,16 @@ type PortalUserProfile = {
   first_name: string | null;
   last_name: string | null;
   is_admin: boolean | null;
+  must_reset_password: boolean | null;
+  created_at: string;
+};
+
+type PortalUserAuditLogRow = {
+  id: number;
+  action: string;
+  actor_email: string | null;
+  target_email: string | null;
+  details: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -34,7 +54,9 @@ export async function getCurrentPortalUser() {
 
   const { data, error } = await supabase
     .from("portal_users")
-    .select("id,email,first_name,last_name,is_admin,created_at")
+    .select(
+      "id,email,first_name,last_name,is_admin,must_reset_password,created_at",
+    )
     .eq("id", user.id)
     .maybeSingle<PortalUserProfile>();
 
@@ -49,6 +71,7 @@ export async function getCurrentPortalUser() {
     firstName: data?.first_name ?? "",
     lastName: data?.last_name ?? "",
     isAdmin: Boolean(data?.is_admin),
+    mustResetPassword: Boolean(data?.must_reset_password),
     createdAt: data?.created_at ?? "",
   };
 }
@@ -70,7 +93,9 @@ export async function listPortalUsers(): Promise<PortalUser[]> {
     await Promise.all([
       admin
         .from("portal_users")
-        .select("id,email,first_name,last_name,is_admin,created_at")
+        .select(
+          "id,email,first_name,last_name,is_admin,must_reset_password,created_at",
+        )
         .order("email", { ascending: true }),
       admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
     ]);
@@ -105,6 +130,7 @@ export async function listPortalUsers(): Promise<PortalUser[]> {
       firstName: profile.first_name ?? "",
       lastName: profile.last_name ?? "",
       isAdmin: Boolean(profile.is_admin),
+      mustResetPassword: Boolean(profile.must_reset_password),
       createdAt: profile.created_at || authUser?.createdAt || "",
       lastSignInAt: authUser?.lastSignInAt ?? null,
     };
@@ -112,7 +138,7 @@ export async function listPortalUsers(): Promise<PortalUser[]> {
 }
 
 export async function createPortalUser(formData: FormData) {
-  await requirePortalAdmin();
+  const currentUser = await requirePortalAdmin();
 
   const email = normalizeEmail(formData.get("email"));
   const password = String(formData.get("password") || "");
@@ -145,6 +171,26 @@ export async function createPortalUser(formData: FormData) {
     firstName,
     lastName,
     isAdmin,
+    mustResetPassword: true,
+  });
+
+  await logPortalUserEvent({
+    action: "portal_user.created",
+    actor: currentUser,
+    target: {
+      id: data.user.id,
+      email,
+    },
+    details: {
+      created: {
+        email,
+        firstName,
+        lastName,
+        isAdmin,
+        mustResetPassword: true,
+      },
+      temporaryPasswordSet: true,
+    },
   });
 
   revalidatePath("/admin");
@@ -168,6 +214,7 @@ export async function updatePortalUser(formData: FormData) {
   }
 
   const admin = createAdminClient();
+  const before = await getPortalUserSnapshot(id);
   const update: {
     email: string;
     password?: string;
@@ -203,6 +250,24 @@ export async function updatePortalUser(formData: FormData) {
     firstName,
     lastName,
     isAdmin,
+    mustResetPassword: password ? true : before?.mustResetPassword,
+  });
+
+  const after = await getPortalUserSnapshot(id);
+
+  await logPortalUserEvent({
+    action: "portal_user.updated",
+    actor: currentUser,
+    target: {
+      id,
+      email,
+    },
+    details: {
+      before,
+      after,
+      passwordChanged: Boolean(password),
+      resetRequired: password ? true : after?.mustResetPassword,
+    },
   });
 
   revalidatePath("/admin");
@@ -221,6 +286,7 @@ export async function deletePortalUser(formData: FormData) {
   }
 
   const admin = createAdminClient();
+  const before = await getPortalUserSnapshot(id);
   const { error } = await admin.auth.admin.deleteUser(id);
 
   if (error) {
@@ -228,7 +294,84 @@ export async function deletePortalUser(formData: FormData) {
     throw new Error(error.message);
   }
 
+  await logPortalUserEvent({
+    action: "portal_user.deleted",
+    actor: currentUser,
+    target: {
+      email: before?.email ?? "",
+    },
+    details: {
+      deleted: before,
+    },
+  });
+
   revalidatePath("/admin");
+}
+
+export async function completePasswordReset() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const admin = createAdminClient();
+  const before = await getPortalUserSnapshot(user.id);
+  const { error } = await admin
+    .from("portal_users")
+    .update({ must_reset_password: false })
+    .eq("id", user.id);
+
+  if (error) {
+    console.error("Password reset completion failed:", error);
+    throw new Error("Unable to complete password reset.");
+  }
+
+  await logPortalUserEvent({
+    action: "portal_user.password_reset_completed",
+    actor: {
+      id: user.id,
+      email: user.email ?? "",
+    },
+    target: {
+      id: user.id,
+      email: user.email ?? "",
+    },
+    details: {
+      before,
+      after: await getPortalUserSnapshot(user.id),
+    },
+  });
+
+  revalidatePath("/admin");
+}
+
+export async function listPortalUserAuditLogs(): Promise<PortalUserAuditLog[]> {
+  await requirePortalAdmin();
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("portal_user_audit_logs")
+    .select("id,action,actor_email,target_email,details,created_at")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error("Portal audit log lookup failed:", error);
+    throw new Error("Unable to load portal audit log.");
+  }
+
+  return (data as PortalUserAuditLogRow[]).map((log) => ({
+    id: log.id,
+    action: log.action,
+    actorEmail: log.actor_email ?? "Unknown",
+    targetEmail: log.target_email ?? "Unknown",
+    details: log.details ?? {},
+    createdAt: log.created_at,
+  }));
 }
 
 async function requirePortalAdmin() {
@@ -252,20 +395,93 @@ async function upsertPortalUserProfile(
     firstName: string;
     lastName: string;
     isAdmin: boolean;
+    mustResetPassword?: boolean;
   },
 ) {
   const admin = createAdminClient();
-  const { error } = await admin.from("portal_users").upsert({
+  const payload: {
+    id: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    is_admin: boolean;
+    must_reset_password?: boolean;
+  } = {
     id,
     email: user.email,
     first_name: user.firstName,
     last_name: user.lastName,
     is_admin: user.isAdmin,
-  });
+  };
+
+  if (user.mustResetPassword !== undefined) {
+    payload.must_reset_password = user.mustResetPassword;
+  }
+
+  const { error } = await admin.from("portal_users").upsert(payload);
 
   if (error) {
     console.error("Portal user profile upsert failed:", error);
     throw new Error("Unable to save portal user profile.");
+  }
+}
+
+async function getPortalUserSnapshot(id: string) {
+  const admin = createAdminClient();
+  const [{ data: profile }, { data: authUser }] = await Promise.all([
+    admin
+      .from("portal_users")
+      .select(
+        "id,email,first_name,last_name,is_admin,must_reset_password,created_at,updated_at",
+      )
+      .eq("id", id)
+      .maybeSingle(),
+    admin.auth.admin.getUserById(id),
+  ]);
+
+  return {
+    id,
+    email: profile?.email ?? authUser.user?.email ?? "",
+    firstName: profile?.first_name ?? "",
+    lastName: profile?.last_name ?? "",
+    isAdmin: Boolean(profile?.is_admin),
+    mustResetPassword: Boolean(profile?.must_reset_password),
+    createdAt: profile?.created_at ?? authUser.user?.created_at ?? null,
+    updatedAt: profile?.updated_at ?? null,
+    lastSignInAt: authUser.user?.last_sign_in_at ?? null,
+  };
+}
+
+async function logPortalUserEvent({
+  action,
+  actor,
+  target,
+  details,
+}: {
+  action: string;
+  actor: {
+    id: string;
+    email: string;
+  };
+  target: {
+    id?: string;
+    email: string;
+  };
+  details: Record<string, unknown>;
+}) {
+  const admin = createAdminClient();
+  const { error } = await admin.from("portal_user_audit_logs").insert({
+    action,
+    actor_user_id: actor.id,
+    actor_email: actor.email,
+    target_user_id: target.id || null,
+    target_email: target.email,
+    details,
+  });
+
+  if (error) {
+    console.error("Portal audit log insert failed:", error);
+    throw new Error("Unable to write portal audit log.");
   }
 }
 

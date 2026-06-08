@@ -3,6 +3,7 @@ import {
   createPortalUser,
   deletePortalUser,
   getCurrentPortalUser,
+  listPortalUserAuditLogs,
   listPortalUsers,
   updatePortalUser,
 } from "@/lib/portal-users";
@@ -48,7 +49,10 @@ export default async function AdminPage() {
     );
   }
 
-  const users = await listPortalUsers();
+  const [users, auditLogs] = await Promise.all([
+    listPortalUsers(),
+    listPortalUserAuditLogs(),
+  ]);
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
@@ -111,10 +115,11 @@ export default async function AdminPage() {
         </details>
 
         <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-          <div className="grid grid-cols-[1.1fr_1.4fr_0.7fr_1fr_auto] gap-4 border-b border-white/10 px-5 py-3 text-xs uppercase tracking-[0.18em] text-neutral-500 max-lg:hidden">
+          <div className="grid grid-cols-[1.1fr_1.4fr_0.7fr_0.7fr_1fr_auto] gap-4 border-b border-white/10 px-5 py-3 text-xs uppercase tracking-[0.18em] text-neutral-500 max-lg:hidden">
             <span>Name</span>
             <span>Email</span>
             <span>Admin</span>
+            <span>Reset</span>
             <span>Last Sign In</span>
             <span className="text-right">Actions</span>
           </div>
@@ -126,6 +131,69 @@ export default async function AdminPage() {
                 user={user}
               />
             ))}
+          </div>
+        </section>
+
+        <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+          <div className="border-b border-white/10 px-5 py-4">
+            <h2 className="text-2xl font-semibold">Audit Log</h2>
+            <p className="mt-2 text-sm text-neutral-400">
+              The most recent portal user administration changes.
+            </p>
+          </div>
+          <div className="divide-y divide-white/10">
+            {auditLogs.length > 0 ? (
+              auditLogs.map((log) => (
+                <details key={log.id} className="group">
+                  <summary className="grid cursor-pointer list-none gap-3 px-5 py-4 text-sm transition hover:bg-white/[0.05] marker:hidden lg:grid-cols-[1fr_1fr_1fr_1.3fr_auto]">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                        Time
+                      </p>
+                      <p className="mt-1 text-neutral-300">
+                        {formatDateTime(log.createdAt)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                        Change
+                      </p>
+                      <p className="mt-1 text-neutral-100">
+                        {formatAction(log.action)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                        User
+                      </p>
+                      <p className="mt-1 break-all text-neutral-300">
+                        {log.targetEmail}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                        Changed By
+                      </p>
+                      <p className="mt-1 break-all text-neutral-300">
+                        {log.actorEmail}
+                      </p>
+                    </div>
+                    <span className="self-center text-xs font-semibold text-lime-300">
+                      Details
+                    </span>
+                  </summary>
+                  <div className="px-5 pb-5">
+                    <pre className="max-h-80 overflow-auto rounded-xl border border-white/10 bg-neutral-950/70 p-4 text-xs leading-5 text-neutral-300">
+                      {JSON.stringify(log.details, null, 2)}
+                    </pre>
+                  </div>
+                </details>
+              ))
+            ) : (
+              <p className="px-5 py-4 text-sm text-neutral-400">
+                No portal user changes have been logged yet.
+              </p>
+            )}
           </div>
         </section>
       </div>
@@ -144,6 +212,7 @@ function UserRow({
     firstName: string;
     lastName: string;
     isAdmin: boolean;
+    mustResetPassword: boolean;
     lastSignInAt: string | null;
   };
 }) {
@@ -151,7 +220,7 @@ function UserRow({
 
   return (
     <details className="group">
-      <summary className="grid cursor-pointer list-none gap-3 px-5 py-4 transition hover:bg-white/[0.05] marker:hidden lg:grid-cols-[1.1fr_1.4fr_0.7fr_1fr_auto] lg:items-center lg:gap-4">
+      <summary className="grid cursor-pointer list-none gap-3 px-5 py-4 transition hover:bg-white/[0.05] marker:hidden lg:grid-cols-[1.1fr_1.4fr_0.7fr_0.7fr_1fr_auto] lg:items-center lg:gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 lg:hidden">
             Name
@@ -181,6 +250,16 @@ function UserRow({
             </span>
           ) : (
             <span className="text-neutral-500">User</span>
+          )}
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 lg:hidden">
+            Reset
+          </p>
+          {user.mustResetPassword ? (
+            <span className="text-yellow-300">Required</span>
+          ) : (
+            <span className="text-neutral-500">No</span>
           )}
         </div>
         <div>
@@ -230,6 +309,10 @@ function UserRow({
             minLength={8}
             placeholder="Leave blank"
           />
+          <p className="text-xs leading-5 text-neutral-500 md:col-span-2 xl:col-span-4">
+            Entering a new password will require this user to change it the next
+            time they log in.
+          </p>
           <label className="flex items-end gap-2 pb-3 text-sm text-neutral-300">
             <input
               type="checkbox"
@@ -355,4 +438,11 @@ function formatDateTime(value: string | null) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatAction(action: string) {
+  return action
+    .replace("portal_user.", "")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

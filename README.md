@@ -57,6 +57,9 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 The migration seeds Steve Tipton's known portal emails as administrators so the
 Administration menu appears after redeploying and applying the migration.
+The follow-up password reset/audit migration adds the forced temporary password
+workflow and `portal_user_audit_logs`; apply new migrations in order whenever
+they are added.
 
 ## GroupMe Prayer Board
 

@@ -1,27 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import { completePasswordReset } from "@/lib/portal-users";
 import { createClient } from "@/lib/supabase/client";
 
-export default function LoginForm() {
-  const [email, setEmail] = useState("");
+export default function ChangePasswordForm() {
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (password !== confirmPassword) {
+      setMessage("Passwords do not match.");
+      return;
+    }
+
     setIsLoading(true);
-    setMessage("Signing in...");
+    setMessage("Updating password...");
 
     try {
       const supabase = createClient();
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.updateUser({ password });
 
       if (error) {
         setMessage(`Error: ${error.message}`);
@@ -29,29 +31,7 @@ export default function LoginForm() {
         return;
       }
 
-      if (!data.session) {
-        setMessage("Error: No session was returned from Supabase.");
-        setIsLoading(false);
-        return;
-      }
-
-      const { data: portalUser, error: profileError } = await supabase
-        .from("portal_users")
-        .select("must_reset_password")
-        .eq("id", data.session.user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        setMessage(`Error: ${profileError.message}`);
-        setIsLoading(false);
-        return;
-      }
-
-      if (portalUser?.must_reset_password) {
-        window.location.href = "/change-password";
-        return;
-      }
-
+      await completePasswordReset();
       window.location.href = "/dashboard";
     } catch (error) {
       setMessage(
@@ -64,34 +44,34 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleLogin} className="mt-8 space-y-4">
+    <form onSubmit={handleSubmit} className="mt-8 space-y-4">
       <div>
         <label className="text-sm font-medium text-neutral-300">
-          Email address
+          New password
         </label>
-
         <input
-          type="email"
+          type="password"
           required
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          minLength={8}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
           className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
-          placeholder="you@example.com"
+          placeholder="Create a new password"
         />
       </div>
 
       <div>
         <label className="text-sm font-medium text-neutral-300">
-          Password
+          Confirm new password
         </label>
-
         <input
           type="password"
           required
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
+          minLength={8}
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
           className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
-          placeholder="Enter password"
+          placeholder="Confirm new password"
         />
       </div>
 
@@ -100,10 +80,10 @@ export default function LoginForm() {
         disabled={isLoading}
         className="w-full rounded-xl bg-lime-400 px-4 py-3 font-semibold text-neutral-950 transition hover:bg-lime-300 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isLoading ? "Signing In..." : "Sign In"}
+        {isLoading ? "Updating Password..." : "Update Password"}
       </button>
 
-      {message && <p className="text-sm text-neutral-300">{message}</p>}
+      {message ? <p className="text-sm text-neutral-300">{message}</p> : null}
     </form>
   );
 }
