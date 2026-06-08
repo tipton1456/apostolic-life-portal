@@ -6,6 +6,7 @@ import {
   type GivingRange,
 } from "@/lib/giving";
 import { createClient } from "@/lib/supabase/server";
+import GivingRangeFilter from "./giving-range-filter";
 
 type PageProps = {
   searchParams: Promise<{
@@ -52,21 +53,11 @@ export default async function GivingPage({ searchParams }: PageProps) {
           </p>
 
           <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-2">
-              {RANGE_OPTIONS.map((option) => (
-                <a
-                  key={option.value}
-                  href={`/giving?range=${option.value}`}
-                  className={
-                    option.value === summary.range
-                      ? "rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-neutral-950"
-                      : "rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:border-lime-400/60 hover:text-lime-300"
-                  }
-                >
-                  {option.label}
-                </a>
-              ))}
-            </div>
+            <GivingRangeFilter
+              key={summary.range}
+              currentRange={summary.range}
+              options={RANGE_OPTIONS}
+            />
             <Link
               href="/give-now"
               className="inline-flex w-fit items-center justify-center rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
