@@ -233,32 +233,34 @@ export async function updateContactFromForm(formData: FormData) {
 
   let updateStatus = "elvanto";
 
-  try {
-    const planningCenterResult = await syncPlanningCenterContactUpdate({
-      address: update.address
-        ? {
-            city: update.address.city,
-            countryCode: normalizeCountryCode(update.address.country),
-            state: update.address.state,
-            streetLine1: update.address.line1,
-            streetLine2: update.address.line2,
-            zip: update.address.postcode,
-          }
-        : undefined,
-      birthdate: update.birthday,
-      email: update.email,
-      firstName: person.firstName,
-      lastName: person.lastName,
-      mobile: update.mobile,
-      phone: update.phone,
-      pictureUrl: update.pictureUrl,
-      previousEmail: person.email,
-    });
+  if (personType === "primary") {
+    try {
+      const planningCenterResult = await syncPlanningCenterContactUpdate({
+        address: update.address
+          ? {
+              city: update.address.city,
+              countryCode: normalizeCountryCode(update.address.country),
+              state: update.address.state,
+              streetLine1: update.address.line1,
+              streetLine2: update.address.line2,
+              zip: update.address.postcode,
+            }
+          : undefined,
+        birthdate: update.birthday,
+        email: update.email,
+        firstName: person.firstName,
+        lastName: person.lastName,
+        mobile: update.mobile,
+        phone: update.phone,
+        pictureUrl: update.pictureUrl,
+        previousEmail: person.email,
+      });
 
-    updateStatus = planningCenterResult.matched ? "synced" : "elvanto";
-  } catch (error) {
-    console.error("Planning Center contact sync failed:", error);
-    updateStatus = "partial";
+      updateStatus = planningCenterResult.matched ? "synced" : "elvanto";
+    } catch (error) {
+      console.error("Planning Center contact sync failed:", error);
+      updateStatus = "partial";
+    }
   }
 
   revalidatePath("/contact");
