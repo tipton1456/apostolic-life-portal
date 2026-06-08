@@ -62,7 +62,10 @@ type PcoItemAttributes = {
 
 type PcoPersonAttributes = {
   avatar?: string;
+  first_name?: string;
   demographic_avatar_url?: string;
+  last_name?: string;
+  name?: string;
 };
 
 type PcoEmailAttributes = {
@@ -120,6 +123,12 @@ export type UpcomingAssignment = {
   status: string;
   team: string;
   times: string;
+};
+
+export type PlanningCenterPersonSearchResult = {
+  id: string;
+  name: string;
+  thumbnail?: string;
 };
 
 export type PlanSummary = {
@@ -189,6 +198,40 @@ export async function getUpcomingAssignments(
     `/services/v2/people/${personId}/schedules`,
     {
       filter: "future",
+      include: "plan",
+      order: "starts_at",
+      per_page: String(limit),
+    },
+  );
+  const plansById = new Map(
+    normalizeResources<PcoPlanAttributes>(response.included)
+      .filter((resource) => resource.type === "Plan")
+      .map((plan) => [
+        plan.id,
+        plan.attributes?.title || plan.attributes?.series_title,
+      ]),
+  );
+
+  return normalizeResources(response.data)
+    .map(mapSchedule)
+    .filter((assignment): assignment is UpcomingAssignment => Boolean(assignment))
+    .map((assignment) => ({
+      ...assignment,
+      serviceTypeName:
+        plansById.get(assignment.planId) ?? assignment.serviceTypeName,
+    }));
+}
+
+export async function getUpcomingAssignmentsForPersonId(
+  personId: string,
+  limit = 25,
+): Promise<UpcomingAssignment[]> {
+  if (!personId || !hasPlanningCenterCredentials()) return [];
+
+  const response = await pcoFetch<PcoScheduleAttributes>(
+    `/services/v2/people/${personId}/schedules`,
+    {
+      filter: "future",
       order: "starts_at",
       per_page: String(limit),
     },
@@ -197,6 +240,37 @@ export async function getUpcomingAssignments(
   return normalizeResources(response.data)
     .map(mapSchedule)
     .filter((assignment): assignment is UpcomingAssignment => Boolean(assignment));
+}
+
+export async function getPlanningCenterPerson(
+  personId: string,
+): Promise<PlanningCenterPersonSearchResult | null> {
+  if (!personId || !hasPlanningCenterCredentials()) return null;
+
+  const response = await pcoFetch<PcoPersonAttributes>(
+    `/people/v2/people/${personId}`,
+  );
+  const person = normalizeResources<PcoPersonAttributes>(response.data)[0];
+
+  return person ? mapPersonSearchResult(person) : null;
+}
+
+export async function searchPlanningCenterPeople(
+  query: string,
+): Promise<PlanningCenterPersonSearchResult[]> {
+  const trimmedQuery = query.trim();
+
+  if (trimmedQuery.length < 2 || !hasPlanningCenterCredentials()) return [];
+
+  const response = await pcoFetch<PcoPersonAttributes>("/people/v2/people", {
+    "where[search_name]": trimmedQuery,
+    order: "name",
+    per_page: "10",
+  });
+
+  return normalizeResources<PcoPersonAttributes>(response.data).map(
+    mapPersonSearchResult,
+  );
 }
 
 export async function getPlanDetail(
@@ -749,6 +823,21 @@ function mapSchedule(
     status: formatStatus(attributes.status),
     team: attributes.team_name ?? "Team",
     times: attributes.position_display_times ?? "Time not listed",
+  };
+}
+
+function mapPersonSearchResult(
+  person: JsonApiResource<PcoPersonAttributes>,
+): PlanningCenterPersonSearchResult {
+  const attributes = person.attributes ?? {};
+  const fallbackName = [attributes.first_name, attributes.last_name]
+    .filter(Boolean)
+    .join(" ");
+
+  return {
+    id: person.id,
+    name: attributes.name || fallbackName || "Planning Center Person",
+    thumbnail: attributes.demographic_avatar_url ?? attributes.avatar,
   };
 }
 

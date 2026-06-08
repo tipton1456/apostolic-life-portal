@@ -34,6 +34,10 @@ function getBackLink(pathname: string) {
     return { href: "/groups", label: "← Back to Group Management" };
   }
 
+  if (pathname.startsWith("/admin/") && pathname !== "/admin") {
+    return { href: "/admin", label: "← Back to Administration" };
+  }
+
   const scheduleMatch = pathname.match(
     /^\/schedule\/([^/]+)\/([^/]+)(?:\/(teams|order))?$/,
   );
