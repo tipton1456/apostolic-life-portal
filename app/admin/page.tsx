@@ -65,11 +65,16 @@ export default async function AdminPage() {
           </p>
         </header>
 
-        <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <h2 className="text-2xl font-semibold">Add User</h2>
+        <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-2xl font-semibold marker:hidden">
+            <span>Add User</span>
+            <span className="rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-neutral-950">
+              Add User
+            </span>
+          </summary>
           <form
             action={createPortalUser}
-            className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_1.3fr_1fr_auto]"
+            className="mt-6 grid gap-4 border-t border-white/10 pt-5 lg:grid-cols-[1fr_1fr_1.3fr_1fr_auto]"
           >
             <Field label="First name" name="firstName" autoComplete="given-name" />
             <Field label="Last name" name="lastName" autoComplete="family-name" />
@@ -103,119 +108,168 @@ export default async function AdminPage() {
               Create User
             </button>
           </form>
-        </section>
+        </details>
 
         <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1050px] text-left text-sm">
-              <thead className="border-b border-white/10 text-xs uppercase tracking-[0.18em] text-neutral-500">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Name</th>
-                  <th className="px-5 py-3 font-medium">Email</th>
-                  <th className="px-5 py-3 font-medium">Admin</th>
-                  <th className="px-5 py-3 font-medium">Password</th>
-                  <th className="px-5 py-3 font-medium">Last Sign In</th>
-                  <th className="px-5 py-3 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {users.map((user) => (
-                  <tr key={user.id} className="align-top">
-                    <td className="px-5 py-4">
-                      <form
-                        id={`update-${user.id}`}
-                        action={updatePortalUser}
-                        className="grid grid-cols-2 gap-2"
-                      >
-                        <input type="hidden" name="id" value={user.id} />
-                        <AdminInput
-                          label="First name"
-                          name="firstName"
-                          defaultValue={user.firstName}
-                        />
-                        <AdminInput
-                          label="Last name"
-                          name="lastName"
-                          defaultValue={user.lastName}
-                        />
-                      </form>
-                    </td>
-                    <td className="px-5 py-4">
-                      <AdminInput
-                        form={`update-${user.id}`}
-                        label="Email"
-                        name="email"
-                        type="email"
-                        defaultValue={user.email}
-                        required
-                      />
-                    </td>
-                    <td className="px-5 py-4">
-                      <label className="inline-flex items-center gap-2 text-neutral-300">
-                        <input
-                          form={`update-${user.id}`}
-                          type="checkbox"
-                          name="isAdmin"
-                          defaultChecked={user.isAdmin}
-                          disabled={user.id === currentUser.id}
-                          className="h-4 w-4 rounded border-white/20 bg-neutral-900 text-lime-400 accent-lime-400 disabled:opacity-60"
-                        />
-                        {user.isAdmin ? "Admin" : "User"}
-                      </label>
-                      {user.id === currentUser.id ? (
-                        <p className="mt-2 text-xs text-neutral-500">
-                          Your admin access is locked here.
-                        </p>
-                      ) : null}
-                    </td>
-                    <td className="px-5 py-4">
-                      <AdminInput
-                        form={`update-${user.id}`}
-                        label="New password"
-                        name="password"
-                        type="password"
-                        minLength={8}
-                        placeholder="Leave blank"
-                      />
-                    </td>
-                    <td className="px-5 py-4 text-neutral-300">
-                      {formatDateTime(user.lastSignInAt)}
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="submit"
-                          form={`update-${user.id}`}
-                          className="rounded-lg bg-lime-400 px-3 py-2 text-xs font-semibold text-neutral-950 transition hover:bg-lime-300"
-                        >
-                          Save
-                        </button>
-                        <form action={deletePortalUser}>
-                          <input type="hidden" name="id" value={user.id} />
-                          <button
-                            type="submit"
-                            disabled={user.id === currentUser.id}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-red-300 transition hover:border-red-300/60 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-40"
-                            aria-label={`Delete ${user.email}`}
-                            title={
-                              user.id === currentUser.id
-                                ? "You cannot delete your own account"
-                                : `Delete ${user.email}`
-                            }
-                          >
-                            <TrashIcon />
-                          </button>
-                        </form>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-[1.1fr_1.4fr_0.7fr_1fr_auto] gap-4 border-b border-white/10 px-5 py-3 text-xs uppercase tracking-[0.18em] text-neutral-500 max-lg:hidden">
+            <span>Name</span>
+            <span>Email</span>
+            <span>Admin</span>
+            <span>Last Sign In</span>
+            <span className="text-right">Actions</span>
+          </div>
+          <div className="divide-y divide-white/10">
+            {users.map((user) => (
+              <UserRow
+                key={user.id}
+                currentUserId={currentUser.id}
+                user={user}
+              />
+            ))}
           </div>
         </section>
       </div>
     </main>
+  );
+}
+
+function UserRow({
+  currentUserId,
+  user,
+}: {
+  currentUserId: string;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    isAdmin: boolean;
+    lastSignInAt: string | null;
+  };
+}) {
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+
+  return (
+    <details className="group">
+      <summary className="grid cursor-pointer list-none gap-3 px-5 py-4 transition hover:bg-white/[0.05] marker:hidden lg:grid-cols-[1.1fr_1.4fr_0.7fr_1fr_auto] lg:items-center lg:gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 lg:hidden">
+            Name
+          </p>
+          <p className="font-semibold text-neutral-100">
+            {fullName || "Name not set"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 lg:hidden">
+            Email
+          </p>
+          <p className="break-all text-neutral-300">{user.email}</p>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 lg:hidden">
+            Admin
+          </p>
+          {user.isAdmin ? (
+            <span className="inline-flex items-center gap-2 text-neutral-200">
+              <span
+                aria-label="Admin"
+                title="Admin"
+                className="h-2.5 w-2.5 rounded-full bg-green-400"
+              />
+              Admin
+            </span>
+          ) : (
+            <span className="text-neutral-500">User</span>
+          )}
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 lg:hidden">
+            Last Sign In
+          </p>
+          <p className="text-neutral-300">{formatDateTime(user.lastSignInAt)}</p>
+        </div>
+        <div className="flex items-center gap-2 lg:justify-end">
+          <span
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-lime-300 transition group-open:border-lime-300/60 group-open:bg-lime-400/10"
+            aria-label={`Update ${user.email}`}
+            title={`Update ${user.email}`}
+          >
+            <PencilIcon />
+          </span>
+        </div>
+      </summary>
+      <div className="px-5 pb-5">
+        <form
+          id={`update-${user.id}`}
+          action={updatePortalUser}
+          className="grid gap-4 rounded-xl border border-white/10 bg-neutral-950/40 p-5 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.4fr_1fr_auto]"
+        >
+          <input type="hidden" name="id" value={user.id} />
+          <Field
+            label="First name"
+            name="firstName"
+            defaultValue={user.firstName}
+          />
+          <Field
+            label="Last name"
+            name="lastName"
+            defaultValue={user.lastName}
+          />
+          <Field
+            label="Email"
+            name="email"
+            type="email"
+            defaultValue={user.email}
+            required
+          />
+          <Field
+            label="New password"
+            name="password"
+            type="password"
+            minLength={8}
+            placeholder="Leave blank"
+          />
+          <label className="flex items-end gap-2 pb-3 text-sm text-neutral-300">
+            <input
+              type="checkbox"
+              name="isAdmin"
+              defaultChecked={user.isAdmin}
+              disabled={user.id === currentUserId}
+              className="h-4 w-4 rounded border-white/20 bg-neutral-900 text-lime-400 accent-lime-400 disabled:opacity-60"
+            />
+            Admin
+          </label>
+          {user.id === currentUserId ? (
+            <p className="text-xs text-neutral-500 md:col-span-2 xl:col-span-4">
+              Your admin access is locked here.
+            </p>
+          ) : null}
+          <button
+            type="submit"
+            className="rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300 md:w-fit"
+          >
+            Save User
+          </button>
+        </form>
+        <form action={deletePortalUser} className="mt-3 flex justify-end">
+          <input type="hidden" name="id" value={user.id} />
+          <button
+            type="submit"
+            disabled={user.id === currentUserId}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-red-300 transition hover:border-red-300/60 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-40"
+            title={
+              user.id === currentUserId
+                ? "You cannot delete your own account"
+                : `Delete ${user.email}`
+            }
+          >
+            <TrashIcon />
+            Delete User
+          </button>
+        </form>
+      </div>
+    </details>
   );
 }
 
@@ -226,6 +280,8 @@ function Field({
   required,
   minLength,
   autoComplete,
+  defaultValue,
+  placeholder,
 }: {
   label: string;
   name: string;
@@ -233,6 +289,8 @@ function Field({
   required?: boolean;
   minLength?: number;
   autoComplete?: string;
+  defaultValue?: string;
+  placeholder?: string;
 }) {
   return (
     <label className="block text-sm font-medium text-neutral-300">
@@ -243,45 +301,29 @@ function Field({
         required={required}
         minLength={minLength}
         autoComplete={autoComplete}
+        defaultValue={defaultValue}
+        placeholder={placeholder}
         className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
       />
     </label>
   );
 }
 
-function AdminInput({
-  label,
-  name,
-  type = "text",
-  defaultValue,
-  required,
-  minLength,
-  placeholder,
-  form,
-}: {
-  label: string;
-  name: string;
-  type?: string;
-  defaultValue?: string;
-  required?: boolean;
-  minLength?: number;
-  placeholder?: string;
-  form?: string;
-}) {
+function PencilIcon() {
   return (
-    <label className="block text-xs font-medium text-neutral-500">
-      <span className="sr-only">{label}</span>
-      <input
-        form={form}
-        name={name}
-        type={type}
-        defaultValue={defaultValue}
-        required={required}
-        minLength={minLength}
-        placeholder={placeholder}
-        className="w-full rounded-lg border border-white/10 bg-neutral-900 px-3 py-2 text-sm text-white outline-none ring-lime-400 transition placeholder:text-neutral-600 focus:ring-2"
-      />
-    </label>
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
   );
 }
 
