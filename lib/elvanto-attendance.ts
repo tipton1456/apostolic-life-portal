@@ -57,11 +57,11 @@ export type AttendanceDashboard = {
 
 const AM_SERVICE_NAME = process.env.ELVANTO_SUNDAY_AM_SERVICE_NAME ?? "Sunday AM";
 const PM_SERVICE_NAME = process.env.ELVANTO_SUNDAY_PM_SERVICE_NAME ?? "Sunday PM";
+const ATTENDANCE_TIME_ZONE =
+  process.env.ELVANTO_ATTENDANCE_TIME_ZONE ?? "America/Chicago";
 const ATTENDANCE_FIELDS = [
   "service_times",
   "notes",
-  "plans",
-  "volunteers",
   "picture",
 ];
 
@@ -159,7 +159,7 @@ export async function getAttendanceDashboard(
     rows,
     hasExtractedAttendance
       ? undefined
-      : "Elvanto returned services, but no attendance counts were present in the API response.",
+      : "Elvanto returned Sunday services, but the API response did not include attendance counts. No totals are being calculated from service plan lengths or volunteer schedules.",
   );
 }
 
@@ -224,7 +224,7 @@ function summarizeSundays(
   }
 
   for (const service of services) {
-    const serviceDate = getDateOnly(service.date);
+    const serviceDate = getServiceDate(service.date);
     if (!serviceDate || !rowsByDate.has(serviceDate)) continue;
 
     const row = rowsByDate.get(serviceDate)!;
@@ -261,9 +261,13 @@ function extractAttendance(value: unknown): number {
   let best = 0;
 
   walk(value, (key, current) => {
+    if (!isAttendanceCountKey(key)) {
+      return;
+    }
+
     if (
       typeof current === "number" &&
-      /attendance|attended|total|count|guests|people/i.test(key)
+      Number.isFinite(current)
     ) {
       best = Math.max(best, current);
     }
@@ -271,13 +275,27 @@ function extractAttendance(value: unknown): number {
     if (
       typeof current === "string" &&
       /^\d+$/.test(current) &&
-      /attendance|attended|total|count|guests|people/i.test(key)
+      current.length <= 5
     ) {
       best = Math.max(best, Number(current));
     }
   });
 
   return best;
+}
+
+function isAttendanceCountKey(key: string) {
+  if (
+    /length|duration|formatted|service_length|total_length|status|date|time|volunteer|position|plan|song|file|note/i.test(
+      key,
+    )
+  ) {
+    return false;
+  }
+
+  return /attendance|attended|attendee|check_?in|guest|statistic|headcount/i.test(
+    key,
+  );
 }
 
 function extractAttendeeIds(value: unknown): string[] {
@@ -411,10 +429,26 @@ function addDays(value: string, days: number) {
   return formatDateInput(date);
 }
 
-function getDateOnly(value?: string) {
+function getServiceDate(value?: string) {
   if (!value) return "";
 
-  return value.slice(0, 10);
+  const utcDate = new Date(`${value.replace(" ", "T")}Z`);
+
+  if (Number.isNaN(utcDate.getTime())) {
+    return value.slice(0, 10);
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: ATTENDANCE_TIME_ZONE,
+    year: "numeric",
+  }).formatToParts(utcDate);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  return year && month && day ? `${year}-${month}-${day}` : value.slice(0, 10);
 }
 
 function formatDateInput(date: Date) {
