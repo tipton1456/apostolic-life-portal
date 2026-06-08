@@ -19,8 +19,11 @@ export const metadata: Metadata = {
   description: "Member portal for Apostolic Life",
   icons: {
     apple: "/icon.png",
-    icon: "/icon.png",
-    shortcut: "/icon.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
   },
 };
 
