@@ -97,11 +97,7 @@ export default async function ContactPage({ searchParams }: PageProps) {
                       name="birthday"
                       defaultValue={household.primary.birthdayValue}
                     />
-                    <TextInput
-                      label="Profile Picture URL"
-                      name="pictureUrl"
-                      defaultValue={household.primary.picture ?? ""}
-                    />
+                    <FileInput label="Profile Picture" name="profilePicture" />
                   </div>
 
                   <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -337,13 +333,33 @@ function DateInput({
   );
 }
 
+function FileInput({ label, name }: { label: string; name: string }) {
+  return (
+    <label className="block">
+      <span className="text-xs uppercase tracking-[0.2em] text-neutral-500">
+        {label}
+      </span>
+      <input
+        type="file"
+        name={name}
+        accept="image/*"
+        className="mt-1 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-sm text-neutral-100 outline-none ring-lime-400 transition file:mr-4 file:rounded-lg file:border-0 file:bg-lime-400 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-neutral-950 hover:file:bg-lime-300 focus:ring-2"
+      />
+      <span className="mt-1 block text-xs text-neutral-500">
+        JPG, PNG, or WebP under 5MB. Photo uploads sync to Planning Center when
+        matched.
+      </span>
+    </label>
+  );
+}
+
 function editableValue(value: string) {
   return value === "Not listed" ? "" : value;
 }
 
 function getUpdateMessage(updated: string) {
   if (updated === "synced") {
-    return "Contact information saved in Elvanto and Planning Center.";
+    return "Contact information saved in Elvanto. Matching updates were also sent to Planning Center.";
   }
 
   if (updated === "partial") {

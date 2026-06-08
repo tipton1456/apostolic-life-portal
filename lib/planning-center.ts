@@ -98,6 +98,7 @@ export type PlanningCenterContactUpdate = {
   lastName: string;
   mobile?: string;
   phone?: string;
+  pictureFile?: File;
   pictureUrl?: string;
   previousEmail?: string;
 };
@@ -295,7 +296,11 @@ export async function syncPlanningCenterContactUpdate(
   const personAttributes: Record<string, string> = {};
 
   if (update.birthdate) personAttributes.birthdate = update.birthdate;
-  if (update.pictureUrl) personAttributes.avatar = update.pictureUrl;
+  if (update.pictureFile && update.pictureFile.size > 0) {
+    personAttributes.avatar = await uploadPlanningCenterFile(update.pictureFile);
+  } else if (update.pictureUrl) {
+    personAttributes.avatar = update.pictureUrl;
+  }
 
   if (Object.keys(personAttributes).length > 0) {
     await pcoJsonApiFetch(`/people/v2/people/${personId}`, "PATCH", {
@@ -648,6 +653,46 @@ async function pcoJsonApiFetch(
   }
 
   return response;
+}
+
+async function uploadPlanningCenterFile(file: File) {
+  const clientId = getPlanningCenterClientId();
+  const clientSecret = getPlanningCenterClientSecret();
+
+  if (!clientId || !clientSecret) {
+    throw new Error("Planning Center credentials are not configured.");
+  }
+
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const response = await fetch("https://upload.planningcenteronline.com/v2/files", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString(
+        "base64",
+      )}`,
+      "User-Agent":
+        process.env.PLANNING_CENTER_USER_AGENT ??
+        "Apostolic Life Portal (admin@apostoliclifeupc.com)",
+    },
+    body: formData,
+    cache: "no-store",
+  });
+
+  const result = (await response.json()) as {
+    data?: Array<{
+      id?: string;
+    }>;
+  };
+  const fileId = result.data?.[0]?.id;
+
+  if (!response.ok || !fileId) {
+    console.error("Planning Center file upload failed:", result);
+    throw new Error("Planning Center photo upload failed.");
+  }
+
+  return fileId;
 }
 
 function getPlanningCenterClientId() {

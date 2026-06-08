@@ -74,7 +74,7 @@ type ContactUpdateInput = {
   mobile?: string;
   personId: string;
   phone?: string;
-  pictureUrl?: string;
+  pictureFile?: File;
 };
 
 const PERSON_DETAIL_FIELDS = [
@@ -218,7 +218,7 @@ export async function updateContactFromForm(formData: FormData) {
   }
 
   if (personType === "primary") {
-    update.pictureUrl = normalizeOptionalInput(formData.get("pictureUrl"));
+    update.pictureFile = getImageFile(formData.get("profilePicture"));
     update.address = {
       line1: normalizeOptionalInput(formData.get("addressLine1")),
       line2: normalizeOptionalInput(formData.get("addressLine2")),
@@ -252,7 +252,7 @@ export async function updateContactFromForm(formData: FormData) {
         lastName: person.lastName,
         mobile: update.mobile,
         phone: update.phone,
-        pictureUrl: update.pictureUrl,
+        pictureFile: update.pictureFile,
         previousEmail: person.email,
       });
 
@@ -393,14 +393,6 @@ async function updateElvantoContact(update: ContactUpdateInput) {
 
   await postElvanto("people/edit.json", authorization, body);
 
-  if (update.pictureUrl) {
-    await postElvanto("people/edit.json", authorization, {
-      id: update.personId,
-      "fields[picture]": update.pictureUrl,
-    }).catch((error) => {
-      console.error("Elvanto picture update failed:", error);
-    });
-  }
 }
 
 async function postElvanto(
@@ -537,4 +529,20 @@ function normalizeCountryCode(country: string) {
   if (normalizedCountry.length === 2) return normalizedCountry;
 
   return normalizedCountry;
+}
+
+function getImageFile(value: FormDataEntryValue | null) {
+  if (!(value instanceof File) || value.size === 0) return undefined;
+
+  if (!value.type.startsWith("image/")) {
+    throw new Error("Profile picture must be an image file.");
+  }
+
+  const maxFileSize = 5 * 1024 * 1024;
+
+  if (value.size > maxFileSize) {
+    throw new Error("Profile picture must be smaller than 5MB.");
+  }
+
+  return value;
 }
