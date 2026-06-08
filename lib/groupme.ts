@@ -55,33 +55,11 @@ export async function getPrayerBoardMessages(limit = 30): Promise<PrayerBoard> {
   }
 
   try {
-    const url = new URL(
-      `https://api.groupme.com/v3/groups/${groupId}/messages`,
-    );
-    url.searchParams.set("limit", String(getFetchLimit(limit)));
-
-    const response = await fetch(url, {
-      headers: {
-        "X-Access-Token": accessToken,
-      },
-      cache: "no-store",
+    const messages = await getFilteredMessages({
+      accessToken,
+      groupId,
+      limit,
     });
-
-    if (!response.ok) {
-      console.error(`GroupMe messages lookup failed: ${response.status}`);
-      return {
-        conversationUrl,
-        isConfigured: true,
-        messages: [],
-      };
-    }
-
-    const result = (await response.json()) as GroupMeMessageResponse;
-    const messages = (result.response?.messages ?? [])
-      .filter((message) => !message.system)
-      .filter((message) => !shouldExcludePrayerBoardMessage(message.text))
-      .slice(0, limit)
-      .map(mapMessage);
 
     return {
       conversationUrl,
@@ -99,8 +77,96 @@ export async function getPrayerBoardMessages(limit = 30): Promise<PrayerBoard> {
   }
 }
 
-function getFetchLimit(limit: number) {
+async function getFilteredMessages({
+  accessToken,
+  groupId,
+  limit,
+}: {
+  accessToken: string;
+  groupId: string;
+  limit: number;
+}) {
+  const messages: PrayerBoardMessage[] = [];
+  const seenMessageIds = new Set<string>();
+  let beforeId: string | undefined;
+
+  for (let page = 0; page < getMaxPages(limit); page += 1) {
+    const result = await getMessagePage({
+      accessToken,
+      beforeId,
+      groupId,
+      pageLimit: getPageLimit(limit),
+    });
+    const pageMessages = result.response?.messages ?? [];
+
+    if (pageMessages.length === 0) break;
+
+    for (const message of pageMessages) {
+      const messageId = message.id ?? `${message.created_at}-${message.name}`;
+
+      if (seenMessageIds.has(messageId)) continue;
+
+      seenMessageIds.add(messageId);
+
+      if (message.system || shouldExcludePrayerBoardMessage(message.text)) {
+        continue;
+      }
+
+      messages.push(mapMessage(message));
+
+      if (messages.length >= limit) {
+        return messages;
+      }
+    }
+
+    const nextBeforeId = pageMessages.at(-1)?.id;
+
+    if (!nextBeforeId || nextBeforeId === beforeId) break;
+
+    beforeId = nextBeforeId;
+  }
+
+  return messages;
+}
+
+async function getMessagePage({
+  accessToken,
+  beforeId,
+  groupId,
+  pageLimit,
+}: {
+  accessToken: string;
+  beforeId?: string;
+  groupId: string;
+  pageLimit: number;
+}) {
+  const url = new URL(`https://api.groupme.com/v3/groups/${groupId}/messages`);
+  url.searchParams.set("limit", String(pageLimit));
+
+  if (beforeId) {
+    url.searchParams.set("before_id", beforeId);
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      "X-Access-Token": accessToken,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`GroupMe messages lookup failed: ${response.status}`);
+  }
+
+  return (await response.json()) as GroupMeMessageResponse;
+}
+
+function getPageLimit(limit: number) {
   return Math.min(Math.max(limit * 8, 50), 100);
+}
+
+function getMaxPages(limit: number) {
+  return limit <= 5 ? 5 : 3;
 }
 
 function shouldExcludePrayerBoardMessage(text?: string) {
