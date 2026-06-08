@@ -8,6 +8,7 @@ import {
 } from "@/lib/planning-center";
 import { createClient } from "@/lib/supabase/server";
 import AssignmentCountSelect from "./assignment-count-select";
+import AssignmentViewToggle from "./assignment-view-toggle";
 
 type PageProps = {
   searchParams: Promise<{
@@ -64,7 +65,7 @@ export default async function AssignmentsPage({ searchParams }: PageProps) {
             </div>
 
             <div className="flex flex-col gap-3 md:items-end">
-              <AssignmentViewToggle view={view} count={count} />
+              <AssignmentViewToggle key={view} view={view} count={count} />
               <AssignmentCountSelect count={count} view={view} />
             </div>
           </div>
@@ -83,37 +84,6 @@ export default async function AssignmentsPage({ searchParams }: PageProps) {
         </section>
       </div>
     </main>
-  );
-}
-
-function AssignmentViewToggle({
-  count,
-  view,
-}: {
-  count: number;
-  view: AssignmentView;
-}) {
-  const options: Array<{ label: string; value: AssignmentView }> = [
-    { label: "My Assignments", value: "mine" },
-    { label: "My Family's Assignments", value: "family" },
-  ];
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((option) => (
-        <Link
-          key={option.value}
-          href={`/assignments?view=${option.value}&count=${count}`}
-          className={
-            option.value === view
-              ? "rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-neutral-950"
-              : "rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:border-lime-400/60 hover:text-lime-300"
-          }
-        >
-          {option.label}
-        </Link>
-      ))}
-    </div>
   );
 }
 
