@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getHousehold, updateContactFromForm } from "@/lib/elvanto";
+import { getPlanningCenterProfilePicture } from "@/lib/planning-center";
 import { createClient } from "@/lib/supabase/server";
+import ContactSaveButton from "./contact-save-button";
 
 type PageProps = {
   searchParams: Promise<{
@@ -20,7 +22,17 @@ export default async function ContactPage({ searchParams }: PageProps) {
     redirect("/login");
   }
 
-  const household = await getHousehold(user.email ?? undefined);
+  const [household, planningCenterProfilePicture] = await Promise.all([
+    getHousehold(user.email ?? undefined),
+    getPlanningCenterProfilePicture(user.email ?? undefined),
+  ]);
+  const primaryPicture = household
+    ? getPrimaryPicture(
+        planningCenterProfilePicture,
+        household.primary.picture,
+        updated,
+      )
+    : undefined;
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
@@ -47,9 +59,9 @@ export default async function ContactPage({ searchParams }: PageProps) {
           <>
             <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
               <div className="flex items-start gap-4">
-                {household.primary.picture ? (
+                {primaryPicture ? (
                   <img
-                    src={household.primary.picture}
+                    src={primaryPicture}
                     alt={`${household.primary.firstName} ${household.primary.lastName}`}
                     className="h-20 w-20 shrink-0 rounded-full object-cover"
                   />
@@ -133,12 +145,7 @@ export default async function ContactPage({ searchParams }: PageProps) {
                     />
                   </div>
 
-                  <button
-                    type="submit"
-                    className="mt-6 rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
-                  >
-                    Save My Contact Information
-                  </button>
+                  <ContactSaveButton label="Save My Contact Information" />
                 </form>
               </details>
             </section>
@@ -213,12 +220,7 @@ export default async function ContactPage({ searchParams }: PageProps) {
                               defaultValue={person.birthdayValue}
                             />
                           </div>
-                          <button
-                            type="submit"
-                            className="mt-5 rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
-                          >
-                            Save {person.firstName}
-                          </button>
+                          <ContactSaveButton label={`Save ${person.firstName}`} />
                         </form>
                       </details>
                     </article>
@@ -355,6 +357,21 @@ function FileInput({ label, name }: { label: string; name: string }) {
 
 function editableValue(value: string) {
   return value === "Not listed" ? "" : value;
+}
+
+function getPrimaryPicture(
+  planningCenterProfilePicture: string | null,
+  elvantoPicture: string | undefined,
+  updated: string | undefined,
+) {
+  const picture = planningCenterProfilePicture ?? elvantoPicture;
+
+  if (!picture) return undefined;
+  if (!updated || !planningCenterProfilePicture) return picture;
+
+  const separator = picture.includes("?") ? "&" : "?";
+
+  return `${picture}${separator}updated=${encodeURIComponent(updated)}`;
 }
 
 function getUpdateMessage(updated: string) {

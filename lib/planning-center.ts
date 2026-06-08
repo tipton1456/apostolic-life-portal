@@ -60,6 +60,11 @@ type PcoItemAttributes = {
   title?: string;
 };
 
+type PcoPersonAttributes = {
+  avatar?: string;
+  demographic_avatar_url?: string;
+};
+
 type PcoEmailAttributes = {
   address?: string;
   location?: string;
@@ -327,6 +332,23 @@ export async function syncPlanningCenterContactUpdate(
   }
 
   return { matched: true };
+}
+
+export async function getPlanningCenterProfilePicture(email?: string) {
+  const personId = await getPlanningCenterPersonId(email);
+
+  if (!personId) return null;
+
+  const response = await pcoFetch<PcoPersonAttributes>(
+    `/people/v2/people/${personId}`,
+  );
+  const person = normalizeResources<PcoPersonAttributes>(response.data)[0];
+
+  return (
+    person?.attributes?.demographic_avatar_url ??
+    person?.attributes?.avatar ??
+    null
+  );
 }
 
 function hasPlanningCenterCredentials() {
