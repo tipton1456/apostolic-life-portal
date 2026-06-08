@@ -1,4 +1,3 @@
-import Link from "next/link";
 import PortalLogo from "../portal-logo";
 import LoginForm from "./login-form";
 
@@ -13,13 +12,6 @@ export default function LoginPage() {
         <h1 className="mt-4 text-3xl font-bold">Portal Login</h1>
 
         <LoginForm />
-
-        <Link
-          href="/create-account"
-          className="mt-6 inline-flex w-full justify-center rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:border-lime-400/60"
-        >
-          Create Account
-        </Link>
       </div>
     </main>
   );

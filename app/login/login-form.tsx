@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -33,6 +34,10 @@ export default function LoginForm() {
         setMessage("Error: No session was returned from Supabase.");
         setIsLoading(false);
         return;
+      }
+
+      if (!rememberMe) {
+        convertSupabaseCookiesToSessionCookies();
       }
 
       const { data: portalUser, error: profileError } = await supabase
@@ -95,6 +100,16 @@ export default function LoginForm() {
         />
       </div>
 
+      <label className="flex items-center gap-3 text-sm text-neutral-300">
+        <input
+          type="checkbox"
+          checked={rememberMe}
+          onChange={(event) => setRememberMe(event.target.checked)}
+          className="h-4 w-4 rounded border-white/20 bg-neutral-900 text-lime-400 accent-lime-400"
+        />
+        Remember me
+      </label>
+
       <button
         type="submit"
         disabled={isLoading}
@@ -106,4 +121,24 @@ export default function LoginForm() {
       {message && <p className="text-sm text-neutral-300">{message}</p>}
     </form>
   );
+}
+
+function convertSupabaseCookiesToSessionCookies() {
+  const isSecure = window.location.protocol === "https:";
+  const cookieAttributes = `path=/; SameSite=Lax${isSecure ? "; Secure" : ""}`;
+
+  document.cookie
+    .split(";")
+    .map((cookie) => cookie.trim())
+    .filter((cookie) => cookie.startsWith("sb-"))
+    .forEach((cookie) => {
+      const separatorIndex = cookie.indexOf("=");
+
+      if (separatorIndex === -1) return;
+
+      const name = cookie.slice(0, separatorIndex);
+      const value = cookie.slice(separatorIndex + 1);
+
+      document.cookie = `${name}=${value}; ${cookieAttributes}`;
+    });
 }
