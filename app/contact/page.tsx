@@ -45,12 +45,7 @@ export default async function ContactPage({ searchParams }: PageProps) {
 
         {household ? (
           <>
-            <form
-              action={updateContactFromForm}
-              className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6"
-            >
-              <input type="hidden" name="personId" value={household.primary.id} />
-              <input type="hidden" name="personType" value="primary" />
+            <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
               <div className="flex items-start gap-4">
                 {household.primary.picture ? (
                   <img
@@ -66,68 +61,91 @@ export default async function ContactPage({ searchParams }: PageProps) {
 
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <Info label="Email" value={household.primary.email} />
-                <TextInput
-                  label="Phone"
-                  name="phone"
-                  defaultValue={editableValue(household.primary.phone)}
-                />
-                <TextInput
-                  label="Mobile"
-                  name="mobile"
-                  defaultValue={editableValue(household.primary.mobile)}
-                />
-                <DateInput
-                  label="Birthdate"
-                  name="birthday"
-                  defaultValue={household.primary.birthdayValue}
-                />
-                <TextInput
-                  label="Profile Picture URL"
-                  name="pictureUrl"
-                  defaultValue={household.primary.picture ?? ""}
-                />
+                <Info label="Phone" value={household.primary.phone} />
+                <Info label="Mobile" value={household.primary.mobile} />
+                <Info label="Birthdate" value={household.primary.birthday} />
+                <Info label="Address" value={household.primary.address} />
               </div>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <TextInput
-                  label="Address"
-                  name="addressLine1"
-                  defaultValue={household.primary.addressFields.line1}
-                />
-                <TextInput
-                  label="Address 2"
-                  name="addressLine2"
-                  defaultValue={household.primary.addressFields.line2}
-                />
-                <TextInput
-                  label="City"
-                  name="city"
-                  defaultValue={household.primary.addressFields.city}
-                />
-                <TextInput
-                  label="State"
-                  name="state"
-                  defaultValue={household.primary.addressFields.state}
-                />
-                <TextInput
-                  label="Zip"
-                  name="postcode"
-                  defaultValue={household.primary.addressFields.postcode}
-                />
-                <TextInput
-                  label="Country"
-                  name="country"
-                  defaultValue={household.primary.addressFields.country}
-                />
-              </div>
+              <details className="group mt-6">
+                <UpdateContactSummary />
 
-              <button
-                type="submit"
-                className="mt-6 rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
-              >
-                Save My Contact Information
-              </button>
-            </form>
+                <form
+                  action={updateContactFromForm}
+                  className="mt-5 border-t border-white/10 pt-5"
+                >
+                  <input
+                    type="hidden"
+                    name="personId"
+                    value={household.primary.id}
+                  />
+                  <input type="hidden" name="personType" value="primary" />
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <TextInput
+                      label="Phone"
+                      name="phone"
+                      defaultValue={editableValue(household.primary.phone)}
+                    />
+                    <TextInput
+                      label="Mobile"
+                      name="mobile"
+                      defaultValue={editableValue(household.primary.mobile)}
+                    />
+                    <DateInput
+                      label="Birthdate"
+                      name="birthday"
+                      defaultValue={household.primary.birthdayValue}
+                    />
+                    <TextInput
+                      label="Profile Picture URL"
+                      name="pictureUrl"
+                      defaultValue={household.primary.picture ?? ""}
+                    />
+                  </div>
+
+                  <div className="mt-6 grid gap-4 md:grid-cols-2">
+                    <TextInput
+                      label="Address"
+                      name="addressLine1"
+                      defaultValue={household.primary.addressFields.line1}
+                    />
+                    <TextInput
+                      label="Address 2"
+                      name="addressLine2"
+                      defaultValue={household.primary.addressFields.line2}
+                    />
+                    <TextInput
+                      label="City"
+                      name="city"
+                      defaultValue={household.primary.addressFields.city}
+                    />
+                    <TextInput
+                      label="State"
+                      name="state"
+                      defaultValue={household.primary.addressFields.state}
+                    />
+                    <TextInput
+                      label="Zip"
+                      name="postcode"
+                      defaultValue={household.primary.addressFields.postcode}
+                    />
+                    <TextInput
+                      label="Country"
+                      name="country"
+                      defaultValue={household.primary.addressFields.country}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="mt-6 rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
+                  >
+                    Save My Contact Information
+                  </button>
+                </form>
+              </details>
+            </section>
 
             <section className="mt-8">
               <h2 className="text-2xl font-semibold">Family Members</h2>
@@ -135,13 +153,10 @@ export default async function ContactPage({ searchParams }: PageProps) {
               {household.family.length > 0 ? (
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   {household.family.map((person) => (
-                    <form
+                    <article
                       key={`${person.firstName}-${person.lastName}-${person.relationship}`}
-                      action={updateContactFromForm}
                       className="rounded-2xl border border-white/10 bg-white/[0.03] p-6"
                     >
-                      <input type="hidden" name="personId" value={person.id} />
-                      <input type="hidden" name="personType" value="family" />
                       <div className="flex items-start gap-4">
                         {person.picture ? (
                           <img
@@ -160,35 +175,57 @@ export default async function ContactPage({ searchParams }: PageProps) {
                         </div>
                       </div>
                       <div className="mt-4 space-y-3">
-                        <TextInput
-                          label="Email"
-                          name="email"
-                          type="email"
-                          defaultValue={editableValue(person.email)}
-                        />
-                        <TextInput
-                          label="Phone"
-                          name="phone"
-                          defaultValue={editableValue(person.phone)}
-                        />
-                        <TextInput
-                          label="Mobile"
-                          name="mobile"
-                          defaultValue={editableValue(person.mobile)}
-                        />
-                        <DateInput
-                          label="Birthdate"
-                          name="birthday"
-                          defaultValue={person.birthdayValue}
-                        />
+                        <Info label="Email" value={person.email} />
+                        <Info label="Phone" value={person.phone} />
+                        <Info label="Mobile" value={person.mobile} />
+                        <Info label="Birthdate" value={person.birthday} />
                       </div>
-                      <button
-                        type="submit"
-                        className="mt-5 rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
-                      >
-                        Save {person.firstName}
-                      </button>
-                    </form>
+
+                      <details className="group mt-5">
+                        <UpdateContactSummary />
+
+                        <form
+                          action={updateContactFromForm}
+                          className="mt-5 border-t border-white/10 pt-5"
+                        >
+                          <input
+                            type="hidden"
+                            name="personId"
+                            value={person.id}
+                          />
+                          <input type="hidden" name="personType" value="family" />
+                          <div className="space-y-3">
+                            <TextInput
+                              label="Email"
+                              name="email"
+                              type="email"
+                              defaultValue={editableValue(person.email)}
+                            />
+                            <TextInput
+                              label="Phone"
+                              name="phone"
+                              defaultValue={editableValue(person.phone)}
+                            />
+                            <TextInput
+                              label="Mobile"
+                              name="mobile"
+                              defaultValue={editableValue(person.mobile)}
+                            />
+                            <DateInput
+                              label="Birthdate"
+                              name="birthday"
+                              defaultValue={person.birthdayValue}
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            className="mt-5 rounded-xl bg-lime-400 px-4 py-3 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
+                          >
+                            Save {person.firstName}
+                          </button>
+                        </form>
+                      </details>
+                    </article>
                   ))}
                 </div>
               ) : (
@@ -225,6 +262,33 @@ function Info({ label, value }: { label: string; value: string }) {
       </p>
       <p className="mt-1 text-neutral-200">{value}</p>
     </div>
+  );
+}
+
+function UpdateContactSummary() {
+  return (
+    <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-neutral-100 transition hover:border-lime-400/60 hover:text-lime-300 group-open:border-lime-400/60 group-open:text-lime-300 [&::-webkit-details-marker]:hidden">
+      <PencilIcon />
+      <span>Update Contact</span>
+    </summary>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
   );
 }
 
