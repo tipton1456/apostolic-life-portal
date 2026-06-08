@@ -144,8 +144,13 @@ export default async function DashboardPage() {
                         key={message.id}
                         className="transition hover:bg-white/[0.06]"
                       >
-                        <td className="w-48 px-5 py-4 font-semibold text-lime-300">
-                          {message.author}
+                        <td className="w-48 px-5 py-4">
+                          <p className="font-semibold text-lime-300">
+                            {message.author}
+                          </p>
+                          <p className="mt-1 text-xs uppercase tracking-[0.14em] text-neutral-500">
+                            {message.createdAtLabel}
+                          </p>
                         </td>
                         <td className="px-5 py-4 text-neutral-200">
                           <Link href="/prayer-board" className="block">
