@@ -32,8 +32,7 @@ export async function getCurrentPortalUser() {
 
   if (!user) return null;
 
-  const admin = createAdminClient();
-  const { data, error } = await admin
+  const { data, error } = await supabase
     .from("portal_users")
     .select("id,email,first_name,last_name,is_admin,created_at")
     .eq("id", user.id)
