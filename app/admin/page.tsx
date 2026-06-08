@@ -14,11 +14,6 @@ const ADMIN_ITEMS = [
     href: "/admin/schedule-lookup",
     label: "Schedule Look Up",
   },
-  {
-    description: "Review Sunday AM, Sunday PM, and unique Sunday attendance trends from Elvanto.",
-    href: "/admin/attendance",
-    label: "Attendance Dashboard",
-  },
 ];
 
 export default async function AdminLandingPage() {
