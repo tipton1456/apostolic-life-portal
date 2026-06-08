@@ -17,6 +17,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Apostolic Life Member Portal",
   description: "Member portal for Apostolic Life",
+  icons: {
+    apple: "/icon.png",
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+  },
 };
 
 export default function RootLayout({
