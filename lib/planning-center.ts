@@ -194,6 +194,26 @@ export async function getUpcomingAssignments(
     return shouldUseSampleData() ? sampleAssignments.slice(0, limit) : [];
   }
 
+  return getUpcomingAssignmentsForPersonId(personId, limit);
+}
+
+export async function getUpcomingAssignmentsForEmail(
+  email?: string,
+  limit = 3,
+): Promise<UpcomingAssignment[]> {
+  const personId = await getPlanningCenterPersonId(email);
+
+  if (!personId) return [];
+
+  return getUpcomingAssignmentsForPersonId(personId, limit);
+}
+
+export async function getUpcomingAssignmentsForPersonId(
+  personId: string,
+  limit = 25,
+): Promise<UpcomingAssignment[]> {
+  if (!personId || !hasPlanningCenterCredentials()) return [];
+
   const response = await pcoFetch<PcoScheduleAttributes>(
     `/services/v2/people/${personId}/schedules`,
     {
@@ -220,26 +240,6 @@ export async function getUpcomingAssignments(
       serviceTypeName:
         plansById.get(assignment.planId) ?? assignment.serviceTypeName,
     }));
-}
-
-export async function getUpcomingAssignmentsForPersonId(
-  personId: string,
-  limit = 25,
-): Promise<UpcomingAssignment[]> {
-  if (!personId || !hasPlanningCenterCredentials()) return [];
-
-  const response = await pcoFetch<PcoScheduleAttributes>(
-    `/services/v2/people/${personId}/schedules`,
-    {
-      filter: "future",
-      order: "starts_at",
-      per_page: String(limit),
-    },
-  );
-
-  return normalizeResources(response.data)
-    .map(mapSchedule)
-    .filter((assignment): assignment is UpcomingAssignment => Boolean(assignment));
 }
 
 export async function getPlanningCenterPerson(

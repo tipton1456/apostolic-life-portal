@@ -2,7 +2,13 @@
 
 import { useRouter } from "next/navigation";
 
-export default function AssignmentCountSelect({ count }: { count: number }) {
+export default function AssignmentCountSelect({
+  count,
+  view = "mine",
+}: {
+  count: number;
+  view?: "mine" | "family";
+}) {
   const router = useRouter();
 
   return (
@@ -11,7 +17,7 @@ export default function AssignmentCountSelect({ count }: { count: number }) {
       <select
         value={count}
         onChange={(event) =>
-          router.push(`/assignments?count=${event.target.value}`)
+          router.push(`/assignments?view=${view}&count=${event.target.value}`)
         }
         className="ml-3 rounded-xl border border-white/10 bg-neutral-900 px-3 py-2 text-neutral-100 outline-none ring-lime-400 transition focus:ring-2"
       >
