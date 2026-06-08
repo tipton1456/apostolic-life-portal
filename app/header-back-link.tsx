@@ -52,6 +52,7 @@ function getBackLink(pathname: string) {
   if (
     [
       "/assignments",
+      "/admin",
       "/contact",
       "/events",
       "/give-now",

@@ -44,6 +44,20 @@ deduplicating groups across all people who match the email. Group leaders can
 view members, search people, add people, and remove people from groups through
 Elvanto.
 
+## Portal Administration
+
+Portal administrators are stored in `public.portal_users`. Apply the SQL
+migration in `supabase/migrations` before using the admin page. User
+management uses Supabase Auth Admin APIs, so this server-only variable must be
+configured locally and in Vercel:
+
+```bash
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+The migration seeds Steve Tipton's known portal emails as administrators so the
+Administration menu appears after redeploying and applying the migration.
+
 ## GroupMe Prayer Board
 
 The prayer board page reads recent messages from a GroupMe conversation. It is

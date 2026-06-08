@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getLeaderGroupsForEmail } from "@/lib/elvanto-groups";
 import { getHousehold } from "@/lib/elvanto";
+import { isCurrentUserPortalAdmin } from "@/lib/portal-users";
 import { getPlanningCenterProfilePicture } from "@/lib/planning-center";
 import { createClient } from "@/lib/supabase/server";
 import SiteNavigationMenu from "./site-navigation-menu";
@@ -18,10 +19,11 @@ export default async function SiteNavigation({
 
   if (!user) return null;
 
-  const [household, leaderGroups, planningCenterProfilePicture] = await Promise.all([
+  const [household, leaderGroups, planningCenterProfilePicture, isPortalAdmin] = await Promise.all([
     getHousehold(user.email ?? undefined),
     getLeaderGroupsForEmail(user.email ?? undefined),
     getPlanningCenterProfilePicture(user.email ?? undefined),
+    isCurrentUserPortalAdmin(),
   ]);
   const memberName = household?.primary
     ? `${household.primary.firstName} ${household.primary.lastName}`
@@ -34,6 +36,7 @@ export default async function SiteNavigation({
     { href: "/give-now", label: "Give Now" },
     { href: "/giving", label: "Giving Records" },
     { href: "/prayer-board", label: "Prayer Board" },
+    ...(isPortalAdmin ? [{ href: "/admin", label: "Administration" }] : []),
     ...(leaderGroups.length > 0
       ? [{ href: "/groups", label: "Group Management" }]
       : []),
