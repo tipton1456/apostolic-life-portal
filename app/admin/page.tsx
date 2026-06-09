@@ -28,6 +28,12 @@ const ADMIN_ITEMS: Array<{
     icon: "resources",
     label: "Cognito Forms",
   },
+  {
+    description: "Review recent production deployments and the commit trail behind portal updates.",
+    href: "/admin/deployments",
+    icon: "deployments",
+    label: "Deployment Log",
+  },
 ];
 
 export default async function AdminLandingPage() {

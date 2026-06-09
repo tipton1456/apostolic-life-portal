@@ -7,6 +7,7 @@ import {
   HeartHandshake,
   LayoutDashboard,
   Pencil,
+  Rocket,
   Search,
   ShieldCheck,
   Trash2,
@@ -19,6 +20,7 @@ export type PortalIconName =
   | "assignments"
   | "contact"
   | "dashboard"
+  | "deployments"
   | "events"
   | "expense"
   | "giving"
@@ -34,6 +36,7 @@ const iconMap: Record<PortalIconName, LucideIcon> = {
   assignments: ClipboardList,
   contact: Users,
   dashboard: LayoutDashboard,
+  deployments: Rocket,
   events: CalendarDays,
   expense: HandCoins,
   giving: CreditCard,
