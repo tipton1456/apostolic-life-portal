@@ -238,6 +238,12 @@ export async function getUpcomingAssignmentsForEmail(
   return getUpcomingAssignmentsForPersonId(personId, limit);
 }
 
+export async function hasPlanningCenterPersonForEmail(email?: string) {
+  if (isDemoEmail(email)) return true;
+
+  return Boolean(await getPlanningCenterPersonId(email));
+}
+
 export async function getUpcomingAssignmentsForPersonId(
   personId: string,
   limit = 25,

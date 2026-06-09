@@ -1,5 +1,7 @@
 import {
+  AlertTriangle,
   CalendarDays,
+  CheckCircle2,
   ClipboardList,
   CreditCard,
   FileText,
@@ -18,6 +20,8 @@ import {
 export type PortalIconName =
   | "admin"
   | "assignments"
+  | "caution"
+  | "check"
   | "contact"
   | "dashboard"
   | "deployments"
@@ -34,6 +38,8 @@ export type PortalIconName =
 const iconMap: Record<PortalIconName, LucideIcon> = {
   admin: ShieldCheck,
   assignments: ClipboardList,
+  caution: AlertTriangle,
+  check: CheckCircle2,
   contact: Users,
   dashboard: LayoutDashboard,
   deployments: Rocket,

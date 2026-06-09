@@ -143,6 +143,42 @@ export async function listPortalUsers(): Promise<PortalUser[]> {
   });
 }
 
+export async function hasPortalUserForEmail(email?: string) {
+  await requirePortalAdmin();
+
+  const normalizedEmail = String(email || "")
+    .trim()
+    .toLowerCase();
+
+  if (!normalizedEmail) return false;
+
+  const admin = createAdminClient();
+  const [{ data: profiles, error: profileError }, { data: authData, error: authError }] =
+    await Promise.all([
+      admin
+        .from("portal_users")
+        .select("id,email")
+        .ilike("email", normalizedEmail)
+        .limit(1),
+      admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+    ]);
+
+  if (profileError) {
+    console.error("Portal profile email lookup failed:", profileError);
+  }
+
+  if (authError) {
+    console.error("Portal auth email lookup failed:", authError);
+  }
+
+  return Boolean(
+    profiles?.length ||
+      authData?.users.some(
+        (user) => user.email?.trim().toLowerCase() === normalizedEmail,
+      ),
+  );
+}
+
 export async function createPortalUser(formData: FormData) {
   const currentUser = await requirePortalAdmin();
 

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { PortalIcon } from "@/app/icons";
 import { getHouseholdForAdminClone, type Household } from "@/lib/elvanto";
 import {
+  hasPlanningCenterPersonForEmail,
   getUpcomingAssignments,
   getUpcomingAssignmentsForEmail,
   type UpcomingAssignment,
 } from "@/lib/planning-center";
-import { getCurrentPortalUser } from "@/lib/portal-users";
+import { getCurrentPortalUser, hasPortalUserForEmail } from "@/lib/portal-users";
 
 type PageProps = {
   searchParams: Promise<{
@@ -27,12 +29,14 @@ export default async function CloneDashboardPage({ searchParams }: PageProps) {
 
   const { email: emailParam } = await searchParams;
   const email = normalizeEmail(emailParam);
-  const [household, assignments] = email
+  const [household, assignments, hasPortalAccount, hasPlanningCenterAccount] = email
     ? await Promise.all([
         getHouseholdForAdminClone(email),
         getUpcomingAssignments(email, 10),
+        hasPortalUserForEmail(email),
+        hasPlanningCenterPersonForEmail(email),
       ])
-    : [null, []];
+    : [null, [], false, false];
   const familyAssignments =
     household && email
       ? await getFamilyAssignmentSections(household.family, email, 10)
@@ -85,6 +89,28 @@ export default async function CloneDashboardPage({ searchParams }: PageProps) {
           </section>
         ) : (
           <section className="mt-8 space-y-8">
+            <AccountStatusGrid
+              statuses={[
+                {
+                  isReady: hasPortalAccount,
+                  label: "Portal",
+                  readyText: "Portal account found",
+                  warningText: "No portal account found",
+                },
+                {
+                  isReady: Boolean(household),
+                  label: "Elvanto",
+                  readyText: "Elvanto profile found",
+                  warningText: "No Elvanto profile found",
+                },
+                {
+                  isReady: hasPlanningCenterAccount,
+                  label: "Planning Center",
+                  readyText: "Planning Center person found",
+                  warningText: "No Planning Center person found",
+                },
+              ]}
+            />
             <CloneSummary email={email} household={household} />
             <ContactSection email={email} household={household} />
             <AssignmentsSection
@@ -100,6 +126,51 @@ export default async function CloneDashboardPage({ searchParams }: PageProps) {
         )}
       </div>
     </main>
+  );
+}
+
+type AccountStatus = {
+  isReady: boolean;
+  label: string;
+  readyText: string;
+  warningText: string;
+};
+
+function AccountStatusGrid({ statuses }: { statuses: AccountStatus[] }) {
+  return (
+    <section className="grid gap-3 md:grid-cols-3">
+      {statuses.map((status) => (
+        <article
+          key={status.label}
+          className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
+        >
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+              status.isReady
+                ? "bg-green-400/15 text-green-300"
+                : "bg-yellow-400/15 text-yellow-300"
+            }`}
+          >
+            <PortalIcon
+              className="h-5 w-5"
+              name={status.isReady ? "check" : "caution"}
+            />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-neutral-100">
+              {status.label}
+            </h2>
+            <p
+              className={`mt-0.5 text-xs ${
+                status.isReady ? "text-green-200/80" : "text-yellow-200/80"
+              }`}
+            >
+              {status.isReady ? status.readyText : status.warningText}
+            </p>
+          </div>
+        </article>
+      ))}
+    </section>
   );
 }
 
