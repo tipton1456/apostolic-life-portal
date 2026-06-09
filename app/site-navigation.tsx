@@ -1,7 +1,10 @@
 import { getLeaderGroupsForEmail } from "@/lib/elvanto-groups";
 import { getHousehold } from "@/lib/elvanto";
 import { isCurrentUserPortalAdmin } from "@/lib/portal-users";
-import { getPlanningCenterProfilePicture } from "@/lib/planning-center";
+import {
+  getPlanningCenterLeaderTeamsForEmail,
+  getPlanningCenterProfilePicture,
+} from "@/lib/planning-center";
 import { getCurrentSessionUser } from "@/lib/demo";
 import SiteNavigationMenu from "./site-navigation-menu";
 
@@ -14,9 +17,16 @@ export default async function SiteNavigation({
 
   if (!user) return null;
 
-  const [household, leaderGroups, planningCenterProfilePicture, isPortalAdmin] = await Promise.all([
+  const [
+    household,
+    leaderGroups,
+    planningCenterLeaderTeams,
+    planningCenterProfilePicture,
+    isPortalAdmin,
+  ] = await Promise.all([
     getHousehold(user.email ?? undefined),
     getLeaderGroupsForEmail(user.email ?? undefined),
+    getPlanningCenterLeaderTeamsForEmail(user.email ?? undefined),
     getPlanningCenterProfilePicture(user.email ?? undefined),
     user.isDemo ? false : isCurrentUserPortalAdmin(),
   ]);
@@ -31,9 +41,10 @@ export default async function SiteNavigation({
     { href: "/give-now", label: "Give Now" },
     { href: "/giving", label: "Giving Records" },
     { href: "/resources", label: "Resources" },
+    { href: "/my-groups", label: "My Groups" },
     { href: "/prayer-board", label: "Prayer Board" },
     ...(isPortalAdmin ? [{ href: "/admin", label: "Administration" }] : []),
-    ...(leaderGroups.length > 0
+    ...(leaderGroups.length > 0 || planningCenterLeaderTeams.length > 0
       ? [{ href: "/groups", label: "Group Management" }]
       : []),
   ];

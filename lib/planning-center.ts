@@ -49,8 +49,14 @@ type PcoTeamMemberAttributes = {
 };
 
 type PcoTeamAttributes = {
+  archived_at?: string | null;
+  deleted_at?: string | null;
   name?: string;
   sequence?: number;
+};
+
+type PcoTeamLeaderAttributes = {
+  send_responses_for_accepts?: boolean;
 };
 
 type PcoServiceTypeAttributes = {
@@ -75,7 +81,11 @@ type PcoPersonAttributes = {
 };
 
 type PcoServicesPersonAttributes = {
+  birthdate?: string;
+  first_name?: string;
   full_name?: string;
+  last_name?: string;
+  photo_thumbnail_url?: string;
 };
 
 type PcoEmailAttributes = {
@@ -139,6 +149,31 @@ export type PlanningCenterPersonSearchResult = {
   id: string;
   name: string;
   thumbnail?: string;
+};
+
+export type PlanningCenterTeamSummary = {
+  href: string;
+  id: string;
+  leaders: string;
+  name: string;
+  type: "Planning Center Team";
+};
+
+export type PlanningCenterTeamMember = {
+  birthdate: string;
+  email: string;
+  id: string;
+  isLeader: boolean;
+  mobile: string;
+  name: string;
+  picture?: string;
+  position: string;
+};
+
+export type PlanningCenterTeamDetail = {
+  id: string;
+  members: PlanningCenterTeamMember[];
+  name: string;
 };
 
 export type PlanSummary = {
@@ -316,6 +351,90 @@ export async function searchPlanningCenterPeople(
   return normalizeResources<PcoPersonAttributes>(response.data).map(
     mapPersonSearchResult,
   );
+}
+
+export async function getPlanningCenterTeamsForEmail(
+  email?: string,
+): Promise<PlanningCenterTeamSummary[]> {
+  if (isDemoEmail(email)) return samplePlanningCenterTeams;
+
+  const personId = await getPlanningCenterServicesPersonId(email);
+
+  if (!personId || !hasPlanningCenterCredentials()) return [];
+
+  const { leaderIdsByTeamId, teams } =
+    await getPlanningCenterPersonTeamBundle(personId);
+  const summaries = await Promise.all(
+    teams.map((team) =>
+      mapPlanningCenterTeamSummary(team, leaderIdsByTeamId.get(team.id)),
+    ),
+  );
+
+  return summaries.sort((firstTeam, secondTeam) =>
+    firstTeam.name.localeCompare(secondTeam.name),
+  );
+}
+
+export async function getPlanningCenterLeaderTeamsForEmail(
+  email?: string,
+): Promise<PlanningCenterTeamSummary[]> {
+  if (isDemoEmail(email)) {
+    return samplePlanningCenterTeams.filter((team) => team.id === "demo-pco-tech");
+  }
+
+  const personId = await getPlanningCenterServicesPersonId(email);
+
+  if (!personId || !hasPlanningCenterCredentials()) return [];
+
+  const { leaderIdsByTeamId, teams } =
+    await getPlanningCenterPersonTeamBundle(personId);
+  const leaderTeams = await Promise.all(
+    teams.map(async (team) => {
+      const leaderIds =
+        leaderIdsByTeamId.get(team.id) ??
+        (await getPlanningCenterTeamLeaderIds(team.id));
+
+      return leaderIds.has(personId)
+        ? await mapPlanningCenterTeamSummary(team, leaderIds)
+        : null;
+    }),
+  );
+
+  return leaderTeams
+    .filter((team): team is PlanningCenterTeamSummary => Boolean(team))
+    .sort((firstTeam, secondTeam) => firstTeam.name.localeCompare(secondTeam.name));
+}
+
+export async function getPlanningCenterLeaderTeamDetail(
+  teamId: string,
+  email?: string,
+): Promise<PlanningCenterTeamDetail | null> {
+  if (isDemoEmail(email)) {
+    return samplePlanningCenterTeamDetails.find((team) => team.id === teamId) ?? null;
+  }
+
+  const personId = await getPlanningCenterServicesPersonId(email);
+
+  if (!personId || !hasPlanningCenterCredentials()) return null;
+
+  const [team, leaderIds] = await Promise.all([
+    getPlanningCenterTeam(teamId),
+    getPlanningCenterTeamLeaderIds(teamId),
+  ]);
+
+  if (!team || !leaderIds.has(personId)) return null;
+
+  const members = await getPlanningCenterTeamPeople(teamId);
+
+  return {
+    id: team.id,
+    members: members
+      .map((member) => mapPlanningCenterTeamMember(member, leaderIds))
+      .sort((firstMember, secondMember) =>
+        firstMember.name.localeCompare(secondMember.name),
+      ),
+    name: team.attributes?.name ?? "Planning Center Team",
+  };
 }
 
 export async function getPlanDetail(
@@ -783,6 +902,109 @@ async function getPlanningCenterResources<TAttributes = Record<string, unknown>>
   return normalizeResources<TAttributes>(response.data);
 }
 
+async function getPlanningCenterPersonTeamBundle(personId: string) {
+  const response = await pcoFetch<PcoTeamAttributes>(
+    `/services/v2/people/${personId}/teams`,
+    {
+      include: "team_leaders",
+      per_page: "100",
+    },
+  );
+
+  const teamLeaderPersonIdsById = new Map(
+    normalizeResources<PcoTeamLeaderAttributes>(response.included)
+      .filter((resource) => resource.type === "TeamLeader")
+      .map((leader) => [
+        leader.id,
+        getRelationship(leader, "person")?.id,
+      ]),
+  );
+  const teams = normalizeResources<PcoTeamAttributes>(response.data).filter(
+    (team) => !team.attributes?.archived_at && !team.attributes?.deleted_at,
+  );
+  const leaderIdsByTeamId = new Map<string, Set<string>>();
+
+  for (const team of teams) {
+    const leaderIds = normalizeRelationshipArray(
+      team.relationships?.team_leaders?.data,
+    )
+      .map((leader) => teamLeaderPersonIdsById.get(leader.id))
+      .filter((id): id is string => Boolean(id));
+
+    if (leaderIds.length > 0) {
+      leaderIdsByTeamId.set(team.id, new Set(leaderIds));
+    }
+  }
+
+  return { leaderIdsByTeamId, teams };
+}
+
+async function getPlanningCenterTeam(teamId: string) {
+  const response = await pcoFetch<PcoTeamAttributes>(
+    `/services/v2/teams/${teamId}`,
+  );
+
+  return normalizeResources<PcoTeamAttributes>(response.data)[0] ?? null;
+}
+
+async function getPlanningCenterTeamPeople(teamId: string) {
+  const response = await pcoFetch<PcoServicesPersonAttributes>(
+    `/services/v2/teams/${teamId}/people`,
+    {
+      per_page: "100",
+    },
+  );
+
+  return normalizeResources<PcoServicesPersonAttributes>(response.data);
+}
+
+async function getPlanningCenterTeamLeaderIds(teamId: string) {
+  const response = await pcoFetch(`/services/v2/teams/${teamId}/team_leaders`, {
+    per_page: "100",
+  });
+
+  return new Set(
+    normalizeResources(response.data)
+      .map((leader) => getRelationship(leader, "person")?.id)
+      .filter((id): id is string => Boolean(id)),
+  );
+}
+
+async function mapPlanningCenterTeamSummary(
+  team: JsonApiResource<PcoTeamAttributes>,
+  knownLeaderIds?: Set<string>,
+): Promise<PlanningCenterTeamSummary> {
+  const leaderIds = knownLeaderIds ?? (await getPlanningCenterTeamLeaderIds(team.id));
+  const leaderNames = await getPlanningCenterServicePersonNames(
+    Array.from(leaderIds),
+  );
+
+  return {
+    href: `/groups/planning-center/${team.id}`,
+    id: team.id,
+    leaders: leaderNames.length > 0 ? leaderNames.join(", ") : "Not listed",
+    name: team.attributes?.name ?? "Planning Center Team",
+    type: "Planning Center Team",
+  };
+}
+
+async function getPlanningCenterServicePersonNames(personIds: string[]) {
+  const people = await Promise.all(
+    personIds.map(async (personId) => {
+      const response = await pcoFetch<PcoServicesPersonAttributes>(
+        `/services/v2/people/${personId}`,
+      );
+
+      return normalizeResources<PcoServicesPersonAttributes>(response.data)[0];
+    }),
+  );
+
+  return people
+    .map((person) => formatServicesPersonName(person))
+    .filter(Boolean)
+    .sort((firstName, secondName) => firstName.localeCompare(secondName));
+}
+
 function findPrimaryResource<TAttributes extends { primary?: boolean }>(
   resources: Array<JsonApiResource<TAttributes>>,
 ) {
@@ -1027,6 +1249,66 @@ function mapPersonSearchResult(
   };
 }
 
+function mapPlanningCenterTeamMember(
+  person: JsonApiResource<PcoServicesPersonAttributes>,
+  leaderIds: Set<string>,
+): PlanningCenterTeamMember {
+  return {
+    birthdate: formatPlanningCenterBirthday(person.attributes?.birthdate),
+    email: "Not listed",
+    id: person.id,
+    isLeader: leaderIds.has(person.id),
+    mobile: "Not listed",
+    name: formatServicesPersonName(person) || "Planning Center Person",
+    picture: person.attributes?.photo_thumbnail_url,
+    position: leaderIds.has(person.id) ? "Leader" : "Member",
+  };
+}
+
+function formatServicesPersonName(
+  person?: JsonApiResource<PcoServicesPersonAttributes>,
+) {
+  const attributes = person?.attributes;
+
+  if (!attributes) return "";
+
+  return (
+    attributes.full_name ||
+    [attributes.first_name, attributes.last_name].filter(Boolean).join(" ")
+  );
+}
+
+function formatPlanningCenterBirthday(birthdate?: string) {
+  if (!birthdate) return "Not listed";
+
+  const [year, month, day] = birthdate.split("-").map(Number);
+
+  if (!year || !month || !day) return birthdate;
+
+  const formattedBirthday = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+
+  return `${formattedBirthday} (Age ${calculateAge(year, month, day)})`;
+}
+
+function calculateAge(year: number, month: number, day: number) {
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const hasBirthdayPassedThisYear =
+    today.getMonth() + 1 > month ||
+    (today.getMonth() + 1 === month && today.getDate() >= day);
+
+  if (!hasBirthdayPassedThisYear) {
+    age -= 1;
+  }
+
+  return age;
+}
+
 function mapPlan(
   plan: JsonApiResource<PcoPlanAttributes>,
   serviceTypeId: string,
@@ -1219,6 +1501,62 @@ const sampleAssignments: UpcomingAssignment[] = [
     status: "Confirmed",
     team: "Production Team",
     times: "10:00 AM Call, 10:30 AM Service",
+  },
+];
+
+const samplePlanningCenterTeams: PlanningCenterTeamSummary[] = [
+  {
+    href: "/groups/planning-center/demo-pco-tech",
+    id: "demo-pco-tech",
+    leaders: "Daniel Demo, Maria Demo",
+    name: "Tech Team",
+    type: "Planning Center Team",
+  },
+  {
+    href: "/groups/planning-center/demo-pco-worship",
+    id: "demo-pco-worship",
+    leaders: "Avery Johnson",
+    name: "Worship Team",
+    type: "Planning Center Team",
+  },
+];
+
+const samplePlanningCenterTeamDetails: PlanningCenterTeamDetail[] = [
+  {
+    id: "demo-pco-tech",
+    name: "Tech Team",
+    members: [
+      {
+        birthdate: "Jan 14, 1984 (Age 42)",
+        email: "demo@apostoliclife.local",
+        id: "demo-pco-member-1",
+        isLeader: true,
+        mobile: "Not listed",
+        name: "Daniel Demo",
+        picture: "https://i.pravatar.cc/120?img=12",
+        position: "Leader",
+      },
+      {
+        birthdate: "Mar 8, 1986 (Age 40)",
+        email: "Not listed",
+        id: "demo-pco-member-2",
+        isLeader: true,
+        mobile: "Not listed",
+        name: "Maria Demo",
+        picture: "https://i.pravatar.cc/120?img=47",
+        position: "Leader",
+      },
+      {
+        birthdate: "Not listed",
+        email: "Not listed",
+        id: "demo-pco-member-3",
+        isLeader: false,
+        mobile: "Not listed",
+        name: "Jordan Carter",
+        picture: "https://i.pravatar.cc/120?img=36",
+        position: "Member",
+      },
+    ],
   },
 ];
 

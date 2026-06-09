@@ -62,6 +62,7 @@ function getBackLink(pathname: string) {
       "/give-now",
       "/giving",
       "/groups",
+      "/my-groups",
       "/prayer-board",
     ].includes(pathname)
   ) {

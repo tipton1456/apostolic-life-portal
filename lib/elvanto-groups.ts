@@ -42,6 +42,13 @@ export type LeaderGroup = {
   position: "Leader";
 };
 
+export type MemberGroupSummary = {
+  id: string;
+  leaders: string;
+  name: string;
+  type: "Elvanto Group";
+};
+
 export type GroupMember = {
   id: string;
   name: string;
@@ -103,6 +110,45 @@ export async function getLeaderGroupsForEmail(email?: string) {
   }
 
   return Array.from(leaderGroups.values()).sort((firstGroup, secondGroup) =>
+    firstGroup.name.localeCompare(secondGroup.name),
+  );
+}
+
+export async function getMemberGroupsForEmail(email?: string) {
+  if (isDemoEmail(email)) return sampleMemberGroups;
+  if (!email) return [];
+
+  const authorization = getElvantoAuthorization();
+
+  if (!authorization) return [];
+
+  const matchedPeople = await getPeopleByEmail(authorization, email);
+  const matchedPersonIds = new Set(matchedPeople.map((person) => person.id));
+
+  if (matchedPersonIds.size === 0) return [];
+
+  const groups = await getAllGroupsWithPeople(authorization);
+  const memberGroups = new Map<string, MemberGroupSummary>();
+
+  for (const group of groups) {
+    if (!group.id || !group.name) continue;
+
+    const members = dedupePeople(normalizeArray(group.people?.person));
+    const isMember = members.some(
+      (person) => person.id && matchedPersonIds.has(person.id),
+    );
+
+    if (!isMember) continue;
+
+    memberGroups.set(group.id, {
+      id: group.id,
+      leaders: formatLeaderNames(members),
+      name: group.name,
+      type: "Elvanto Group",
+    });
+  }
+
+  return Array.from(memberGroups.values()).sort((firstGroup, secondGroup) =>
     firstGroup.name.localeCompare(secondGroup.name),
   );
 }
@@ -459,6 +505,16 @@ function isLeaderPosition(position?: string) {
   return position?.toLowerCase() === "leader";
 }
 
+function formatLeaderNames(people: ElvantoGroupPerson[]) {
+  const leaders = people
+    .filter((person) => isLeaderPosition(person.position))
+    .map(formatName)
+    .filter(Boolean)
+    .sort((firstName, secondName) => firstName.localeCompare(secondName));
+
+  return leaders.length > 0 ? leaders.join(", ") : "Not listed";
+}
+
 function dedupePeople(people: ElvantoGroupPerson[]) {
   const dedupedPeople = new Map<string, ElvantoGroupPerson>();
 
@@ -476,6 +532,21 @@ const sampleLeaderGroups: LeaderGroup[] = [
     id: "demo-life-group",
     name: "Downtown Life Group",
     position: "Leader",
+  },
+];
+
+const sampleMemberGroups: MemberGroupSummary[] = [
+  {
+    id: "demo-life-group",
+    leaders: "Daniel Demo, Maria Demo",
+    name: "Downtown Life Group",
+    type: "Elvanto Group",
+  },
+  {
+    id: "demo-discipleship",
+    leaders: "Angela Reed",
+    name: "New Members Discipleship",
+    type: "Elvanto Group",
   },
 ];
 
