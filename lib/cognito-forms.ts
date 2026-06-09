@@ -48,6 +48,13 @@ export type CognitoEntryResult = {
   entryNumber?: string;
 };
 
+export type CognitoUploadedFile = {
+  ContentType: string;
+  Id: string;
+  Name: string;
+  Size: number;
+};
+
 const COGNITO_API_BASE_URL = "https://www.cognitoforms.com/api";
 
 export function hasCognitoFormsConfig() {
@@ -105,10 +112,27 @@ export async function createCognitoFormEntry(
   };
 }
 
+export async function uploadCognitoFile(file: File): Promise<CognitoUploadedFile> {
+  const body = new FormData();
+  body.append("File", file, file.name);
+
+  const result = await cognitoFetch<Record<string, unknown>>("/files", {
+    body,
+    method: "POST",
+  });
+
+  return {
+    ContentType: stringValue(result.ContentType) ?? file.type,
+    Id: stringValue(result.Id) ?? "",
+    Name: stringValue(result.Name) ?? file.name,
+    Size: numberValue(result.Size) ?? file.size,
+  };
+}
+
 async function cognitoFetch<T>(
   path: string,
   init: {
-    body?: string;
+    body?: BodyInit;
     method?: "GET" | "POST";
   } = {},
 ): Promise<T> {
@@ -124,7 +148,7 @@ async function cognitoFetch<T>(
     headers: {
       Accept: "application/json",
       Authorization: `Bearer ${apiKey}`,
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...(typeof init.body === "string" ? { "Content-Type": "application/json" } : {}),
     },
     method: init.method ?? "GET",
   });
@@ -149,6 +173,17 @@ function isObject(value: unknown): value is Record<string, unknown> {
 function stringValue(value: unknown) {
   if (typeof value === "string") return value;
   if (typeof value === "number") return String(value);
+
+  return undefined;
+}
+
+function numberValue(value: unknown) {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const number = Number(value);
+
+    return Number.isFinite(number) ? number : undefined;
+  }
 
   return undefined;
 }

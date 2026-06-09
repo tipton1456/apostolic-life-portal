@@ -1,13 +1,23 @@
 import { redirect } from "next/navigation";
-import { createCognitoFormEntry } from "@/lib/cognito-forms";
+import {
+  createCognitoFormEntry,
+  uploadCognitoFile,
+  type CognitoUploadedFile,
+} from "@/lib/cognito-forms";
 import { getCurrentSessionUser } from "@/lib/demo";
 import { getHousehold } from "@/lib/elvanto";
 import ExpenseLines from "./expense-lines";
-import { EXPENSE_LINES, REPORT_TYPE_FIELD, REPORT_TYPES } from "./expense-fields";
+import {
+  EXPENSE_LINES,
+  RECEIPT_UPLOAD_FIELD,
+  REPORT_TYPE_FIELD,
+  REPORT_TYPES,
+} from "./expense-fields";
 import SubmitButton from "./submit-button";
 
 type PageProps = {
   searchParams: Promise<{
+    error?: string;
     submitted?: string;
   }>;
 };
@@ -23,7 +33,7 @@ export default async function ExpenseReimbursementPage({
     redirect("/login");
   }
 
-  const { submitted } = await searchParams;
+  const { error, submitted } = await searchParams;
   const household = await getHousehold(user.email);
   const requesterName = household?.primary
     ? `${household.primary.firstName} ${household.primary.lastName}`
@@ -39,11 +49,24 @@ export default async function ExpenseReimbursementPage({
       redirect("/login");
     }
 
-    const entry = buildReimbursementEntry(formData, currentUser.email);
+    const receiptFiles = getReceiptFiles(formData);
+
+    if (receiptFiles.length === 0) {
+      redirect("/expense-reimbursement?error=receipt");
+    }
 
     if (currentUser.isDemo) {
       redirect("/expense-reimbursement?submitted=demo");
     }
+
+    const uploadedReceipts = await Promise.all(
+      receiptFiles.map((file) => uploadCognitoFile(file)),
+    );
+    const entry = buildReimbursementEntry(
+      formData,
+      currentUser.email,
+      uploadedReceipts,
+    );
 
     await createCognitoFormEntry(EXPENSE_REIMBURSEMENT_FORM_ID, entry);
     redirect("/expense-reimbursement?submitted=true");
@@ -69,6 +92,12 @@ export default async function ExpenseReimbursementPage({
               {submitted === "demo"
                 ? "Demo reimbursement submitted. No live Cognito entry was created."
                 : "Reimbursement submitted to Cognito Forms."}
+            </p>
+          ) : null}
+
+          {error === "receipt" ? (
+            <p className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-200">
+              Please upload a receipt before submitting the report.
             </p>
           ) : null}
         </header>
@@ -102,6 +131,24 @@ export default async function ExpenseReimbursementPage({
           </section>
 
           <ExpenseLines />
+
+          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <h2 className="text-2xl font-semibold">Receipts</h2>
+            <p className="mt-2 text-sm text-neutral-400">
+              Upload the receipt, invoice, or supporting file for this report.
+            </p>
+            <label className="mt-5 block text-sm font-medium text-neutral-300">
+              Upload Receipts / Files
+              <input
+                accept="image/*,.pdf"
+                className="mt-2 w-full rounded-xl border border-dashed border-white/15 bg-neutral-900 px-4 py-4 text-sm text-neutral-200 file:mr-4 file:rounded-lg file:border-0 file:bg-lime-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-neutral-950 hover:border-lime-400/50"
+                multiple
+                name="receipts"
+                required
+                type="file"
+              />
+            </label>
+          </section>
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
             <h2 className="text-2xl font-semibold">Comments</h2>
@@ -155,9 +202,13 @@ function Field({
   );
 }
 
-function buildReimbursementEntry(formData: FormData, fallbackEmail: string) {
+function buildReimbursementEntry(
+  formData: FormData,
+  fallbackEmail: string,
+  uploadedReceipts: CognitoUploadedFile[],
+) {
   const reportType = getReportType(formData);
-  const entry: Record<string, string | string[] | number> = {
+  const entry: Record<string, unknown> = {
     [REPORT_TYPE_FIELD]: [reportType],
     Name: getText(formData, "requesterName"),
     Event: getText(formData, "event"),
@@ -165,6 +216,10 @@ function buildReimbursementEntry(formData: FormData, fallbackEmail: string) {
     Date: getText(formData, "date"),
     RequesterComments: getText(formData, "requesterComments"),
   };
+
+  if (uploadedReceipts.length > 0) {
+    entry[RECEIPT_UPLOAD_FIELD] = uploadedReceipts;
+  }
 
   for (const line of EXPENSE_LINES) {
     const description = getText(formData, line.description);
@@ -179,6 +234,24 @@ function buildReimbursementEntry(formData: FormData, fallbackEmail: string) {
   }
 
   return entry;
+}
+
+function getReceiptFiles(formData: FormData) {
+  return formData
+    .getAll("receipts")
+    .filter((value): value is File => isUploadedFile(value));
+}
+
+function isUploadedFile(value: FormDataEntryValue): value is File {
+  return (
+    typeof value === "object" &&
+    "arrayBuffer" in value &&
+    "name" in value &&
+    "size" in value &&
+    typeof value.name === "string" &&
+    typeof value.size === "number" &&
+    value.size > 0
+  );
 }
 
 function getReportType(formData: FormData) {

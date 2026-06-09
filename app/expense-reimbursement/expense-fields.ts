@@ -1,5 +1,6 @@
 export const REPORT_TYPE_FIELD =
   "SelectTheTypeOfReportDoNotSelectMoreThanOneTypePerSubmission";
+export const RECEIPT_UPLOAD_FIELD = "UploadReceiptsFiles";
 
 export const REPORT_TYPES = [
   "Requisition",
