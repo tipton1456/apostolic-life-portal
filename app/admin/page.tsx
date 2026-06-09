@@ -14,6 +14,11 @@ const ADMIN_ITEMS = [
     href: "/admin/schedule-lookup",
     label: "Schedule Look Up",
   },
+  {
+    description: "Verify the Cognito Forms API connection and inspect available forms.",
+    href: "/admin/cognito-forms",
+    label: "Cognito Forms",
+  },
 ];
 
 export default async function AdminLandingPage() {
