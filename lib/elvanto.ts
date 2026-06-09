@@ -299,6 +299,79 @@ export async function updateContactFromForm(formData: FormData) {
   redirect(`/contact?updated=${updateStatus}`);
 }
 
+export async function updateContactFromAdminClone(formData: FormData) {
+  "use server";
+
+  const currentUser = await getCurrentPortalUser();
+
+  if (!currentUser) {
+    redirect("/login");
+  }
+
+  if (!currentUser.isAdmin) {
+    redirect("/dashboard");
+  }
+
+  const cloneEmail = normalizeOptionalInput(formData.get("cloneEmail"));
+  const personId = String(formData.get("personId") || "");
+
+  if (!cloneEmail || !personId) {
+    throw new Error("Clone email and person ID are required.");
+  }
+
+  const household = await getHouseholdForAdminClone(cloneEmail);
+
+  if (!household) {
+    throw new Error("Unable to find that household.");
+  }
+
+  const householdPeople = [household.primary, ...household.family];
+  const person = householdPeople.find((householdPerson) => householdPerson.id === personId);
+
+  if (!person) {
+    throw new Error("That person is not connected to the cloned household.");
+  }
+
+  const update: ContactUpdateInput = {
+    personId,
+    birthday: normalizeDateInput(String(formData.get("birthday") || "")),
+    email: normalizeOptionalInput(formData.get("email")),
+    mobile: normalizeOptionalInput(formData.get("mobile")),
+    phone: normalizeOptionalInput(formData.get("phone")),
+  };
+
+  await updateElvantoContact(update);
+
+  let updateStatus = "elvanto";
+
+  try {
+    const planningCenterResult = await syncPlanningCenterContactUpdate({
+      birthdate: update.birthday,
+      email: update.email,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      mobile: update.mobile,
+      phone: update.phone,
+      previousEmail: person.email,
+    });
+
+    updateStatus = planningCenterResult.matched ? "synced" : "elvanto";
+  } catch (error) {
+    console.error("Planning Center admin clone contact sync failed:", error);
+    updateStatus = "partial";
+  }
+
+  const redirectEmail =
+    person.id === household.primary.id && update.email ? update.email : cloneEmail;
+
+  revalidatePath("/admin/clone-dashboard");
+  redirect(
+    `/admin/clone-dashboard?email=${encodeURIComponent(
+      redirectEmail,
+    )}&updated=${updateStatus}`,
+  );
+}
+
 function getElvantoAuthorization() {
   const apiKey = process.env.ELVANTO_API_KEY;
 

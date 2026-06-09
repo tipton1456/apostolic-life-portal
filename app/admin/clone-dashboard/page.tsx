@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import AdminFormButton from "@/app/admin/admin-form-button";
 import { PortalIcon } from "@/app/icons";
-import { getHouseholdForAdminClone, type Household } from "@/lib/elvanto";
+import {
+  getHouseholdForAdminClone,
+  updateContactFromAdminClone,
+  type Household,
+  type HouseholdPerson,
+} from "@/lib/elvanto";
 import {
   hasPlanningCenterPersonForEmail,
   getUpcomingAssignments,
@@ -13,6 +19,7 @@ import { getCurrentPortalUser, hasPortalUserForEmail } from "@/lib/portal-users"
 type PageProps = {
   searchParams: Promise<{
     email?: string;
+    updated?: string;
   }>;
 };
 
@@ -27,7 +34,7 @@ export default async function CloneDashboardPage({ searchParams }: PageProps) {
     redirect("/dashboard");
   }
 
-  const { email: emailParam } = await searchParams;
+  const { email: emailParam, updated } = await searchParams;
   const email = normalizeEmail(emailParam);
   const [household, assignments, hasPortalAccount, hasPlanningCenterAccount] = email
     ? await Promise.all([
@@ -56,6 +63,11 @@ export default async function CloneDashboardPage({ searchParams }: PageProps) {
             Enter a member email to preview their household and Planning Center
             assignment data for troubleshooting.
           </p>
+          {updated ? (
+            <p className="mt-4 rounded-xl border border-lime-400/30 bg-lime-400/10 px-4 py-3 text-sm font-semibold text-lime-300">
+              {getUpdateMessage(updated)}
+            </p>
+          ) : null}
         </header>
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
@@ -192,8 +204,9 @@ function CloneSummary({
           : email}
       </h2>
       <p className="mt-2 text-sm text-lime-50/80">
-        This is a read-only admin troubleshooting view. It does not change the
-        active portal session, and giving records are intentionally not loaded.
+        This admin troubleshooting view does not change the active portal
+        session, and giving records are intentionally not loaded. Contact
+        changes require opening an Update Contact form.
       </p>
     </div>
   );
@@ -242,6 +255,10 @@ function ContactSection({
           <Info label="Birthdate" value={household.primary.birthday} />
           <Info label="Address" value={household.primary.address} />
         </div>
+        <AdminContactUpdateDetails
+          cloneEmail={email}
+          person={household.primary}
+        />
       </article>
 
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
@@ -276,6 +293,7 @@ function ContactSection({
                   <Info label="Mobile" value={formatUsPhone(person.mobile)} />
                   <Info label="Birthdate" value={person.birthday} />
                 </div>
+                <AdminContactUpdateDetails cloneEmail={email} person={person} />
               </article>
             ))}
           </div>
@@ -286,6 +304,82 @@ function ContactSection({
         )}
       </section>
     </section>
+  );
+}
+
+function AdminContactUpdateDetails({
+  cloneEmail,
+  person,
+}: {
+  cloneEmail: string;
+  person: HouseholdPerson;
+}) {
+  return (
+    <details className="group mt-5">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-neutral-100 transition hover:border-lime-400/60 hover:text-lime-300 group-open:border-lime-400/60 group-open:text-lime-300 [&::-webkit-details-marker]:hidden">
+        <PortalIcon className="h-4 w-4" name="update" />
+        <span>Update Contact</span>
+      </summary>
+
+      <form
+        action={updateContactFromAdminClone}
+        className="mt-5 border-t border-white/10 pt-5"
+      >
+        <input type="hidden" name="cloneEmail" value={cloneEmail} />
+        <input type="hidden" name="personId" value={person.id} />
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextInput
+            label="Email"
+            name="email"
+            type="email"
+            defaultValue={editableValue(person.email)}
+          />
+          <TextInput
+            label="Phone"
+            name="phone"
+            defaultValue={editableValue(person.phone)}
+          />
+          <TextInput
+            label="Mobile"
+            name="mobile"
+            defaultValue={editableValue(person.mobile)}
+          />
+          <TextInput
+            label="Birthdate"
+            name="birthday"
+            type="date"
+            defaultValue={person.birthdayValue}
+          />
+        </div>
+        <AdminFormButton pendingLabel="Saving..." className="mt-5">
+          Save Contact
+        </AdminFormButton>
+      </form>
+    </details>
+  );
+}
+
+function TextInput({
+  defaultValue,
+  label,
+  name,
+  type = "text",
+}: {
+  defaultValue: string;
+  label: string;
+  name: string;
+  type?: string;
+}) {
+  return (
+    <label className="block text-sm font-medium text-neutral-300">
+      {label}
+      <input
+        type={type}
+        name={name}
+        defaultValue={defaultValue}
+        className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
+      />
+    </label>
   );
 }
 
@@ -481,6 +575,10 @@ function normalizeEmail(email?: string) {
   return normalized;
 }
 
+function editableValue(value: string) {
+  return value === "Not listed" ? "" : value;
+}
+
 function formatUsPhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
 
@@ -493,4 +591,16 @@ function formatUsPhone(phone: string) {
   }
 
   return phone;
+}
+
+function getUpdateMessage(updated: string) {
+  if (updated === "synced") {
+    return "Contact updated in Elvanto and synced to Planning Center where matched.";
+  }
+
+  if (updated === "partial") {
+    return "Contact updated in Elvanto, but Planning Center sync needs review.";
+  }
+
+  return "Contact updated in Elvanto. No matching Planning Center person was found.";
 }
