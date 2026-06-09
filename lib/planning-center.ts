@@ -74,6 +74,10 @@ type PcoPersonAttributes = {
   name?: string;
 };
 
+type PcoServicesPersonAttributes = {
+  full_name?: string;
+};
+
 type PcoEmailAttributes = {
   address?: string;
   location?: string;
@@ -209,7 +213,7 @@ export async function getUpcomingAssignments(
 ): Promise<UpcomingAssignment[]> {
   if (isDemoEmail(email)) return sampleAssignments.slice(0, limit);
 
-  const personId = await getPlanningCenterPersonId(email);
+  const personId = await getPlanningCenterServicesPersonId(email);
 
   if (!personId) {
     return shouldUseSampleData() ? sampleAssignments.slice(0, limit) : [];
@@ -231,7 +235,7 @@ export async function getUpcomingAssignmentsForEmail(
     }));
   }
 
-  const personId = await getPlanningCenterPersonId(email);
+  const personId = await getPlanningCenterServicesPersonId(email);
 
   if (!personId) return [];
 
@@ -241,7 +245,12 @@ export async function getUpcomingAssignmentsForEmail(
 export async function hasPlanningCenterPersonForEmail(email?: string) {
   if (isDemoEmail(email)) return true;
 
-  return Boolean(await getPlanningCenterPersonId(email));
+  const [peoplePersonId, servicesPersonId] = await Promise.all([
+    getPlanningCenterPersonId(email),
+    getPlanningCenterServicesPersonId(email),
+  ]);
+
+  return Boolean(peoplePersonId || servicesPersonId);
 }
 
 export async function getUpcomingAssignmentsForPersonId(
@@ -577,6 +586,55 @@ async function getPlanningCenterPersonId(email?: string) {
     const person = getRelationship(emailRecord, "person");
 
     if (person?.id) return person.id;
+  }
+
+  return null;
+}
+
+async function getPlanningCenterServicesPersonId(email?: string) {
+  if (!email || !hasPlanningCenterCredentials()) return null;
+
+  const lookupEmailSet = new Set(getPlanningCenterLookupEmails(email));
+  let offset = 0;
+  const perPage = 100;
+
+  while (offset < 1000) {
+    const response = await pcoFetch<PcoServicesPersonAttributes>(
+      "/services/v2/people",
+      {
+        include: "emails",
+        offset: String(offset),
+        per_page: String(perPage),
+      },
+    );
+    const people = normalizeResources<PcoServicesPersonAttributes>(response.data);
+    const emailsById = new Map(
+      normalizeResources<PcoEmailAttributes>(response.included)
+        .filter((resource) => resource.type === "Email")
+        .map((resource) => [
+          resource.id,
+          resource.attributes?.address?.trim().toLowerCase(),
+        ]),
+    );
+
+    for (const person of people) {
+      const emailRelationships = normalizeRelationshipArray(
+        person.relationships?.emails?.data,
+      );
+      const hasMatchingEmail = emailRelationships.some((emailRelationship) => {
+        const address = emailsById.get(emailRelationship.id);
+
+        return Boolean(address && lookupEmailSet.has(address));
+      });
+
+      if (hasMatchingEmail) {
+        return person.id;
+      }
+    }
+
+    if (people.length < perPage) break;
+
+    offset += perPage;
   }
 
   return null;
@@ -1081,6 +1139,14 @@ function getRelationship(resource: JsonApiResource | undefined, name: string) {
   if (!data || Array.isArray(data)) return null;
 
   return data;
+}
+
+function normalizeRelationshipArray(
+  relationship: JsonApiRelationship["data"] | null | undefined,
+) {
+  if (!relationship) return [];
+
+  return Array.isArray(relationship) ? relationship : [relationship];
 }
 
 function formatStatus(status?: string) {
