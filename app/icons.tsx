@@ -8,6 +8,7 @@ import {
   HandCoins,
   HeartHandshake,
   LayoutDashboard,
+  MessageSquareText,
   Pencil,
   Rocket,
   Search,
@@ -23,6 +24,7 @@ export type PortalIconName =
   | "caution"
   | "check"
   | "contact"
+  | "communications"
   | "dashboard"
   | "deployments"
   | "events"
@@ -41,6 +43,7 @@ const iconMap: Record<PortalIconName, LucideIcon> = {
   caution: AlertTriangle,
   check: CheckCircle2,
   contact: Users,
+  communications: MessageSquareText,
   dashboard: LayoutDashboard,
   deployments: Rocket,
   events: CalendarDays,

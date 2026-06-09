@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { PortalIcon } from "@/app/icons";
+import { sendGroupSms } from "@/lib/communications";
 import {
   addPersonToGroup,
   getLeaderGroupDetail,
@@ -8,8 +8,8 @@ import {
   updateGroupMemberLeader,
 } from "@/lib/elvanto-groups";
 import { getCurrentSessionUser } from "@/lib/demo";
+import GroupCommunicationPanel from "./group-communication-panel";
 import GroupMemberSearch from "./group-member-search";
-import LeaderToggle from "./leader-toggle";
 
 type PageProps = {
   params: Promise<{
@@ -17,6 +17,7 @@ type PageProps = {
   }>;
   searchParams: Promise<{
     edit?: string;
+    sms?: string;
   }>;
 };
 
@@ -25,7 +26,7 @@ export default async function GroupDetailPage({
   searchParams,
 }: PageProps) {
   const { groupId } = await params;
-  const { edit } = await searchParams;
+  const { edit, sms } = await searchParams;
   const isEditing = edit === "true";
   const user = await getCurrentSessionUser();
 
@@ -78,105 +79,15 @@ export default async function GroupDetailPage({
           />
         ) : null}
 
-        <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[780px] text-left text-sm">
-              <thead className="border-b border-white/10 text-xs uppercase tracking-[0.18em] text-neutral-500">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Name</th>
-                  <th className="px-5 py-3 font-medium">Leader</th>
-                  <th className="px-5 py-3 font-medium">Birthdate</th>
-                  <th className="px-5 py-3 font-medium">Mobile</th>
-                  <th className="px-5 py-3 font-medium">Email</th>
-                  {isEditing ? (
-                    <th className="px-5 py-3 text-right font-medium">Edit</th>
-                  ) : null}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {group.members.map((member) => (
-                  <tr key={member.id} className="transition hover:bg-white/[0.06]">
-                    <td className="px-5 py-4 font-semibold text-neutral-100">
-                      <div className="flex items-center gap-3">
-                        {member.picture ? (
-                          <img
-                            src={member.picture}
-                            alt={member.name}
-                            className="h-8 w-8 shrink-0 rounded-full object-cover"
-                          />
-                        ) : (
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-lime-400 text-xs font-bold text-neutral-950">
-                            {getInitials(member.name)}
-                          </span>
-                        )}
-                        <span>{member.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      {member.isLeader ? (
-                        <span
-                          aria-label="Leader"
-                          title="Leader"
-                          className="block h-2.5 w-2.5 rounded-full bg-green-400"
-                        />
-                      ) : (
-                        <span className="text-neutral-600">-</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4 text-neutral-300">
-                      {member.birthdate}
-                    </td>
-                    <td className="px-5 py-4 text-neutral-300">
-                      {member.mobile}
-                    </td>
-                    <td className="px-5 py-4 text-neutral-300">
-                      {member.email}
-                    </td>
-                    {isEditing ? (
-                      <td className="px-5 py-4 text-right">
-                        <div className="flex items-center justify-end gap-4">
-                          <LeaderToggle
-                            groupId={group.id}
-                            isLeader={member.isLeader}
-                            memberId={member.id}
-                            memberName={member.name}
-                            updateLeaderAction={updateGroupMemberLeader}
-                          />
-                          <form action={removePersonFromGroup}>
-                            <input type="hidden" name="groupId" value={group.id} />
-                            <input
-                              type="hidden"
-                              name="personId"
-                              value={member.id}
-                            />
-                            <button
-                              type="submit"
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-red-300 transition hover:border-red-300/60 hover:bg-red-400/10"
-                              aria-label={`Remove ${member.name}`}
-                              title={`Remove ${member.name}`}
-                            >
-                              <PortalIcon className="h-4 w-4" name="trash" />
-                            </button>
-                          </form>
-                        </div>
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <GroupCommunicationPanel
+          group={group}
+          isEditing={isEditing}
+          removePersonAction={removePersonFromGroup}
+          sendSmsAction={sendGroupSms}
+          smsStatus={sms}
+          updateLeaderAction={updateGroupMemberLeader}
+        />
       </div>
     </main>
   );
-}
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
 }

@@ -9,6 +9,7 @@ type ElvantoGroupPerson = {
   preferred_name?: string;
   lastname?: string;
   email?: string;
+  phone?: string;
   mobile?: string;
   birthday?: string;
   picture?: string;
@@ -29,6 +30,7 @@ type ElvantoPerson = {
   preferred_name?: string;
   lastname?: string;
   email?: string;
+  phone?: string;
   mobile?: string;
   birthday?: string;
   picture?: string;
@@ -349,6 +351,8 @@ async function getPersonInfo(authorization: string, personId: string) {
   const result = await postElvanto(authorization, "people/getInfo.json", {
     id: personId,
     "fields[0]": "birthday",
+    "fields[1]": "phone",
+    "fields[2]": "mobile",
   });
 
   return normalizeArray<ElvantoPerson>(result?.person)[0] ?? null;
@@ -397,7 +401,7 @@ function mapGroupMember(person: Partial<ElvantoGroupPerson>): GroupMember {
     id: person.id ?? "",
     name: formatName(person),
     birthdate: formatBirthday(person.birthday),
-    mobile: person.mobile || "Not listed",
+    mobile: person.mobile || person.phone || "Not listed",
     email: person.email || "Not listed",
     position,
     isLeader: isLeaderPosition(position),
@@ -505,7 +509,7 @@ const sampleGroupDetails: GroupDetail[] = [
         birthdate: "Apr 19, 1991 (35)",
         email: "caleb.martin@example.com",
         isLeader: false,
-        mobile: "(662) 555-2310",
+        mobile: "(662) 555-2311",
         name: "Caleb Martin",
         picture: "https://i.pravatar.cc/120?img=54",
         position: "Member",

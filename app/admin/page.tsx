@@ -46,6 +46,12 @@ const ADMIN_ITEMS: Array<{
     icon: "deployments",
     label: "Deployment Log",
   },
+  {
+    description: "Review SMS messages sent from group management and recipient delivery results.",
+    href: "/admin/communications",
+    icon: "communications",
+    label: "Communication Log",
+  },
 ];
 
 export default async function AdminLandingPage() {
