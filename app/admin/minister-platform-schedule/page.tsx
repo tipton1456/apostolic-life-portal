@@ -110,31 +110,31 @@ function CalendarView({
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-      <div className="flex flex-col gap-4 border-b border-white/10 px-5 py-4 md:flex-row md:items-center md:justify-between">
-        <h2 className="text-2xl font-semibold">{month.title}</h2>
+    <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
+      <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-3 md:flex-row md:items-center md:justify-between">
+        <h2 className="text-xl font-semibold">{month.title}</h2>
         <div className="flex flex-wrap gap-2">
           {previousMonth ? (
             <Link
               href={`/admin/minister-platform-schedule?view=calendar&month=${previousMonth}`}
-              className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:border-lime-400/60 hover:text-lime-300"
+              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-lime-400/60 hover:text-lime-300"
             >
               Previous Month
             </Link>
           ) : (
-            <span className="rounded-xl border border-white/5 px-4 py-2 text-sm font-semibold text-neutral-600">
+            <span className="rounded-lg border border-white/5 px-3 py-1.5 text-xs font-semibold text-neutral-600">
               Previous Month
             </span>
           )}
           {nextMonth ? (
             <Link
               href={`/admin/minister-platform-schedule?view=calendar&month=${nextMonth}`}
-              className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:border-lime-400/60 hover:text-lime-300"
+              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-neutral-200 transition hover:border-lime-400/60 hover:text-lime-300"
             >
               Next Month
             </Link>
           ) : (
-            <span className="rounded-xl border border-white/5 px-4 py-2 text-sm font-semibold text-neutral-600">
+            <span className="rounded-lg border border-white/5 px-3 py-1.5 text-xs font-semibold text-neutral-600">
               Next Month
             </span>
           )}
@@ -142,7 +142,7 @@ function CalendarView({
       </div>
       <div className="grid grid-cols-7 border-b border-white/10 bg-neutral-950/50 text-center text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
         {WEEKDAY_LABELS.map((label) => (
-          <div key={label} className="px-2 py-3">
+          <div key={label} className="px-2 py-2">
             {label}
           </div>
         ))}
@@ -153,16 +153,16 @@ function CalendarView({
             key={day.key}
             className={
               day.inMonth
-                ? "min-h-36 border-b border-white/10 p-3 md:border-r"
-                : "hidden min-h-36 border-b border-white/10 bg-neutral-950/40 p-3 text-neutral-600 md:block md:border-r"
+                ? "min-h-28 border-b border-white/10 p-2 md:border-r"
+                : "hidden min-h-28 border-b border-white/10 bg-neutral-950/40 p-2 text-neutral-600 md:block md:border-r"
             }
           >
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-2 flex items-center justify-between">
               <span
                 className={
                   day.isToday
-                    ? "flex h-7 w-7 items-center justify-center rounded-full bg-lime-400 text-sm font-bold text-neutral-950"
-                    : "text-sm font-semibold text-neutral-300"
+                    ? "flex h-6 w-6 items-center justify-center rounded-full bg-lime-400 text-xs font-bold text-neutral-950"
+                    : "text-xs font-semibold text-neutral-300"
                 }
               >
                 {day.dayNumber}
@@ -173,7 +173,7 @@ function CalendarView({
                 </span>
               ) : null}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {day.planGroups.map((planGroup) => (
                 <PlanCard key={planGroup.id} compact planGroup={planGroup} />
               ))}
@@ -193,7 +193,7 @@ function ListView({
   const planGroups = groupAssignmentsByPlan(assignments);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-3 lg:grid-cols-2">
       {planGroups.map((planGroup) => (
         <PlanCard key={planGroup.id} planGroup={planGroup} />
       ))}
@@ -212,16 +212,16 @@ function PlanCard({
     <div
       className={
         compact
-          ? "rounded-lg border border-white/10 bg-neutral-950/60 p-2"
-          : "rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+          ? "rounded-md border border-white/10 bg-neutral-950/60 p-2"
+          : "rounded-xl border border-white/10 bg-white/[0.03] p-4"
       }
     >
       <div className="flex flex-col gap-1">
         <p
           className={
             compact
-              ? "text-xs font-semibold text-neutral-100"
-              : "text-lg font-semibold text-neutral-100"
+              ? "text-[11px] font-semibold leading-tight text-neutral-100"
+              : "text-base font-semibold leading-tight text-neutral-100"
           }
         >
           {planGroup.planName}
@@ -229,8 +229,8 @@ function PlanCard({
         <p
           className={
             compact
-              ? "text-xs text-lime-300"
-              : "text-sm font-semibold text-lime-300"
+              ? "text-[11px] leading-tight text-lime-300"
+              : "text-xs font-semibold text-lime-300"
           }
         >
           {formatDate(planGroup.dateLabel)}
@@ -239,7 +239,7 @@ function PlanCard({
 
       <div
         className={
-          compact ? "mt-3 space-y-3" : "mt-5 grid gap-4 md:grid-cols-2"
+          compact ? "mt-2 space-y-2" : "mt-3 grid gap-3 md:grid-cols-2"
         }
       >
         {POSITION_ORDER.map((position) => {
@@ -252,11 +252,11 @@ function PlanCard({
           if (positionAssignments.length === 0) return null;
 
           return (
-            <div key={position} className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+            <div key={position} className="space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
                 {position}
               </p>
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {positionAssignments.map((assignment) => (
                   <PersonLine key={assignment.id} assignment={assignment} />
                 ))}
@@ -277,7 +277,7 @@ function PersonLine({
   const declined = isDeclined(assignment.status);
 
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <div className="flex items-center gap-1.5 text-xs leading-tight">
       <StatusDot status={assignment.status} />
       <span
         className={
@@ -298,7 +298,7 @@ function StatusDot({ status }: { status: string }) {
       <span
         aria-label={`${status} status`}
         title={status}
-        className={`h-2.5 w-2.5 shrink-0 rounded-full ${getStatusColor(status)}`}
+        className={`h-2 w-2 shrink-0 rounded-full ${getStatusColor(status)}`}
       />
       <span className="sr-only">{status}</span>
     </span>
