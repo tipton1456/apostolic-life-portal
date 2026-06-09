@@ -332,13 +332,26 @@ export async function updateContactFromAdminClone(formData: FormData) {
     throw new Error("That person is not connected to the cloned household.");
   }
 
+  let pictureFile: File | undefined;
+
+  try {
+    pictureFile = getImageFile(formData.get("profilePicture"));
+  } catch (error) {
+    console.error("Admin clone photo validation failed:", error);
+    redirect(
+      `/admin/clone-dashboard?email=${encodeURIComponent(
+        cloneEmail,
+      )}&updated=photo-error`,
+    );
+  }
+
   const update: ContactUpdateInput = {
     personId,
     birthday: normalizeDateInput(String(formData.get("birthday") || "")),
     email: normalizeOptionalInput(formData.get("email")),
     mobile: normalizeOptionalInput(formData.get("mobile")),
     phone: normalizeOptionalInput(formData.get("phone")),
-    pictureFile: getImageFile(formData.get("profilePicture")),
+    pictureFile,
   };
 
   await updateElvantoContact(update);

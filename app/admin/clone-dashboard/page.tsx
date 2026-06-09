@@ -621,5 +621,9 @@ function getUpdateMessage(updated: string) {
     return "Contact updated in Elvanto, but Planning Center sync needs review.";
   }
 
+  if (updated === "photo-error") {
+    return "Photo upload failed. Please use a JPG, PNG, or WebP image under 5MB.";
+  }
+
   return "Contact updated in Elvanto. No matching Planning Center person was found.";
 }
