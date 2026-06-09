@@ -64,7 +64,22 @@ export type CognitoUploadedFile = {
   Size: number;
 };
 
+export type CognitoExpenseEntry = {
+  amountTotal: number;
+  dateSubmitted: string;
+  email: string;
+  entryId: string;
+  event: string;
+  id: number;
+  requestDate: string;
+  reportType: string;
+  status: string;
+};
+
 const COGNITO_API_BASE_URL = "https://www.cognitoforms.com/api";
+const COGNITO_ODATA_BASE_URL = "https://www.cognitoforms.com/api/odata";
+const EXPENSE_REIMBURSEMENT_FORM_ID = "3";
+const EXPENSE_REIMBURSEMENT_VIEW_ID = "1";
 
 export function hasCognitoFormsConfig() {
   return Boolean(process.env.COGNITO_FORMS_API_KEY);
@@ -157,6 +172,28 @@ export async function uploadCognitoFile(file: File): Promise<CognitoUploadedFile
   };
 }
 
+export async function listCognitoExpenseEntriesByEmail(
+  email: string,
+): Promise<CognitoExpenseEntry[]> {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!normalizedEmail) return [];
+
+  const result = await cognitoODataFetch<{
+    value?: Record<string, unknown>[];
+  }>(
+    `/Forms(${EXPENSE_REIMBURSEMENT_FORM_ID})/Views(${EXPENSE_REIMBURSEMENT_VIEW_ID})/Entries`,
+  );
+
+  return (result.value ?? [])
+    .map(mapExpenseEntry)
+    .filter((entry): entry is CognitoExpenseEntry => Boolean(entry))
+    .filter((entry) => entry.email.toLowerCase() === normalizedEmail)
+    .sort((firstEntry, secondEntry) =>
+      secondEntry.dateSubmitted.localeCompare(firstEntry.dateSubmitted),
+    );
+}
+
 async function cognitoFetch<T>(
   path: string,
   init: {
@@ -194,6 +231,34 @@ async function cognitoFetch<T>(
   return response.json();
 }
 
+async function cognitoODataFetch<T>(path: string): Promise<T> {
+  const apiKey = process.env.COGNITO_FORMS_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Cognito Forms API key is not configured.");
+  }
+
+  const response = await fetch(`${COGNITO_ODATA_BASE_URL}${path}`, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Cognito Forms OData request failed:", {
+      path,
+      status: response.status,
+      body: errorText.slice(0, 500),
+    });
+    throw new Error("Cognito Forms OData request failed.");
+  }
+
+  return response.json();
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
@@ -214,6 +279,28 @@ function numberValue(value: unknown) {
   }
 
   return undefined;
+}
+
+function mapExpenseEntry(
+  entry: Record<string, unknown>,
+): CognitoExpenseEntry | null {
+  const id = numberValue(entry.Id);
+
+  if (!id) return null;
+
+  return {
+    amountTotal: numberValue(entry.Total) ?? 0,
+    dateSubmitted: stringValue(entry.Entry_DateSubmitted) ?? "",
+    email: stringValue(entry.Email) ?? "",
+    entryId: `${EXPENSE_REIMBURSEMENT_FORM_ID}-${id}`,
+    event: stringValue(entry.Event) ?? "",
+    id,
+    requestDate: stringValue(entry.Date) ?? "",
+    reportType:
+      stringValue(entry.SelectTheTypeOfReportDoNotSelectMoreThanOneTypePerSubmission) ??
+      "",
+    status: stringValue(entry.Entry_Status) ?? "Submitted",
+  };
 }
 
 function mapForm(form: CognitoFormResponse): CognitoFormSummary | null {

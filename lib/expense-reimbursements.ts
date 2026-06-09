@@ -2,7 +2,9 @@
 
 import {
   getCognitoFormEntry,
+  listCognitoExpenseEntriesByEmail,
   type CognitoEntryMetadata,
+  type CognitoExpenseEntry,
 } from "@/lib/cognito-forms";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,7 +13,7 @@ export type ExpenseReimbursementTracker = {
   cognitoEntryId: string;
   createdAt: string;
   event: string;
-  id: number;
+  id: string;
   requestDate: string;
   reportType: string;
   status: string;
@@ -85,7 +87,7 @@ export async function listExpenseReimbursementTrackers(): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
+  if (!user?.email) {
     return { error: false, items: [] };
   }
 
@@ -97,15 +99,21 @@ export async function listExpenseReimbursementTrackers(): Promise<{
     .order("created_at", { ascending: false })
     .limit(25);
 
+  let rows: ExpenseReimbursementRow[] = [];
+
   if (error) {
     console.error("Expense reimbursement tracking lookup failed:", error);
-    return { error: true, items: [] };
+  } else {
+    rows = (data ?? []) as ExpenseReimbursementRow[];
   }
 
-  const rows = (data ?? []) as ExpenseReimbursementRow[];
-  const items = await Promise.all(rows.map(mapTrackerRow));
+  const [localItems, cognitoItems] = await Promise.all([
+    Promise.all(rows.map(mapTrackerRow)),
+    listCognitoTrackers(user.email),
+  ]);
+  const items = mergeTrackers(localItems, cognitoItems);
 
-  return { error: false, items };
+  return { error: Boolean(error) && items.length === 0, items };
 }
 
 async function mapTrackerRow(
@@ -118,13 +126,72 @@ async function mapTrackerRow(
     cognitoEntryId: row.cognito_entry_id,
     createdAt: row.created_at,
     event: row.event ?? "",
-    id: row.id,
+    id: `local-${row.id}`,
     requestDate: row.request_date ?? "",
     reportType: row.report_type ?? "",
     status: metadata?.status || "Submitted",
     updatedAt: metadata?.dateUpdated || row.updated_at,
     workflowAction: metadata?.action || "Submit",
   };
+}
+
+async function listCognitoTrackers(
+  email: string,
+): Promise<ExpenseReimbursementTracker[]> {
+  try {
+    const entries = await listCognitoExpenseEntriesByEmail(email);
+
+    return entries.map(mapCognitoTracker);
+  } catch (error) {
+    console.error("Expense reimbursement Cognito entry list failed:", error);
+    return [];
+  }
+}
+
+function mapCognitoTracker(
+  entry: CognitoExpenseEntry,
+): ExpenseReimbursementTracker {
+  return {
+    amountTotal: entry.amountTotal,
+    cognitoEntryId: entry.entryId,
+    createdAt: entry.dateSubmitted,
+    event: entry.event,
+    id: `cognito-${entry.id}`,
+    requestDate: entry.requestDate,
+    reportType: entry.reportType,
+    status: entry.status || "Submitted",
+    updatedAt: entry.dateSubmitted,
+    workflowAction: entry.status || "Submitted",
+  };
+}
+
+function mergeTrackers(
+  localItems: ExpenseReimbursementTracker[],
+  cognitoItems: ExpenseReimbursementTracker[],
+) {
+  const merged = new Map<string, ExpenseReimbursementTracker>();
+
+  for (const item of localItems) {
+    merged.set(getEntryMergeKey(item.cognitoEntryId), item);
+  }
+
+  for (const item of cognitoItems) {
+    merged.set(getEntryMergeKey(item.cognitoEntryId), item);
+  }
+
+  return Array.from(merged.values())
+    .sort((firstItem, secondItem) =>
+      getSortableDate(secondItem).localeCompare(getSortableDate(firstItem)),
+    )
+    .slice(0, 25);
+}
+
+function getEntryMergeKey(entryId: string) {
+  return entryId.split("-").pop() || entryId;
+}
+
+function getSortableDate(item: ExpenseReimbursementTracker) {
+  return item.requestDate || item.createdAt || item.updatedAt || "";
 }
 
 async function getEntryMetadata(
