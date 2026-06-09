@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { syncPlanningCenterContactUpdate } from "./planning-center";
 import { isDemoEmail, isDemoMode } from "./demo";
+import { getCurrentPortalUser } from "./portal-users";
 
 type ElvantoPerson = {
   id?: string;
@@ -41,7 +42,7 @@ type ElvantoFamilyMember = {
   relationship?: string;
 };
 
-type HouseholdPerson = {
+export type HouseholdPerson = {
   id: string;
   firstName: string;
   lastName: string;
@@ -54,7 +55,7 @@ type HouseholdPerson = {
   picture?: string;
 };
 
-type Household = {
+export type Household = {
   primary: HouseholdPerson & { address: string; addressFields: AddressFields };
   family: HouseholdPerson[];
 };
@@ -103,6 +104,28 @@ export async function getHousehold(email?: string): Promise<Household | null> {
   if (isDemoEmail(email) || (await isDemoMode())) return sampleHousehold;
   if (!email) return sampleHousehold;
 
+  return getHouseholdForEmail(email, true);
+}
+
+export async function getHouseholdForAdminClone(
+  email?: string,
+): Promise<Household | null> {
+  const currentUser = await getCurrentPortalUser();
+
+  if (!currentUser?.isAdmin) {
+    return null;
+  }
+
+  if (isDemoEmail(email)) return sampleHousehold;
+  if (!email) return null;
+
+  return getHouseholdForEmail(email, false);
+}
+
+async function getHouseholdForEmail(
+  email: string,
+  requireMatchingLoginEmail: boolean,
+): Promise<Household | null> {
   const supabase = await createClient();
 
   const {
@@ -111,7 +134,10 @@ export async function getHousehold(email?: string): Promise<Household | null> {
 
   if (!user) return sampleHousehold;
 
-  if (!user.email || user.email.toLowerCase() !== email.toLowerCase()) {
+  if (
+    requireMatchingLoginEmail &&
+    (!user.email || user.email.toLowerCase() !== email.toLowerCase())
+  ) {
     console.error("Elvanto lookup blocked because login email did not match.");
     return null;
   }

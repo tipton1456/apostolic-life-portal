@@ -23,6 +23,12 @@ const ADMIN_ITEMS: Array<{
     label: "Schedule Look Up",
   },
   {
+    description: "Preview a member dashboard by email for testing and support.",
+    href: "/admin/clone-dashboard",
+    icon: "dashboard",
+    label: "Clone Dashboard",
+  },
+  {
     description: "View upcoming Minister and Platform assignments from Planning Center.",
     href: "/admin/minister-platform-schedule",
     icon: "assignments",
