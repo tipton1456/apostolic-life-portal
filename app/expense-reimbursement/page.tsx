@@ -13,6 +13,7 @@ import {
   REPORT_TYPE_FIELD,
   REPORT_TYPES,
 } from "./expense-fields";
+import ReceiptUpload from "./receipt-upload";
 import SubmitButton from "./submit-button";
 
 type PageProps = {
@@ -23,6 +24,7 @@ type PageProps = {
 };
 
 const EXPENSE_REIMBURSEMENT_FORM_ID = "3";
+const MAX_RECEIPT_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 export default async function ExpenseReimbursementPage({
   searchParams,
@@ -55,20 +57,30 @@ export default async function ExpenseReimbursementPage({
       redirect("/expense-reimbursement?error=receipt");
     }
 
+    if (getTotalFileSize(receiptFiles) > MAX_RECEIPT_UPLOAD_BYTES) {
+      redirect("/expense-reimbursement?error=receipt-size");
+    }
+
     if (currentUser.isDemo) {
       redirect("/expense-reimbursement?submitted=demo");
     }
 
-    const uploadedReceipts = await Promise.all(
-      receiptFiles.map((file) => uploadCognitoFile(file)),
-    );
-    const entry = buildReimbursementEntry(
-      formData,
-      currentUser.email,
-      uploadedReceipts,
-    );
+    try {
+      const uploadedReceipts = await Promise.all(
+        receiptFiles.map((file) => uploadCognitoFile(file)),
+      );
+      const entry = buildReimbursementEntry(
+        formData,
+        currentUser.email,
+        uploadedReceipts,
+      );
 
-    await createCognitoFormEntry(EXPENSE_REIMBURSEMENT_FORM_ID, entry);
+      await createCognitoFormEntry(EXPENSE_REIMBURSEMENT_FORM_ID, entry);
+    } catch (error) {
+      console.error("Expense reimbursement submission failed:", error);
+      redirect("/expense-reimbursement?error=submit");
+    }
+
     redirect("/expense-reimbursement?submitted=true");
   }
 
@@ -98,6 +110,19 @@ export default async function ExpenseReimbursementPage({
           {error === "receipt" ? (
             <p className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-200">
               Please upload a receipt before submitting the report.
+            </p>
+          ) : null}
+
+          {error === "receipt-size" ? (
+            <p className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-200">
+              Receipt uploads must be 4 MB or less total.
+            </p>
+          ) : null}
+
+          {error === "submit" ? (
+            <p className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-200">
+              The reimbursement could not be submitted. Please try again with a
+              smaller receipt file.
             </p>
           ) : null}
         </header>
@@ -132,23 +157,7 @@ export default async function ExpenseReimbursementPage({
 
           <ExpenseLines />
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-            <h2 className="text-2xl font-semibold">Receipts</h2>
-            <p className="mt-2 text-sm text-neutral-400">
-              Upload the receipt, invoice, or supporting file for this report.
-            </p>
-            <label className="mt-5 block text-sm font-medium text-neutral-300">
-              Upload Receipts / Files
-              <input
-                accept="image/*,.pdf"
-                className="mt-2 w-full rounded-xl border border-dashed border-white/15 bg-neutral-900 px-4 py-4 text-sm text-neutral-200 file:mr-4 file:rounded-lg file:border-0 file:bg-lime-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-neutral-950 hover:border-lime-400/50"
-                multiple
-                name="receipts"
-                required
-                type="file"
-              />
-            </label>
-          </section>
+          <ReceiptUpload />
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
             <h2 className="text-2xl font-semibold">Comments</h2>
@@ -240,6 +249,10 @@ function getReceiptFiles(formData: FormData) {
   return formData
     .getAll("receipts")
     .filter((value): value is File => isUploadedFile(value));
+}
+
+function getTotalFileSize(files: File[]) {
+  return files.reduce((totalSize, file) => totalSize + file.size, 0);
 }
 
 function isUploadedFile(value: FormDataEntryValue): value is File {
