@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { PortalIcon } from "@/app/icons";
 import { getHousehold, updateContactFromForm } from "@/lib/elvanto";
 import { getPlanningCenterProfilePicture } from "@/lib/planning-center";
 import { getCurrentSessionUser } from "@/lib/demo";
@@ -271,27 +272,9 @@ function Info({ label, value }: { label: string; value: string }) {
 function UpdateContactSummary() {
   return (
     <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-neutral-100 transition hover:border-lime-400/60 hover:text-lime-300 group-open:border-lime-400/60 group-open:text-lime-300 [&::-webkit-details-marker]:hidden">
-      <PencilIcon />
+      <PortalIcon className="h-4 w-4" name="update" />
       <span>Update Contact</span>
     </summary>
-  );
-}
-
-function PencilIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
   );
 }
 

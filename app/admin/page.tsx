@@ -1,22 +1,31 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { PortalIcon, type PortalIconName } from "@/app/icons";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import { hasAdminClientConfig } from "@/lib/supabase/admin";
 
-const ADMIN_ITEMS = [
+const ADMIN_ITEMS: Array<{
+  description: string;
+  href: string;
+  icon: PortalIconName;
+  label: string;
+}> = [
   {
     description: "Create users, manage admin access, reset passwords, and review the audit log.",
     href: "/admin/users",
+    icon: "admin",
     label: "Portal Users",
   },
   {
     description: "Search Planning Center people and view upcoming assignments for any person.",
     href: "/admin/schedule-lookup",
+    icon: "search",
     label: "Schedule Look Up",
   },
   {
     description: "Verify the Cognito Forms API connection and inspect available forms.",
     href: "/admin/cognito-forms",
+    icon: "resources",
     label: "Cognito Forms",
   },
 ];
@@ -71,6 +80,9 @@ export default async function AdminLandingPage() {
               href={item.href}
               className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-lime-400/60 hover:bg-white/[0.06]"
             >
+              <span className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-lime-400/30 bg-lime-400/10 text-lime-300">
+                <PortalIcon name={item.icon} />
+              </span>
               <h2 className="text-2xl font-semibold text-neutral-100">
                 {item.label}
               </h2>

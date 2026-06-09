@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { PortalIcon, type PortalIconName } from "@/app/icons";
 import { getCurrentSessionUser } from "@/lib/demo";
 
-const RESOURCE_ITEMS = [
+const RESOURCE_ITEMS: Array<{
+  description: string;
+  href: string;
+  icon: PortalIconName;
+  label: string;
+}> = [
   {
     description:
       "Submit expense and reimbursement details directly through the portal.",
     href: "/expense-reimbursement",
+    icon: "expense",
     label: "Expense Reimbursement",
   },
 ];
@@ -40,6 +47,9 @@ export default async function ResourcesPage() {
               href={item.href}
               className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-lime-400/60 hover:bg-white/[0.06]"
             >
+              <span className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-lime-400/30 bg-lime-400/10 text-lime-300">
+                <PortalIcon name={item.icon} />
+              </span>
               <h2 className="text-2xl font-semibold text-neutral-100">
                 {item.label}
               </h2>
