@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getPlanDetail } from "@/lib/planning-center";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentSessionUser } from "@/lib/demo";
 
 type PageProps = {
   params: Promise<{
@@ -12,11 +12,7 @@ type PageProps = {
 
 export default async function SchedulePlanPage({ params }: PageProps) {
   const { serviceTypeId, planId } = await params;
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentSessionUser();
 
   if (!user) {
     redirect("/login");

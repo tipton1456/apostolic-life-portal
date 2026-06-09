@@ -17,6 +17,28 @@ export default function LoginForm() {
     setMessage("Signing in...");
 
     try {
+      if (email.trim().toLowerCase() === "demo" && password === "demo") {
+        const response = await fetch("/api/demo-login", {
+          body: JSON.stringify({ password, username: email }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({
+            message: "Demo login failed.",
+          }));
+          setMessage(`Error: ${data.message}`);
+          setIsLoading(false);
+          return;
+        }
+
+        window.location.href = "/dashboard";
+        return;
+      }
+
       const supabase = createClient();
 
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -72,16 +94,16 @@ export default function LoginForm() {
     <form onSubmit={handleLogin} className="mt-8 space-y-4">
       <div>
         <label className="text-sm font-medium text-neutral-300">
-          Email address
+          Email address or demo username
         </label>
 
         <input
-          type="email"
+          type="text"
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
-          placeholder="you@example.com"
+          placeholder="you@example.com or demo"
         />
       </div>
 

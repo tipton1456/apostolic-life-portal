@@ -1,13 +1,9 @@
 import { redirect } from "next/navigation";
 import LoginPage from "./login/page";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentSessionUser } from "@/lib/demo";
 
 export default async function Home() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentSessionUser();
 
   if (user) {
     redirect("/dashboard");

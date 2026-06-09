@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isDemoEmail } from "./demo";
 
 type ElvantoPerson = {
   id?: string;
@@ -75,6 +76,10 @@ export async function getGivingSummary(
 ): Promise<GivingSummary> {
   const dateRange = getDateRange(range);
   const emptySummary = buildSummary(range, dateRange, []);
+
+  if (isDemoEmail(email)) {
+    return buildSummary(range, dateRange, getDemoGivingRecords(dateRange));
+  }
 
   if (!email) return emptySummary;
 
@@ -259,6 +264,42 @@ function buildSummary(
     totalLabel: formatCurrency(total),
     records,
   };
+}
+
+function getDemoGivingRecords(dateRange: { start: string; end: string }) {
+  const records = [
+    demoGivingRecord("demo-giving-1", dateRange.end, "Tithing", 245),
+    demoGivingRecord("demo-giving-2", offsetDate(dateRange.end, -7), "General Offering", 50),
+    demoGivingRecord("demo-giving-3", offsetDate(dateRange.end, -14), "Missions", 35),
+    demoGivingRecord("demo-giving-4", offsetDate(dateRange.end, -21), "Building Fund", 75),
+  ];
+
+  return records.filter(
+    (record) => record.date >= dateRange.start && record.date <= dateRange.end,
+  );
+}
+
+function demoGivingRecord(
+  id: string,
+  date: string,
+  fund: string,
+  amount: number,
+): GivingRecord {
+  return {
+    id,
+    amount,
+    amountLabel: formatCurrency(amount),
+    date,
+    dateLabel: formatDate(date),
+    fund,
+  };
+}
+
+function offsetDate(value: string, days: number) {
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() + days);
+
+  return formatDateForApi(date);
 }
 
 function getDateRange(range: GivingRange) {

@@ -1,3 +1,5 @@
+import { isDemoEmail } from "./demo";
+
 type JsonApiRelationship = {
   data?: { id: string; type: string } | Array<{ id: string; type: string }> | null;
 };
@@ -188,6 +190,8 @@ export async function getUpcomingAssignments(
   email?: string,
   limit = 3,
 ): Promise<UpcomingAssignment[]> {
+  if (isDemoEmail(email)) return sampleAssignments.slice(0, limit);
+
   const personId = await getPlanningCenterPersonId(email);
 
   if (!personId) {
@@ -201,6 +205,15 @@ export async function getUpcomingAssignmentsForEmail(
   email?: string,
   limit = 3,
 ): Promise<UpcomingAssignment[]> {
+  if (isDemoEmail(email) || email?.endsWith("@example.com")) {
+    return sampleAssignments.slice(0, limit).map((assignment, index) => ({
+      ...assignment,
+      id: `${assignment.id}-family-${index}`,
+      position: index % 2 === 0 ? "Student Check-In" : "Youth Vocals",
+      team: index % 2 === 0 ? "Kids Ministry" : "Youth Team",
+    }));
+  }
+
   const personId = await getPlanningCenterPersonId(email);
 
   if (!personId) return [];
@@ -278,6 +291,10 @@ export async function getPlanDetail(
   planId: string,
   userEmail?: string,
 ): Promise<PlanDetail | null> {
+  if (isSamplePlan(serviceTypeId, planId) || isDemoEmail(userEmail)) {
+    return samplePlanDetail(serviceTypeId, planId);
+  }
+
   const [plan, assignments] = await Promise.all([
     getPlanSummary(serviceTypeId, planId),
     getUpcomingAssignments(userEmail),
@@ -309,6 +326,10 @@ export async function getFullTeamsDetail(
   serviceTypeId: string,
   planId: string,
 ): Promise<FullTeamsDetail | null> {
+  if (isSamplePlan(serviceTypeId, planId)) {
+    return sampleFullTeamsDetail(serviceTypeId, planId);
+  }
+
   const plan = await getPlanSummary(serviceTypeId, planId);
 
   if (!plan) {
@@ -341,6 +362,10 @@ export async function getPlanOrderDetail(
   serviceTypeId: string,
   planId: string,
 ): Promise<PlanOrderDetail | null> {
+  if (isSamplePlan(serviceTypeId, planId)) {
+    return samplePlanOrderDetail(serviceTypeId, planId);
+  }
+
   const plan = await getPlanSummary(serviceTypeId, planId);
 
   if (!plan) {
@@ -409,6 +434,8 @@ export async function syncPlanningCenterContactUpdate(
 }
 
 export async function getPlanningCenterProfilePicture(email?: string) {
+  if (isDemoEmail(email)) return "https://i.pravatar.cc/160?img=12";
+
   const personId = await getPlanningCenterPersonId(email);
 
   if (!personId) return null;
@@ -434,6 +461,10 @@ function shouldUseSampleData() {
     process.env.PLANNING_CENTER_USE_SAMPLE_DATA === "true" ||
     process.env.NODE_ENV !== "production"
   );
+}
+
+function isSamplePlan(serviceTypeId: string, planId: string) {
+  return serviceTypeId.startsWith("sample") || planId.startsWith("sample");
 }
 
 async function getPlanningCenterPersonId(email?: string) {

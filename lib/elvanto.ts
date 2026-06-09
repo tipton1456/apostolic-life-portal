@@ -3,6 +3,7 @@ import { sampleHousehold } from "./sample-household";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { syncPlanningCenterContactUpdate } from "./planning-center";
+import { isDemoEmail, isDemoMode } from "./demo";
 
 type ElvantoPerson = {
   id?: string;
@@ -99,6 +100,7 @@ export function hasSharedElvantoApiKey() {
 }
 
 export async function getHousehold(email?: string): Promise<Household | null> {
+  if (isDemoEmail(email) || (await isDemoMode())) return sampleHousehold;
   if (!email) return sampleHousehold;
 
   const supabase = await createClient();
@@ -188,6 +190,10 @@ export async function updateContactFromForm(formData: FormData) {
   } = await supabase.auth.getUser();
 
   if (!user?.email) {
+    if (await isDemoMode()) {
+      redirect("/contact?updated=demo");
+    }
+
     redirect("/login");
   }
 

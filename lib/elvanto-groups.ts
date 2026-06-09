@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { isDemoEmail, isDemoMode } from "@/lib/demo";
 import { createClient } from "@/lib/supabase/server";
 
 type ElvantoGroupPerson = {
@@ -64,6 +65,7 @@ export type PersonSearchResult = {
 };
 
 export async function getLeaderGroupsForEmail(email?: string) {
+  if (isDemoEmail(email)) return sampleLeaderGroups;
   if (!email) return [];
 
   const authorization = getElvantoAuthorization();
@@ -107,6 +109,10 @@ export async function getLeaderGroupDetail(
   groupId: string,
   email?: string,
 ): Promise<GroupDetail | null> {
+  if (isDemoEmail(email)) {
+    return sampleGroupDetails.find((group) => group.id === groupId) ?? null;
+  }
+
   if (!email) return null;
 
   const leaderGroups = await getLeaderGroupsForEmail(email);
@@ -149,6 +155,16 @@ export async function getLeaderGroupDetail(
 }
 
 export async function searchPeopleForGroup(query: string, email?: string) {
+  if (isDemoEmail(email)) {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (normalizedQuery.length < 2) return [];
+
+    return samplePeople
+      .filter((person) => person.name.toLowerCase().includes(normalizedQuery))
+      .slice(0, 8);
+  }
+
   if (!email || query.trim().length < 2) return [];
 
   const authorization = getElvantoAuthorization();
@@ -188,6 +204,11 @@ export async function addPersonToGroup(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (!user && (await isDemoMode())) {
+    revalidatePath(`/groups/${groupId}`);
+    return;
+  }
+
   if (!user) redirect("/login");
 
   const leaderGroups = await getLeaderGroupsForEmail(user.email ?? undefined);
@@ -217,6 +238,11 @@ export async function removePersonFromGroup(formData: FormData) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user && (await isDemoMode())) {
+    revalidatePath(`/groups/${groupId}`);
+    return;
+  }
 
   if (!user) redirect("/login");
 
@@ -248,6 +274,11 @@ export async function updateGroupMemberLeader(formData: FormData) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user && (await isDemoMode())) {
+    revalidatePath(`/groups/${groupId}`);
+    return;
+  }
 
   if (!user) redirect("/login");
 
@@ -435,6 +466,84 @@ function dedupePeople(people: ElvantoGroupPerson[]) {
 
   return Array.from(dedupedPeople.values());
 }
+
+const sampleLeaderGroups: LeaderGroup[] = [
+  {
+    id: "demo-life-group",
+    name: "Downtown Life Group",
+    position: "Leader",
+  },
+];
+
+const sampleGroupDetails: GroupDetail[] = [
+  {
+    id: "demo-life-group",
+    name: "Downtown Life Group",
+    members: [
+      {
+        id: "demo-group-1",
+        birthdate: "Jan 14, 1984 (42)",
+        email: "demo@apostoliclife.local",
+        isLeader: true,
+        mobile: "(662) 555-1201",
+        name: "Daniel Demo",
+        picture: "https://i.pravatar.cc/120?img=12",
+        position: "Leader",
+      },
+      {
+        id: "demo-group-2",
+        birthdate: "Mar 8, 1986 (40)",
+        email: "maria.demo@example.com",
+        isLeader: true,
+        mobile: "(662) 555-1211",
+        name: "Maria Demo",
+        picture: "https://i.pravatar.cc/120?img=47",
+        position: "Leader",
+      },
+      {
+        id: "demo-group-3",
+        birthdate: "Apr 19, 1991 (35)",
+        email: "caleb.martin@example.com",
+        isLeader: false,
+        mobile: "(662) 555-2310",
+        name: "Caleb Martin",
+        picture: "https://i.pravatar.cc/120?img=54",
+        position: "Member",
+      },
+      {
+        id: "demo-group-4",
+        birthdate: "Nov 2, 1978 (47)",
+        email: "angela.reed@example.com",
+        isLeader: false,
+        mobile: "(662) 555-2408",
+        name: "Angela Reed",
+        picture: "https://i.pravatar.cc/120?img=45",
+        position: "Member",
+      },
+    ],
+  },
+];
+
+const samplePeople: PersonSearchResult[] = [
+  {
+    id: "demo-person-1",
+    email: "nina.brooks@example.com",
+    mobile: "(662) 555-2602",
+    name: "Nina Brooks",
+  },
+  {
+    id: "demo-person-2",
+    email: "owen.price@example.com",
+    mobile: "(662) 555-2618",
+    name: "Owen Price",
+  },
+  {
+    id: "demo-person-3",
+    email: "leah.gray@example.com",
+    mobile: "(662) 555-2644",
+    name: "Leah Gray",
+  },
+];
 
 function normalizeArray<T>(value: T | T[] | null | undefined): T[] {
   if (!value) return [];

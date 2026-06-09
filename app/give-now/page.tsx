@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentSessionUser } from "@/lib/demo";
 
 const DEFAULT_TITHELY_GIVING_FORM_URL =
   "https://give.tithe.ly/?formId=2ab6e731-3ac0-11ee-90fc-1260ab546d11";
@@ -14,11 +14,7 @@ function getGivingFormUrl() {
 }
 
 export default async function GiveNowPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentSessionUser();
 
   if (!user) {
     redirect("/login");

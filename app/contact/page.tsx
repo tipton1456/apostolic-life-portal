@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getHousehold, updateContactFromForm } from "@/lib/elvanto";
 import { getPlanningCenterProfilePicture } from "@/lib/planning-center";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentSessionUser } from "@/lib/demo";
 import ContactSaveButton from "./contact-save-button";
 
 type PageProps = {
@@ -12,11 +12,7 @@ type PageProps = {
 
 export default async function ContactPage({ searchParams }: PageProps) {
   const { updated } = await searchParams;
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentSessionUser();
 
   if (!user) {
     redirect("/login");
@@ -397,6 +393,10 @@ function getPrimaryPicture(
 }
 
 function getUpdateMessage(updated: string) {
+  if (updated === "demo") {
+    return "Demo contact changes are simulated and were not saved to live systems.";
+  }
+
   if (updated === "synced") {
     return "Contact information saved in Elvanto. Matching updates were also sent to Planning Center.";
   }

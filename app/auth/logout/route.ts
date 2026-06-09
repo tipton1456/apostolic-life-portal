@@ -6,5 +6,11 @@ export async function POST() {
 
   await supabase.auth.signOut();
 
-  return NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set("portal_demo", "", {
+    maxAge: 0,
+    path: "/",
+  });
+
+  return response;
 }

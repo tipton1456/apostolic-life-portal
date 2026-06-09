@@ -1,3 +1,5 @@
+import { isDemoMode } from "./demo";
+
 export type ChurchEvent = {
   id: string;
   title: string;
@@ -16,6 +18,12 @@ const EVENTS_FEED_URL =
   "https://apostoliclifeupci.com/events.ics";
 
 export async function getUpcomingEvents(limit?: number): Promise<ChurchEvent[]> {
+  if (await isDemoMode()) {
+    return typeof limit === "number"
+      ? sampleEvents.slice(0, limit)
+      : sampleEvents;
+  }
+
   try {
     const response = await fetch(EVENTS_FEED_URL, {
       cache: "no-store",
@@ -43,6 +51,39 @@ export async function getUpcomingEvents(limit?: number): Promise<ChurchEvent[]> 
     console.error("Events feed lookup failed:", error);
     return [];
   }
+}
+
+const sampleEvents: ChurchEvent[] = [
+  sampleEvent("demo-event-1", "Family Worship Night", "An evening of worship, prayer, and fellowship for every generation.", "Apostolic Life Sanctuary", 4, "6:30 PM - 8:00 PM", "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=900&q=80"),
+  sampleEvent("demo-event-2", "Serve Team Breakfast", "A relaxed breakfast for ministry volunteers with updates for the coming month.", "Fellowship Hall", 9, "9:00 AM - 10:30 AM", "https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=900&q=80"),
+  sampleEvent("demo-event-3", "Youth Rally", "Students from the area will gather for worship, preaching, and after-service food.", "Apostolic Life Youth Center", 15, "7:00 PM - 9:30 PM", "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80"),
+  sampleEvent("demo-event-4", "Community Outreach", "Teams will meet at the church and go into the community with invitation cards and prayer.", "Main Lobby", 22, "10:00 AM - 12:00 PM", "https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=900&q=80"),
+];
+
+function sampleEvent(
+  id: string,
+  title: string,
+  description: string,
+  location: string,
+  daysFromNow: number,
+  timeLabel: string,
+  imageUrl: string,
+): ChurchEvent {
+  const startsAt = new Date();
+  startsAt.setDate(startsAt.getDate() + daysFromNow);
+  startsAt.setHours(18, 30, 0, 0);
+
+  return {
+    id,
+    dateLabel: formatEventDate(startsAt),
+    description,
+    imageUrl,
+    location,
+    sourceUrl: "https://apostoliclifeupci.com/events",
+    startsAt: startsAt.toISOString(),
+    timeLabel,
+    title,
+  };
 }
 
 function parseCalendar(calendar: string) {

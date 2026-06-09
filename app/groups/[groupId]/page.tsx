@@ -6,7 +6,7 @@ import {
   removePersonFromGroup,
   updateGroupMemberLeader,
 } from "@/lib/elvanto-groups";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentSessionUser } from "@/lib/demo";
 import GroupMemberSearch from "./group-member-search";
 import LeaderToggle from "./leader-toggle";
 
@@ -26,11 +26,7 @@ export default async function GroupDetailPage({
   const { groupId } = await params;
   const { edit } = await searchParams;
   const isEditing = edit === "true";
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentSessionUser();
 
   if (!user) {
     redirect("/login");

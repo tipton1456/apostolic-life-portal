@@ -2,7 +2,7 @@ import { getLeaderGroupsForEmail } from "@/lib/elvanto-groups";
 import { getHousehold } from "@/lib/elvanto";
 import { isCurrentUserPortalAdmin } from "@/lib/portal-users";
 import { getPlanningCenterProfilePicture } from "@/lib/planning-center";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentSessionUser } from "@/lib/demo";
 import SiteNavigationMenu from "./site-navigation-menu";
 
 export default async function SiteNavigation({
@@ -10,11 +10,7 @@ export default async function SiteNavigation({
 }: {
   className?: string;
 }) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentSessionUser();
 
   if (!user) return null;
 
@@ -22,7 +18,7 @@ export default async function SiteNavigation({
     getHousehold(user.email ?? undefined),
     getLeaderGroupsForEmail(user.email ?? undefined),
     getPlanningCenterProfilePicture(user.email ?? undefined),
-    isCurrentUserPortalAdmin(),
+    user.isDemo ? false : isCurrentUserPortalAdmin(),
   ]);
   const memberName = household?.primary
     ? `${household.primary.firstName} ${household.primary.lastName}`

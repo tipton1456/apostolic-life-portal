@@ -1,3 +1,5 @@
+import { isDemoMode } from "./demo";
+
 type GroupMeAttachment = {
   type?: string;
   url?: string;
@@ -42,6 +44,14 @@ export type PrayerBoard = {
 };
 
 export async function getPrayerBoardMessages(limit = 30): Promise<PrayerBoard> {
+  if (await isDemoMode()) {
+    return {
+      conversationUrl: "https://groupme.com/join_group/demo-prayer-board",
+      isConfigured: true,
+      messages: samplePrayerMessages.slice(0, limit),
+    };
+  }
+
   const accessToken = process.env.GROUPME_ACCESS_TOKEN;
   const groupId = process.env.GROUPME_PRAYER_GROUP_ID;
   const conversationUrl = process.env.GROUPME_PRAYER_GROUP_URL;
@@ -214,4 +224,33 @@ function formatMessageTime(date: Date) {
     minute: "2-digit",
     timeZone: "America/Chicago",
   }).format(date);
+}
+
+const samplePrayerMessages: PrayerBoardMessage[] = [
+  samplePrayerMessage("demo-prayer-1", "Pastor Robbins", "Please remember the outreach team this weekend as they connect with new families.", -1),
+  samplePrayerMessage("demo-prayer-2", "Maria Demo", "Pray for a coworker who is recovering from surgery this week.", -3),
+  samplePrayerMessage("demo-prayer-3", "Caleb Martin", "Requesting prayer for safe travel for our family.", -5),
+  samplePrayerMessage("demo-prayer-4", "Angela Reed", "Please pray for strength and peace for a family in our neighborhood.", -8),
+  samplePrayerMessage("demo-prayer-5", "Daniel Demo", "Thankful for what God is doing in our church family. Please pray for our youth service.", -12),
+  samplePrayerMessage("demo-prayer-6", "Nina Brooks", "Pray for a friend visiting church for the first time Sunday.", -18),
+];
+
+function samplePrayerMessage(
+  id: string,
+  author: string,
+  text: string,
+  hoursAgo: number,
+): PrayerBoardMessage {
+  const createdAt = new Date();
+  createdAt.setHours(createdAt.getHours() + hoursAgo);
+
+  return {
+    id,
+    author,
+    avatarUrl: `https://i.pravatar.cc/120?u=${encodeURIComponent(author)}`,
+    createdAt: createdAt.toISOString(),
+    createdAtLabel: formatMessageTime(createdAt),
+    imageUrls: [],
+    text,
+  };
 }

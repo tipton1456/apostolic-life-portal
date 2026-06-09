@@ -6,7 +6,7 @@ import {
   getUpcomingAssignmentsForEmail,
   type UpcomingAssignment,
 } from "@/lib/planning-center";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentSessionUser } from "@/lib/demo";
 import AssignmentCountSelect from "./assignment-count-select";
 import AssignmentViewToggle from "./assignment-view-toggle";
 
@@ -24,11 +24,7 @@ export default async function AssignmentsPage({ searchParams }: PageProps) {
   const { count: countParam, view: viewParam } = await searchParams;
   const count = parseAssignmentCount(countParam);
   const view = parseAssignmentView(viewParam);
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentSessionUser();
 
   if (!user) {
     redirect("/login");

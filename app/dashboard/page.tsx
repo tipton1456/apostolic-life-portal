@@ -3,14 +3,10 @@ import { redirect } from "next/navigation";
 import { getUpcomingEvents } from "@/lib/events";
 import { getPrayerBoardMessages } from "@/lib/groupme";
 import { getUpcomingAssignments } from "@/lib/planning-center";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentSessionUser } from "@/lib/demo";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentSessionUser();
 
   if (!user) {
     redirect("/login");

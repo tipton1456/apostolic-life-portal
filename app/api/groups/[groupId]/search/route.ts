@@ -3,7 +3,7 @@ import {
   getLeaderGroupsForEmail,
   searchPeopleForGroup,
 } from "@/lib/elvanto-groups";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentSessionUser } from "@/lib/demo";
 
 type RouteContext = {
   params: Promise<{
@@ -15,11 +15,7 @@ export async function GET(request: Request, context: RouteContext) {
   const { groupId } = await context.params;
   const requestUrl = new URL(request.url);
   const query = requestUrl.searchParams.get("q") ?? "";
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentSessionUser();
 
   if (!user) {
     return NextResponse.json({ people: [] }, { status: 401 });

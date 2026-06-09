@@ -5,7 +5,7 @@ import {
   parseGivingRange,
   type GivingRange,
 } from "@/lib/giving";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentSessionUser } from "@/lib/demo";
 import GivingRangeFilter from "./giving-range-filter";
 
 type PageProps = {
@@ -26,11 +26,7 @@ const RANGE_OPTIONS: Array<{ label: string; value: GivingRange }> = [
 export default async function GivingPage({ searchParams }: PageProps) {
   const { range: rangeParam } = await searchParams;
   const range = parseGivingRange(rangeParam);
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentSessionUser();
 
   if (!user) {
     redirect("/login");
