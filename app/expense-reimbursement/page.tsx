@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createCognitoFormEntry } from "@/lib/cognito-forms";
 import { getCurrentSessionUser } from "@/lib/demo";
 import { getHousehold } from "@/lib/elvanto";
+import ExpenseLines from "./expense-lines";
+import { EXPENSE_LINES, REPORT_TYPE_FIELD, REPORT_TYPES } from "./expense-fields";
 import SubmitButton from "./submit-button";
 
 type PageProps = {
@@ -11,15 +13,6 @@ type PageProps = {
 };
 
 const EXPENSE_REIMBURSEMENT_FORM_ID = "3";
-const EXPENSE_LINES = [
-  { amount: "Amount", department: "Department2", description: "Text" },
-  { amount: "Amount2", department: "Department3", description: "Description" },
-  { amount: "Amount3", department: "Department4", description: "Description2" },
-  { amount: "Amount4", department: "Department5", description: "Description3" },
-  { amount: "Amount5", department: "Department6", description: "Description4" },
-  { amount: "Amount6", department: "Department7", description: "Description5" },
-  { amount: "Amount7", department: "Department", description: "Description6" },
-] as const;
 
 export default async function ExpenseReimbursementPage({
   searchParams,
@@ -108,46 +101,7 @@ export default async function ExpenseReimbursementPage({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h2 className="text-2xl font-semibold">Expense Lines</h2>
-                <p className="mt-2 text-sm text-neutral-400">
-                  Add as many lines as needed. The first line is required.
-                </p>
-              </div>
-              <p className="text-sm font-semibold text-lime-300">
-                Type: Reimbursement
-              </p>
-            </div>
-
-            <div className="mt-5 space-y-4">
-              {EXPENSE_LINES.map((line, index) => (
-                <div
-                  key={line.amount}
-                  className="grid gap-3 rounded-xl border border-white/10 bg-neutral-950/40 p-4 md:grid-cols-[1fr_1fr_10rem]"
-                >
-                  <Field
-                    label={`Description ${index + 1}`}
-                    name={line.description}
-                    required={index === 0}
-                  />
-                  <Field
-                    label={`Department ${index + 1}`}
-                    name={line.department}
-                    required={index === 0}
-                  />
-                  <Field
-                    label={`Amount ${index + 1}`}
-                    name={line.amount}
-                    required={index === 0}
-                    step="0.01"
-                    type="number"
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
+          <ExpenseLines />
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
             <h2 className="text-2xl font-semibold">Comments</h2>
@@ -202,10 +156,9 @@ function Field({
 }
 
 function buildReimbursementEntry(formData: FormData, fallbackEmail: string) {
+  const reportType = getReportType(formData);
   const entry: Record<string, string | string[] | number> = {
-    SelectTheTypeOfReportDoNotSelectMoreThanOneTypePerSubmission: [
-      "Reimbursement",
-    ],
+    [REPORT_TYPE_FIELD]: [reportType],
     Name: getText(formData, "requesterName"),
     Event: getText(formData, "event"),
     Email: getText(formData, "email") || fallbackEmail,
@@ -226,6 +179,14 @@ function buildReimbursementEntry(formData: FormData, fallbackEmail: string) {
   }
 
   return entry;
+}
+
+function getReportType(formData: FormData) {
+  const reportType = getText(formData, "reportType");
+
+  return REPORT_TYPES.includes(reportType as (typeof REPORT_TYPES)[number])
+    ? reportType
+    : "Reimbursement";
 }
 
 function getText(formData: FormData, key: string) {
