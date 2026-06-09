@@ -3,15 +3,15 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+export type AssignmentDisplay = "list" | "calendar";
 type AssignmentView = "mine" | "family";
-type AssignmentDisplay = "list" | "calendar";
 
-const VIEW_OPTIONS: Array<{ label: string; value: AssignmentView }> = [
-  { label: "My Assignments", value: "mine" },
-  { label: "My Family's Assignments", value: "family" },
+const DISPLAY_OPTIONS: Array<{ label: string; value: AssignmentDisplay }> = [
+  { label: "List View", value: "list" },
+  { label: "Calendar View", value: "calendar" },
 ];
 
-export default function AssignmentViewToggle({
+export default function AssignmentDisplayToggle({
   count,
   display,
   view,
@@ -22,33 +22,34 @@ export default function AssignmentViewToggle({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [pendingView, setPendingView] = useState<AssignmentView | null>(null);
-  const activeView = pendingView ?? view;
-  const isNavigating = isPending || pendingView !== null;
+  const [pendingDisplay, setPendingDisplay] =
+    useState<AssignmentDisplay | null>(null);
+  const activeDisplay = pendingDisplay ?? display;
+  const isNavigating = isPending || pendingDisplay !== null;
 
-  function handleViewChange(nextView: AssignmentView) {
-    if (nextView === view || isNavigating) {
-      return;
-    }
+  function handleDisplayChange(nextDisplay: AssignmentDisplay) {
+    if (nextDisplay === display || isNavigating) return;
 
-    setPendingView(nextView);
+    setPendingDisplay(nextDisplay);
     startTransition(() => {
-      router.push(`/assignments?view=${nextView}&display=${display}&count=${count}`);
+      router.push(
+        `/assignments?view=${view}&display=${nextDisplay}&count=${count}`,
+      );
     });
   }
 
   return (
     <div className="flex flex-wrap gap-2">
-      {VIEW_OPTIONS.map((option) => {
-        const isActive = option.value === activeView;
-        const isLoading = option.value === pendingView;
+      {DISPLAY_OPTIONS.map((option) => {
+        const isActive = option.value === activeDisplay;
+        const isLoading = option.value === pendingDisplay;
 
         return (
           <button
             key={option.value}
             type="button"
             disabled={isNavigating}
-            onClick={() => handleViewChange(option.value)}
+            onClick={() => handleDisplayChange(option.value)}
             className={
               isActive
                 ? "inline-flex items-center justify-center gap-2 rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition disabled:cursor-wait"
