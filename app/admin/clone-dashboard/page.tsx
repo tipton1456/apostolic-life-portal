@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import AdminFormButton from "@/app/admin/admin-form-button";
 import { PortalIcon } from "@/app/icons";
 import {
   getHouseholdForAdminClone,
@@ -15,6 +14,7 @@ import {
   type UpcomingAssignment,
 } from "@/lib/planning-center";
 import { getCurrentPortalUser, hasPortalUserForEmail } from "@/lib/portal-users";
+import CloneContactUpdateForm from "./clone-contact-update-form";
 
 type PageProps = {
   searchParams: Promise<{
@@ -321,84 +321,12 @@ function AdminContactUpdateDetails({
         <span>Update Contact</span>
       </summary>
 
-      <form
+      <CloneContactUpdateForm
         action={updateContactFromAdminClone}
-        className="mt-5 border-t border-white/10 pt-5"
-      >
-        <input type="hidden" name="cloneEmail" value={cloneEmail} />
-        <input type="hidden" name="personId" value={person.id} />
-        <div className="grid gap-4 md:grid-cols-2">
-          <TextInput
-            label="Email"
-            name="email"
-            type="email"
-            defaultValue={editableValue(person.email)}
-          />
-          <TextInput
-            label="Phone"
-            name="phone"
-            defaultValue={editableValue(person.phone)}
-          />
-          <TextInput
-            label="Mobile"
-            name="mobile"
-            defaultValue={editableValue(person.mobile)}
-          />
-          <TextInput
-            label="Birthdate"
-            name="birthday"
-            type="date"
-            defaultValue={person.birthdayValue}
-          />
-          <FileInput label="Profile Picture" name="profilePicture" />
-        </div>
-        <AdminFormButton pendingLabel="Saving..." className="mt-5">
-          Save Contact
-        </AdminFormButton>
-      </form>
+        cloneEmail={cloneEmail}
+        person={person}
+      />
     </details>
-  );
-}
-
-function TextInput({
-  defaultValue,
-  label,
-  name,
-  type = "text",
-}: {
-  defaultValue: string;
-  label: string;
-  name: string;
-  type?: string;
-}) {
-  return (
-    <label className="block text-sm font-medium text-neutral-300">
-      {label}
-      <input
-        type={type}
-        name={name}
-        defaultValue={defaultValue}
-        className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
-      />
-    </label>
-  );
-}
-
-function FileInput({ label, name }: { label: string; name: string }) {
-  return (
-    <label className="block text-sm font-medium text-neutral-300 md:col-span-2">
-      {label}
-      <input
-        type="file"
-        name={name}
-        accept="image/*"
-        className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-sm text-neutral-100 outline-none ring-lime-400 transition file:mr-4 file:rounded-lg file:border-0 file:bg-lime-400 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-neutral-950 hover:file:bg-lime-300 focus:ring-2"
-      />
-      <span className="mt-1 block text-xs text-neutral-500">
-        JPG, PNG, or WebP under 5MB. Photo uploads sync to Planning Center when
-        matched.
-      </span>
-    </label>
   );
 }
 
@@ -594,10 +522,6 @@ function normalizeEmail(email?: string) {
   return normalized;
 }
 
-function editableValue(value: string) {
-  return value === "Not listed" ? "" : value;
-}
-
 function formatUsPhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
 
@@ -623,6 +547,10 @@ function getUpdateMessage(updated: string) {
 
   if (updated === "photo-error") {
     return "Photo upload failed. Please use a JPG, PNG, or WebP image under 5MB.";
+  }
+
+  if (updated === "contact-error") {
+    return "Contact update failed. Please review the contact fields and try again.";
   }
 
   return "Contact updated in Elvanto. No matching Planning Center person was found.";

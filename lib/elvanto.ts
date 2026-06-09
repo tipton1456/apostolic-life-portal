@@ -354,7 +354,16 @@ export async function updateContactFromAdminClone(formData: FormData) {
     pictureFile,
   };
 
-  await updateElvantoContact(update);
+  try {
+    await updateElvantoContact(update);
+  } catch (error) {
+    console.error("Admin clone Elvanto contact update failed:", error);
+    redirect(
+      `/admin/clone-dashboard?email=${encodeURIComponent(
+        cloneEmail,
+      )}&updated=contact-error`,
+    );
+  }
 
   let updateStatus = "elvanto";
 
