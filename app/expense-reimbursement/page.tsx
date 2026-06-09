@@ -6,6 +6,7 @@ import {
 } from "@/lib/cognito-forms";
 import { getCurrentSessionUser } from "@/lib/demo";
 import { getHousehold } from "@/lib/elvanto";
+import { recordExpenseReimbursementSubmission } from "@/lib/expense-reimbursements";
 import ExpenseLines from "./expense-lines";
 import {
   EXPENSE_LINES,
@@ -19,12 +20,11 @@ import SubmitButton from "./submit-button";
 type PageProps = {
   searchParams: Promise<{
     error?: string;
-    submitted?: string;
   }>;
 };
 
 const EXPENSE_REIMBURSEMENT_FORM_ID = "3";
-const MAX_RECEIPT_UPLOAD_BYTES = 4 * 1024 * 1024;
+  const MAX_RECEIPT_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 export default async function ExpenseReimbursementPage({
   searchParams,
@@ -35,7 +35,7 @@ export default async function ExpenseReimbursementPage({
     redirect("/login");
   }
 
-  const { error, submitted } = await searchParams;
+  const { error } = await searchParams;
   const household = await getHousehold(user.email);
   const requesterName = household?.primary
     ? `${household.primary.firstName} ${household.primary.lastName}`
@@ -62,7 +62,7 @@ export default async function ExpenseReimbursementPage({
     }
 
     if (currentUser.isDemo) {
-      redirect("/expense-reimbursement?submitted=demo");
+      redirect("/resources?submitted=expense");
     }
 
     try {
@@ -75,22 +75,41 @@ export default async function ExpenseReimbursementPage({
         uploadedReceipts,
       );
 
-      await createCognitoFormEntry(EXPENSE_REIMBURSEMENT_FORM_ID, entry);
+      const result = await createCognitoFormEntry(
+        EXPENSE_REIMBURSEMENT_FORM_ID,
+        entry,
+      );
+
+      if (result.entryId) {
+        try {
+          await recordExpenseReimbursementSubmission({
+            amountTotal: getExpenseTotal(formData),
+            cognitoEntryId: result.entryId,
+            cognitoFormId: EXPENSE_REIMBURSEMENT_FORM_ID,
+            email: getText(formData, "email") || currentUser.email,
+            event: getText(formData, "event"),
+            reportType: getReportType(formData),
+            requestDate: getText(formData, "date"),
+          });
+        } catch (trackingError) {
+          console.error(
+            "Expense reimbursement was submitted but tracking failed:",
+            trackingError,
+          );
+        }
+      }
     } catch (error) {
       console.error("Expense reimbursement submission failed:", error);
       redirect("/expense-reimbursement?error=submit");
     }
 
-    redirect("/expense-reimbursement?submitted=true");
+    redirect("/resources?submitted=expense");
   }
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
       <div className="mx-auto max-w-6xl">
         <header className="border-b border-white/10 pb-6">
-          <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
-            Cognito Forms
-          </p>
           <h1 className="mt-3 text-4xl font-bold tracking-tight">
             Expense Reimbursement
           </h1>
@@ -98,14 +117,6 @@ export default async function ExpenseReimbursementPage({
             Submit reimbursement details directly to the Apostolic Life expense
             form.
           </p>
-
-          {submitted ? (
-            <p className="mt-4 rounded-xl border border-lime-400/30 bg-lime-400/10 px-4 py-3 text-sm font-semibold text-lime-300">
-              {submitted === "demo"
-                ? "Demo reimbursement submitted. No live Cognito entry was created."
-                : "Reimbursement submitted to Cognito Forms."}
-            </p>
-          ) : null}
 
           {error === "receipt" ? (
             <p className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-200">
@@ -287,4 +298,12 @@ function getAmount(formData: FormData, key: string) {
   const amount = Number(value);
 
   return Number.isFinite(amount) ? amount : null;
+}
+
+function getExpenseTotal(formData: FormData) {
+  return EXPENSE_LINES.reduce((total, line) => {
+    const amount = getAmount(formData, line.amount);
+
+    return total + (amount ?? 0);
+  }, 0);
 }

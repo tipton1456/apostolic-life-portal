@@ -48,6 +48,15 @@ export type CognitoEntryResult = {
   entryNumber?: string;
 };
 
+export type CognitoEntryMetadata = {
+  action: string;
+  dateSubmitted: string;
+  dateUpdated: string;
+  number: string;
+  role: string;
+  status: string;
+};
+
 export type CognitoUploadedFile = {
   ContentType: string;
   Id: string;
@@ -109,6 +118,25 @@ export async function createCognitoFormEntry(
   return {
     entryId: stringValue(result.Id) ?? stringValue(entryData.Id),
     entryNumber: stringValue(entryData.Number),
+  };
+}
+
+export async function getCognitoFormEntry(
+  formId: string,
+  entryId: string,
+): Promise<CognitoEntryMetadata | null> {
+  const result = await cognitoFetch<Record<string, unknown>>(
+    `/forms/${encodeURIComponent(formId)}/entries/${encodeURIComponent(entryId)}`,
+  );
+  const entryData = isObject(result.Entry) ? result.Entry : {};
+
+  return {
+    action: stringValue(entryData.Action) ?? "",
+    dateSubmitted: stringValue(entryData.DateSubmitted) ?? "",
+    dateUpdated: stringValue(entryData.DateUpdated) ?? "",
+    number: stringValue(entryData.Number) ?? "",
+    role: stringValue(entryData.Role) ?? "",
+    status: stringValue(entryData.Status) ?? "",
   };
 }
 
