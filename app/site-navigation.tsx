@@ -30,6 +30,7 @@ export default async function SiteNavigation({
     { href: "/events", label: "Events" },
     { href: "/give-now", label: "Give Now" },
     { href: "/giving", label: "Giving Records" },
+    { href: "/resources", label: "Resources" },
     { href: "/prayer-board", label: "Prayer Board" },
     ...(isPortalAdmin ? [{ href: "/admin", label: "Administration" }] : []),
     ...(leaderGroups.length > 0

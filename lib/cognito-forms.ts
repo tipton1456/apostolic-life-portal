@@ -43,6 +43,11 @@ export type CognitoFormDetail = {
   form: CognitoFormSummary;
 };
 
+export type CognitoEntryResult = {
+  entryId?: string;
+  entryNumber?: string;
+};
+
 const COGNITO_API_BASE_URL = "https://www.cognitoforms.com/api";
 
 export function hasCognitoFormsConfig() {
@@ -81,7 +86,32 @@ export async function getCognitoFormDetail(
   };
 }
 
-async function cognitoFetch<T>(path: string): Promise<T> {
+export async function createCognitoFormEntry(
+  formId: string,
+  entry: Record<string, unknown>,
+): Promise<CognitoEntryResult> {
+  const result = await cognitoFetch<Record<string, unknown>>(
+    `/forms/${encodeURIComponent(formId)}/entries`,
+    {
+      body: JSON.stringify(entry),
+      method: "POST",
+    },
+  );
+  const entryData = isObject(result.Entry) ? result.Entry : {};
+
+  return {
+    entryId: stringValue(result.Id) ?? stringValue(entryData.Id),
+    entryNumber: stringValue(entryData.Number),
+  };
+}
+
+async function cognitoFetch<T>(
+  path: string,
+  init: {
+    body?: string;
+    method?: "GET" | "POST";
+  } = {},
+): Promise<T> {
   const apiKey = process.env.COGNITO_FORMS_API_KEY;
 
   if (!apiKey) {
@@ -89,11 +119,14 @@ async function cognitoFetch<T>(path: string): Promise<T> {
   }
 
   const response = await fetch(`${COGNITO_API_BASE_URL}${path}`, {
+    body: init.body,
     cache: "no-store",
     headers: {
       Accept: "application/json",
       Authorization: `Bearer ${apiKey}`,
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
     },
+    method: init.method ?? "GET",
   });
 
   if (!response.ok) {
@@ -107,6 +140,17 @@ async function cognitoFetch<T>(path: string): Promise<T> {
   }
 
   return response.json();
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function stringValue(value: unknown) {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+
+  return undefined;
 }
 
 function mapForm(form: CognitoFormResponse): CognitoFormSummary | null {
