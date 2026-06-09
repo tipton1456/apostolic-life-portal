@@ -53,6 +53,10 @@ type PcoTeamAttributes = {
   sequence?: number;
 };
 
+type PcoServiceTypeAttributes = {
+  name?: string;
+};
+
 type PcoItemAttributes = {
   description?: string;
   item_type?: string;
@@ -184,6 +188,19 @@ export type FullTeamsDetail = {
 export type PlanOrderDetail = {
   items: PlanOrderItem[];
   plan: PlanSummary;
+};
+
+export type MinisterPlatformAssignment = {
+  date: string;
+  dateLabel: string;
+  id: string;
+  name: string;
+  planId: string;
+  planName: string;
+  position: "Minister" | "Platform";
+  serviceTypeId: string;
+  sortDate: string;
+  status: string;
 };
 
 export async function getUpcomingAssignments(
@@ -386,6 +403,80 @@ export async function getPlanOrderDetail(
     plan,
     items: normalizeResources(response.data).map(mapOrderItem),
   };
+}
+
+export async function getMinisterPlatformSchedule(): Promise<
+  MinisterPlatformAssignment[]
+> {
+  if (!hasPlanningCenterCredentials()) return sampleMinisterPlatformSchedule();
+
+  const serviceTypesResponse =
+    await pcoFetch<PcoServiceTypeAttributes>("/services/v2/service_types", {
+      per_page: "50",
+    });
+  const serviceTypes =
+    normalizeResources<PcoServiceTypeAttributes>(serviceTypesResponse.data);
+
+  const plansByServiceType = await Promise.all(
+    serviceTypes.map(async (serviceType) => {
+      const plansResponse = await pcoFetch<PcoPlanAttributes>(
+        `/services/v2/service_types/${serviceType.id}/plans`,
+        {
+          filter: "future",
+          order: "sort_date",
+          per_page: "12",
+        },
+      );
+
+      return normalizeResources<PcoPlanAttributes>(plansResponse.data).map(
+        (plan) => ({
+          plan,
+          serviceType,
+        }),
+      );
+    }),
+  );
+  const upcomingPlans = plansByServiceType
+    .flat()
+    .sort((firstPlan, secondPlan) =>
+      (firstPlan.plan.attributes?.sort_date ?? "").localeCompare(
+        secondPlan.plan.attributes?.sort_date ?? "",
+      ),
+    )
+    .slice(0, 40);
+  const assignments = await Promise.all(
+    upcomingPlans.map(async ({ plan, serviceType }) => {
+      const mappedPlan = mapPlan(plan, serviceType.id, plan.id);
+      const reportPlan = {
+        ...mappedPlan,
+        title:
+          mappedPlan.title === "Service Plan"
+            ? serviceType.attributes?.name ?? mappedPlan.title
+            : mappedPlan.title,
+      };
+      const members = await getPlanTeamMembers(serviceType.id, plan.id);
+
+      return members
+        .map((member) =>
+          mapMinisterPlatformAssignment(
+            member,
+            reportPlan,
+            plan.attributes?.sort_date,
+          ),
+        )
+        .filter(
+          (
+            assignment,
+          ): assignment is MinisterPlatformAssignment => Boolean(assignment),
+        );
+    }),
+  );
+
+  return assignments
+    .flat()
+    .sort((firstAssignment, secondAssignment) =>
+      firstAssignment.sortDate.localeCompare(secondAssignment.sortDate),
+    );
 }
 
 export async function syncPlanningCenterContactUpdate(
@@ -911,6 +1002,48 @@ function mapTeamMember(
   };
 }
 
+function mapMinisterPlatformAssignment(
+  member: TeamAssignment,
+  plan: PlanSummary,
+  sortDate?: string,
+): MinisterPlatformAssignment | null {
+  const isMinister = /minister/i.test(member.position);
+  const isPlatform = /platform/i.test(member.teamName);
+
+  if (!isMinister && !isPlatform) return null;
+
+  return {
+    date: getDateKey(plan.dates, plan),
+    dateLabel: plan.dates,
+    id: `${plan.serviceTypeId}-${plan.planId}-${member.id}`,
+    name: member.name,
+    planId: plan.planId,
+    planName: plan.title,
+    position: isMinister ? "Minister" : "Platform",
+    serviceTypeId: plan.serviceTypeId,
+    sortDate: sortDate ?? getPlanSortDate(plan),
+    status: member.status,
+  };
+}
+
+function getPlanSortDate(plan: PlanSummary) {
+  const parsedDate = new Date(plan.dates);
+
+  return Number.isNaN(parsedDate.getTime())
+    ? plan.dates
+    : parsedDate.toISOString();
+}
+
+function getDateKey(dateLabel: string, plan: PlanSummary) {
+  const parsedDate = new Date(dateLabel);
+
+  if (!Number.isNaN(parsedDate.getTime())) {
+    return parsedDate.toISOString().slice(0, 10);
+  }
+
+  return `${plan.serviceTypeId}-${plan.planId}`;
+}
+
 function mapOrderItem(item: JsonApiResource<PcoItemAttributes>): PlanOrderItem {
   const attributes = item.attributes ?? {};
 
@@ -1128,4 +1261,57 @@ function samplePlanOrderDetail(
       },
     ],
   };
+}
+
+function sampleMinisterPlatformSchedule(): MinisterPlatformAssignment[] {
+  return [
+    {
+      date: "2026-06-14",
+      dateLabel: "June 14, 2026",
+      id: "sample-mp-1",
+      name: "Danny Robbins",
+      planId: "sample-am",
+      planName: "Sunday AM",
+      position: "Minister",
+      serviceTypeId: "sample-sunday-am",
+      sortDate: "2026-06-14T10:00:00.000Z",
+      status: "Confirmed",
+    },
+    {
+      date: "2026-06-14",
+      dateLabel: "June 14, 2026",
+      id: "sample-mp-2",
+      name: "Shannon Dillon",
+      planId: "sample-am",
+      planName: "Sunday AM",
+      position: "Platform",
+      serviceTypeId: "sample-sunday-am",
+      sortDate: "2026-06-14T10:00:00.000Z",
+      status: "Confirmed",
+    },
+    {
+      date: "2026-06-14",
+      dateLabel: "June 14, 2026",
+      id: "sample-mp-3",
+      name: "Carl Sheppard",
+      planId: "sample-pm",
+      planName: "Sunday PM",
+      position: "Platform",
+      serviceTypeId: "sample-sunday-pm",
+      sortDate: "2026-06-14T18:00:00.000Z",
+      status: "Unconfirmed",
+    },
+    {
+      date: "2026-06-21",
+      dateLabel: "June 21, 2026",
+      id: "sample-mp-4",
+      name: "James McChristian",
+      planId: "sample-am-2",
+      planName: "Sunday AM",
+      position: "Platform",
+      serviceTypeId: "sample-sunday-am",
+      sortDate: "2026-06-21T10:00:00.000Z",
+      status: "Declined",
+    },
+  ];
 }

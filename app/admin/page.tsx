@@ -23,6 +23,12 @@ const ADMIN_ITEMS: Array<{
     label: "Schedule Look Up",
   },
   {
+    description: "View upcoming Minister and Platform assignments from Planning Center.",
+    href: "/admin/minister-platform-schedule",
+    icon: "assignments",
+    label: "Minister and Platform Schedule",
+  },
+  {
     description: "Verify the Cognito Forms API connection and inspect available forms.",
     href: "/admin/cognito-forms",
     icon: "resources",
