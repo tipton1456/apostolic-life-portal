@@ -338,6 +338,7 @@ export async function updateContactFromAdminClone(formData: FormData) {
     email: normalizeOptionalInput(formData.get("email")),
     mobile: normalizeOptionalInput(formData.get("mobile")),
     phone: normalizeOptionalInput(formData.get("phone")),
+    pictureFile: getImageFile(formData.get("profilePicture")),
   };
 
   await updateElvantoContact(update);
@@ -352,6 +353,7 @@ export async function updateContactFromAdminClone(formData: FormData) {
       lastName: person.lastName,
       mobile: update.mobile,
       phone: update.phone,
+      pictureFile: update.pictureFile,
       previousEmail: person.email,
     });
 

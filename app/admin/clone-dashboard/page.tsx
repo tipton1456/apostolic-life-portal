@@ -350,6 +350,7 @@ function AdminContactUpdateDetails({
             type="date"
             defaultValue={person.birthdayValue}
           />
+          <FileInput label="Profile Picture" name="profilePicture" />
         </div>
         <AdminFormButton pendingLabel="Saving..." className="mt-5">
           Save Contact
@@ -379,6 +380,24 @@ function TextInput({
         defaultValue={defaultValue}
         className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
       />
+    </label>
+  );
+}
+
+function FileInput({ label, name }: { label: string; name: string }) {
+  return (
+    <label className="block text-sm font-medium text-neutral-300 md:col-span-2">
+      {label}
+      <input
+        type="file"
+        name={name}
+        accept="image/*"
+        className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-sm text-neutral-100 outline-none ring-lime-400 transition file:mr-4 file:rounded-lg file:border-0 file:bg-lime-400 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-neutral-950 hover:file:bg-lime-300 focus:ring-2"
+      />
+      <span className="mt-1 block text-xs text-neutral-500">
+        JPG, PNG, or WebP under 5MB. Photo uploads sync to Planning Center when
+        matched.
+      </span>
     </label>
   );
 }
