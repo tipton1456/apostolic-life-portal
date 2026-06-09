@@ -17,6 +17,10 @@ const EVENTS_FEED_URL =
   process.env.TITHELY_EVENTS_ICS_URL ??
   "https://apostoliclifeupci.com/events.ics";
 
+export function getEventsSubscriptionUrl() {
+  return EVENTS_FEED_URL.replace(/^https?:\/\//, "webcal://");
+}
+
 export async function getUpcomingEvents(limit?: number): Promise<ChurchEvent[]> {
   if (await isDemoMode()) {
     return typeof limit === "number"
