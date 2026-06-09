@@ -141,7 +141,7 @@ function EventsCalendar({
   const days = buildCalendarDays(events, monthDate);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
+    <div className="overflow-visible rounded-xl border border-white/10 bg-white/[0.03]">
       <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-3 md:flex-row md:items-center md:justify-between">
         <h2 className="text-xl font-semibold">{getCalendarTitle(monthDate)}</h2>
         <div className="flex flex-wrap gap-2">
@@ -204,7 +204,10 @@ function EventsCalendar({
 
 function CalendarEventCard({ event }: { event: ChurchEvent }) {
   return (
-    <div className="rounded-md border border-white/10 bg-neutral-950/60 p-2">
+    <div
+      tabIndex={0}
+      className="group relative rounded-md border border-white/10 bg-neutral-950/60 p-2 outline-none transition hover:border-lime-400/50 focus:border-lime-400/50"
+    >
       <p className="text-[11px] font-semibold leading-tight text-neutral-100">
         {event.title}
       </p>
@@ -214,6 +217,18 @@ function CalendarEventCard({ event }: { event: ChurchEvent }) {
       <p className="mt-1 line-clamp-2 text-[11px] leading-tight text-neutral-400">
         {event.location}
       </p>
+      {event.imageUrl ? (
+        <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-xl border border-white/10 bg-neutral-950 p-2 opacity-0 shadow-2xl shadow-black/50 transition group-hover:opacity-100 group-focus:opacity-100">
+          <img
+            src={event.imageUrl}
+            alt={event.title}
+            className="aspect-video w-full rounded-lg object-cover"
+          />
+          <p className="mt-2 line-clamp-1 text-xs font-semibold text-neutral-100">
+            {event.title}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
