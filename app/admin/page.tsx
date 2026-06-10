@@ -47,7 +47,7 @@ const ADMIN_ITEMS: Array<{
     label: "Deployment Log",
   },
   {
-    description: "Review SMS messages sent from group management and recipient delivery results.",
+    description: "Review SMS and email messages sent from group management and recipient delivery results.",
     href: "/admin/communications",
     icon: "communications",
     label: "Communication Log",

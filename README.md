@@ -61,6 +61,24 @@ The follow-up password reset/audit migration adds the forced temporary password
 workflow and `portal_user_audit_logs`; apply new migrations in order whenever
 they are added.
 
+## Group Email Communications
+
+Group leaders can send email from the group management page using the same member
+selection checkboxes as SMS. Messages are sent through Resend and logged in the
+admin communication log.
+
+```bash
+RESEND_API_KEY=
+GROUP_EMAIL_FROM=Apostolic Life <info@apostoliclifeupci.com>
+```
+
+`apostoliclifeupci.com` must be verified in Resend before production email will
+deliver from `info@apostoliclifeupci.com`. Attachments support PDF, image, text,
+CSV, and calendar files up to 10 MB total per send.
+
+Apply the communication log migrations in `supabase/migrations` before using
+group email in production.
+
 ## GroupMe Prayer Board
 
 The prayer board page reads recent messages from a GroupMe conversation. It is

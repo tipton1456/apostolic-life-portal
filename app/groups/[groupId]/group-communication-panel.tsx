@@ -6,34 +6,61 @@ import { PortalIcon } from "@/app/icons";
 import type { GroupDetail } from "@/lib/elvanto-groups";
 import LeaderToggle from "./leader-toggle";
 
+type CommunicationChannel = "sms" | "email";
+
 type GroupCommunicationPanelProps = {
   group: GroupDetail;
   isEditing: boolean;
   removePersonAction: (formData: FormData) => void;
+  sendEmailAction: (formData: FormData) => void;
   sendSmsAction: (formData: FormData) => void;
+  emailStatus?: string;
   smsStatus?: string;
   updateLeaderAction: (formData: FormData) => void;
 };
+
+const MAX_EMAIL_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 export default function GroupCommunicationPanel({
   group,
   isEditing,
   removePersonAction,
+  sendEmailAction,
   sendSmsAction,
+  emailStatus,
   smsStatus,
   updateLeaderAction,
 }: GroupCommunicationPanelProps) {
+  const [channel, setChannel] = useState<CommunicationChannel>("sms");
+  const [attachmentError, setAttachmentError] = useState("");
   const contactableMemberIds = useMemo(
     () =>
       group.members
-        .filter((member) => hasContactPhone(member.mobile))
+        .filter((member) =>
+          channel === "sms"
+            ? hasContactPhone(member.mobile)
+            : hasContactEmail(member.email),
+        )
         .map((member) => member.id),
-    [group.members],
+    [channel, group.members],
   );
   const [selectedMemberIds, setSelectedMemberIds] =
     useState<string[]>(contactableMemberIds);
   const [isComposing, setIsComposing] = useState(false);
   const selectedMemberIdSet = new Set(selectedMemberIds);
+
+  function changeChannel(nextChannel: CommunicationChannel) {
+    setChannel(nextChannel);
+    setSelectedMemberIds(
+      group.members
+        .filter((member) =>
+          nextChannel === "sms"
+            ? hasContactPhone(member.mobile)
+            : hasContactEmail(member.email),
+        )
+        .map((member) => member.id),
+    );
+  }
 
   function toggleMember(memberId: string, checked: boolean) {
     setSelectedMemberIds((currentMemberIds) =>
@@ -43,16 +70,26 @@ export default function GroupCommunicationPanel({
     );
   }
 
+  function isMemberContactable(member: GroupDetail["members"][number]) {
+    return channel === "sms"
+      ? hasContactPhone(member.mobile)
+      : hasContactEmail(member.email);
+  }
+
   return (
     <section className="mt-8 space-y-4">
-      {smsStatus ? <SmsStatusMessage status={smsStatus} /> : null}
+      {smsStatus ? <CommunicationStatusMessage channel="sms" status={smsStatus} /> : null}
+      {emailStatus ? (
+        <CommunicationStatusMessage channel="email" status={emailStatus} />
+      ) : null}
 
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-xl font-semibold">Group Communication</h2>
             <p className="mt-1 text-sm text-neutral-400">
-              {selectedMemberIds.length} selected for SMS
+              {selectedMemberIds.length} selected for{" "}
+              {channel === "sms" ? "SMS" : "Email"}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -82,30 +119,118 @@ export default function GroupCommunicationPanel({
         </div>
 
         {isComposing ? (
-          <form action={sendSmsAction} className="mt-5 border-t border-white/10 pt-5">
-            <input type="hidden" name="groupId" value={group.id} />
-            {selectedMemberIds.map((memberId) => (
-              <input key={memberId} type="hidden" name="memberIds" value={memberId} />
-            ))}
-            <label className="block text-sm font-medium text-neutral-300">
-              SMS Message
-              <textarea
-                name="message"
-                required
-                maxLength={1000}
-                rows={5}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
-                placeholder="Type your message to the selected group members"
+          <div className="mt-5 border-t border-white/10 pt-5">
+            <div className="flex flex-wrap gap-2">
+              <ChannelButton
+                active={channel === "sms"}
+                label="SMS"
+                onClick={() => changeChannel("sms")}
               />
-            </label>
-            <p className="mt-2 text-xs text-neutral-500">
-              The message will include opt-out language. Recipients who have opted
-              out are skipped automatically.
-            </p>
-            <AdminFormButton pendingLabel="Sending..." className="mt-4">
-              Send SMS
-            </AdminFormButton>
-          </form>
+              <ChannelButton
+                active={channel === "email"}
+                label="Email"
+                onClick={() => changeChannel("email")}
+              />
+            </div>
+
+            {channel === "sms" ? (
+              <form action={sendSmsAction} className="mt-5">
+                <input type="hidden" name="groupId" value={group.id} />
+                {selectedMemberIds.map((memberId) => (
+                  <input key={memberId} type="hidden" name="memberIds" value={memberId} />
+                ))}
+                <label className="block text-sm font-medium text-neutral-300">
+                  SMS Message
+                  <textarea
+                    name="message"
+                    required
+                    maxLength={1000}
+                    rows={5}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
+                    placeholder="Type your message to the selected group members"
+                  />
+                </label>
+                <p className="mt-2 text-xs text-neutral-500">
+                  The message will include opt-out language. Recipients who have opted
+                  out are skipped automatically.
+                </p>
+                <AdminFormButton pendingLabel="Sending..." className="mt-4">
+                  Send SMS
+                </AdminFormButton>
+              </form>
+            ) : (
+              <form action={sendEmailAction} className="mt-5">
+                <input type="hidden" name="groupId" value={group.id} />
+                {selectedMemberIds.map((memberId) => (
+                  <input key={memberId} type="hidden" name="memberIds" value={memberId} />
+                ))}
+                <label className="block text-sm font-medium text-neutral-300">
+                  Subject
+                  <input
+                    name="subject"
+                    required
+                    maxLength={200}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
+                    placeholder="Email subject"
+                  />
+                </label>
+                <label className="mt-4 block text-sm font-medium text-neutral-300">
+                  Email Message
+                  <textarea
+                    name="message"
+                    required
+                    maxLength={10000}
+                    rows={8}
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
+                    placeholder="Type your email message to the selected group members"
+                  />
+                </label>
+                <label className="mt-4 block text-sm font-medium text-neutral-300">
+                  Attachments
+                  <input
+                    accept="image/*,.pdf,.csv,.txt,.ics"
+                    className="mt-2 w-full rounded-xl border border-dashed border-white/15 bg-neutral-900 px-4 py-4 text-sm text-neutral-200 file:mr-4 file:rounded-lg file:border-0 file:bg-lime-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-neutral-950 hover:border-lime-400/50"
+                    multiple
+                    name="attachments"
+                    onChange={(event) => {
+                      const files = Array.from(event.currentTarget.files ?? []);
+                      const totalSize = files.reduce(
+                        (sum, file) => sum + file.size,
+                        0,
+                      );
+
+                      if (files.length > 5) {
+                        event.currentTarget.value = "";
+                        setAttachmentError("You can attach up to 5 files.");
+                        return;
+                      }
+
+                      if (totalSize > MAX_EMAIL_ATTACHMENT_BYTES) {
+                        event.currentTarget.value = "";
+                        setAttachmentError("Attachments must be 10 MB or less total.");
+                        return;
+                      }
+
+                      setAttachmentError("");
+                    }}
+                    type="file"
+                  />
+                </label>
+                <p className="mt-2 text-xs text-neutral-500">
+                  Sent from info@apostoliclifeupci.com. Attach up to 5 PDF, image,
+                  text, CSV, or calendar files.
+                </p>
+                {attachmentError ? (
+                  <p className="mt-3 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-200">
+                    {attachmentError}
+                  </p>
+                ) : null}
+                <AdminFormButton pendingLabel="Sending..." className="mt-4">
+                  Send Email
+                </AdminFormButton>
+              </form>
+            )}
+          </div>
         ) : null}
       </div>
 
@@ -127,7 +252,7 @@ export default function GroupCommunicationPanel({
             </thead>
             <tbody className="divide-y divide-white/10">
               {group.members.map((member) => {
-                const hasPhone = hasContactPhone(member.mobile);
+                const contactable = isMemberContactable(member);
 
                 return (
                   <tr key={member.id} className="transition hover:bg-white/[0.06]">
@@ -135,11 +260,11 @@ export default function GroupCommunicationPanel({
                       <input
                         type="checkbox"
                         checked={selectedMemberIdSet.has(member.id)}
-                        disabled={!hasPhone}
+                        disabled={!contactable}
                         onChange={(event) =>
                           toggleMember(member.id, event.target.checked)
                         }
-                        aria-label={`Select ${member.name} for SMS`}
+                        aria-label={`Select ${member.name} for ${channel === "sms" ? "SMS" : "email"}`}
                         className="h-4 w-4 rounded border-white/20 bg-neutral-900 text-lime-400 accent-lime-400 disabled:cursor-not-allowed disabled:opacity-40"
                       />
                     </td>
@@ -219,9 +344,46 @@ export default function GroupCommunicationPanel({
   );
 }
 
-function SmsStatusMessage({ status }: { status: string }) {
-  const message = getSmsStatusMessage(status);
-  const isError = ["config", "log-error", "missing"].includes(status);
+function ChannelButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        active
+          ? "rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition"
+          : "rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:border-lime-400/60 hover:text-lime-300"
+      }
+    >
+      {label}
+    </button>
+  );
+}
+
+function CommunicationStatusMessage({
+  channel,
+  status,
+}: {
+  channel: CommunicationChannel;
+  status: string;
+}) {
+  const message = getCommunicationStatusMessage(channel, status);
+  const isError = [
+    "config",
+    "log-error",
+    "missing",
+    "attachment-limit",
+    "attachment-size",
+    "attachment-type",
+  ].includes(status);
 
   return (
     <p
@@ -236,18 +398,60 @@ function SmsStatusMessage({ status }: { status: string }) {
   );
 }
 
-function getSmsStatusMessage(status: string) {
-  if (status === "sent") return "SMS message queued for the selected group members.";
+function getCommunicationStatusMessage(
+  channel: CommunicationChannel,
+  status: string,
+) {
+  if (channel === "email") {
+    if (status === "sent") {
+      return "Email sent to the selected group members.";
+    }
+    if (status === "demo") return "Demo email simulated.";
+    if (status === "config") return "Resend email is not configured correctly.";
+    if (status === "log-error") {
+      return "Communication logging is not set up yet.";
+    }
+    if (status === "missing") {
+      return "Select at least one member, subject, and message.";
+    }
+    if (status === "attachment-limit") {
+      return "You can attach up to 5 files.";
+    }
+    if (status === "attachment-size") {
+      return "Attachments must be 10 MB or less total.";
+    }
+    if (status === "attachment-type") {
+      return "One or more attachments use an unsupported file type.";
+    }
+
+    return "Email request completed.";
+  }
+
+  if (status === "sent") {
+    return "SMS message queued for the selected group members.";
+  }
   if (status === "demo") return "Demo SMS message simulated.";
   if (status === "config") return "Twilio SMS is not configured correctly.";
   if (status === "log-error") return "Communication logging is not set up yet.";
-  if (status === "missing") return "Select at least one member and enter a message.";
+  if (status === "missing") {
+    return "Select at least one member and enter a message.";
+  }
 
   return "SMS request completed.";
 }
 
 function hasContactPhone(value: string) {
   return Boolean(value && value.toLowerCase() !== "not listed");
+}
+
+function hasContactEmail(value: string) {
+  const normalizedEmail = value.trim().toLowerCase();
+
+  return Boolean(
+    normalizedEmail &&
+      normalizedEmail !== "not listed" &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail),
+  );
 }
 
 function getInitials(name: string) {

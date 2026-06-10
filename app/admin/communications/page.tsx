@@ -26,7 +26,8 @@ export default async function CommunicationLogPage() {
             Communication Log
           </h1>
           <p className="mt-3 max-w-2xl text-neutral-400">
-            Review SMS messages sent from group management and recipient results.
+            Review SMS and email messages sent from group management and
+            recipient results.
           </p>
         </header>
 
@@ -37,7 +38,7 @@ export default async function CommunicationLogPage() {
                 key={log.id}
                 className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]"
               >
-                <summary className="grid cursor-pointer list-none gap-3 px-5 py-4 transition hover:bg-white/[0.05] md:grid-cols-[1fr_12rem_10rem_10rem] [&::-webkit-details-marker]:hidden">
+                <summary className="grid cursor-pointer list-none gap-3 px-5 py-4 transition hover:bg-white/[0.05] md:grid-cols-[1fr_8rem_12rem_10rem_10rem] [&::-webkit-details-marker]:hidden">
                   <div>
                     <h2 className="text-lg font-semibold text-neutral-100">
                       {log.groupName}
@@ -46,6 +47,7 @@ export default async function CommunicationLogPage() {
                       {log.senderEmail} · {formatDateTime(log.createdAt)}
                     </p>
                   </div>
+                  <ChannelBadge channel={log.channel} />
                   <StatusBadge status={log.status} />
                   <p className="text-sm text-neutral-300 md:text-right">
                     {log.successCount} sent
@@ -56,6 +58,18 @@ export default async function CommunicationLogPage() {
                 </summary>
 
                 <div className="border-t border-white/10 p-5">
+                  {log.subject ? (
+                    <p className="mb-4 text-sm font-semibold text-neutral-100">
+                      Subject: {log.subject}
+                    </p>
+                  ) : null}
+
+                  {log.attachmentNames.length > 0 ? (
+                    <p className="mb-4 text-sm text-neutral-400">
+                      Attachments: {log.attachmentNames.join(", ")}
+                    </p>
+                  ) : null}
+
                   <p className="whitespace-pre-line rounded-xl border border-white/10 bg-neutral-950/60 p-4 text-sm leading-6 text-neutral-300">
                     {log.messageBody}
                   </p>
@@ -65,9 +79,13 @@ export default async function CommunicationLogPage() {
                       <thead className="border-b border-white/10 text-xs uppercase tracking-[0.18em] text-neutral-500">
                         <tr>
                           <th className="px-3 py-2 font-medium">Recipient</th>
-                          <th className="px-3 py-2 font-medium">Phone</th>
+                          <th className="px-3 py-2 font-medium">
+                            {log.channel === "email" ? "Email" : "Phone"}
+                          </th>
                           <th className="px-3 py-2 font-medium">Status</th>
-                          <th className="px-3 py-2 font-medium">Twilio SID</th>
+                          <th className="px-3 py-2 font-medium">
+                            {log.channel === "email" ? "Resend ID" : "Twilio SID"}
+                          </th>
                           <th className="px-3 py-2 font-medium">Failure</th>
                         </tr>
                       </thead>
@@ -78,13 +96,13 @@ export default async function CommunicationLogPage() {
                               {recipient.personName}
                             </td>
                             <td className="px-3 py-3 text-neutral-300">
-                              {recipient.phoneNumber || "Not listed"}
+                              {recipient.contactLabel || "Not listed"}
                             </td>
                             <td className="px-3 py-3 text-neutral-300">
                               {recipient.status}
                             </td>
                             <td className="px-3 py-3 text-neutral-400">
-                              {recipient.twilioMessageSid || "-"}
+                              {recipient.providerMessageId || "-"}
                             </td>
                             <td className="px-3 py-3 text-neutral-400">
                               {recipient.failureMessage ||
@@ -103,13 +121,21 @@ export default async function CommunicationLogPage() {
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
               <h2 className="text-xl font-semibold">No messages sent yet</h2>
               <p className="mt-3 text-sm text-neutral-400">
-                Group SMS messages will appear here after they are sent.
+                Group SMS and email messages will appear here after they are sent.
               </p>
             </div>
           )}
         </section>
       </div>
     </main>
+  );
+}
+
+function ChannelBadge({ channel }: { channel: string }) {
+  return (
+    <span className="h-fit rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-300 md:justify-self-end">
+      {channel}
+    </span>
   );
 }
 

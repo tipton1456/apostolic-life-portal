@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { sendGroupSms } from "@/lib/communications";
+import { sendGroupEmail, sendGroupSms } from "@/lib/communications";
 import {
   addPersonToGroup,
   getLeaderGroupDetail,
@@ -17,6 +17,7 @@ type PageProps = {
   }>;
   searchParams: Promise<{
     edit?: string;
+    email?: string;
     sms?: string;
   }>;
 };
@@ -26,7 +27,7 @@ export default async function GroupDetailPage({
   searchParams,
 }: PageProps) {
   const { groupId } = await params;
-  const { edit, sms } = await searchParams;
+  const { edit, email, sms } = await searchParams;
   const isEditing = edit === "true";
   const user = await getCurrentSessionUser();
 
@@ -83,7 +84,9 @@ export default async function GroupDetailPage({
           group={group}
           isEditing={isEditing}
           removePersonAction={removePersonFromGroup}
+          sendEmailAction={sendGroupEmail}
           sendSmsAction={sendGroupSms}
+          emailStatus={email}
           smsStatus={sms}
           updateLeaderAction={updateGroupMemberLeader}
         />
