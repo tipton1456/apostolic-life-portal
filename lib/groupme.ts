@@ -183,6 +183,7 @@ function shouldExcludePrayerBoardMessage(text?: string) {
   const normalizedText = text?.trimStart().toLowerCase() ?? "";
 
   return (
+    normalizedText.startsWith("praise god") ||
     normalizedText.startsWith("praying") ||
     normalizedText.startsWith("thank you")
   );
