@@ -156,6 +156,8 @@ export type PlanningCenterTeamSummary = {
   id: string;
   leaders: string;
   name: string;
+  serviceTypeName?: string;
+  teamName?: string;
   type: "Planning Center Team";
 };
 
@@ -362,16 +364,27 @@ export async function getPlanningCenterTeamsForEmail(
 
   if (!personId || !hasPlanningCenterCredentials()) return [];
 
-  const { leaderIdsByTeamId, teams } =
+  const { leaderIdsByTeamId, serviceTypeNameById, teams } =
     await getPlanningCenterPersonTeamBundle(personId);
   const summaries = await Promise.all(
-    teams.map((team) =>
-      mapPlanningCenterTeamSummary(team, leaderIdsByTeamId.get(team.id)),
-    ),
+    teams.map((team) => {
+      const serviceType = getRelationship(team, "service_type");
+      const serviceTypeName =
+        serviceTypeNameById.get(serviceType?.id ?? "") ?? "Service";
+
+      return mapPlanningCenterMemberTeamSummary(
+        team,
+        serviceTypeName,
+        leaderIdsByTeamId.get(team.id),
+      );
+    }),
   );
 
-  return summaries.sort((firstTeam, secondTeam) =>
-    firstTeam.name.localeCompare(secondTeam.name),
+  return summaries.sort(
+    (firstTeam, secondTeam) =>
+      (firstTeam.serviceTypeName ?? "").localeCompare(
+        secondTeam.serviceTypeName ?? "",
+      ) || (firstTeam.teamName ?? "").localeCompare(secondTeam.teamName ?? ""),
   );
 }
 
@@ -906,7 +919,7 @@ async function getPlanningCenterPersonTeamBundle(personId: string) {
   const response = await pcoFetch<PcoTeamAttributes>(
     `/services/v2/people/${personId}/teams`,
     {
-      include: "team_leaders",
+      include: "service_type,team_leaders",
       per_page: "100",
     },
   );
@@ -917,6 +930,14 @@ async function getPlanningCenterPersonTeamBundle(personId: string) {
       .map((leader) => [
         leader.id,
         getRelationship(leader, "person")?.id,
+      ]),
+  );
+  const serviceTypeNameById = new Map(
+    normalizeResources<PcoServiceTypeAttributes>(response.included)
+      .filter((resource) => resource.type === "ServiceType")
+      .map((serviceType) => [
+        serviceType.id,
+        serviceType.attributes?.name ?? "Service",
       ]),
   );
   const teams = normalizeResources<PcoTeamAttributes>(response.data).filter(
@@ -936,7 +957,7 @@ async function getPlanningCenterPersonTeamBundle(personId: string) {
     }
   }
 
-  return { leaderIdsByTeamId, teams };
+  return { leaderIdsByTeamId, serviceTypeNameById, teams };
 }
 
 async function getPlanningCenterTeam(teamId: string) {
@@ -970,6 +991,29 @@ async function getPlanningCenterTeamLeaderIds(teamId: string) {
   );
 }
 
+async function mapPlanningCenterMemberTeamSummary(
+  team: JsonApiResource<PcoTeamAttributes>,
+  serviceTypeName: string,
+  knownLeaderIds?: Set<string>,
+): Promise<PlanningCenterTeamSummary> {
+  const leaderIds = knownLeaderIds ?? (await getPlanningCenterTeamLeaderIds(team.id));
+  const leaderNames = await getPlanningCenterServicePersonNames(
+    Array.from(leaderIds),
+  );
+  const teamName = team.attributes?.name ?? "Team";
+  const serviceType = getRelationship(team, "service_type");
+
+  return {
+    href: `/groups/planning-center/${team.id}`,
+    id: `${serviceType?.id ?? "service"}-${team.id}`,
+    leaders: leaderNames.length > 0 ? leaderNames.join(", ") : "Not listed",
+    name: formatPlanningCenterMemberTeamName(serviceTypeName, teamName),
+    serviceTypeName,
+    teamName,
+    type: "Planning Center Team",
+  };
+}
+
 async function mapPlanningCenterTeamSummary(
   team: JsonApiResource<PcoTeamAttributes>,
   knownLeaderIds?: Set<string>,
@@ -978,14 +1022,23 @@ async function mapPlanningCenterTeamSummary(
   const leaderNames = await getPlanningCenterServicePersonNames(
     Array.from(leaderIds),
   );
+  const teamName = team.attributes?.name ?? "Planning Center Team";
 
   return {
     href: `/groups/planning-center/${team.id}`,
     id: team.id,
     leaders: leaderNames.length > 0 ? leaderNames.join(", ") : "Not listed",
-    name: team.attributes?.name ?? "Planning Center Team",
+    name: teamName,
+    teamName,
     type: "Planning Center Team",
   };
+}
+
+function formatPlanningCenterMemberTeamName(
+  serviceTypeName: string,
+  teamName: string,
+) {
+  return `${serviceTypeName} | ${teamName}`;
 }
 
 async function getPlanningCenterServicePersonNames(personIds: string[]) {
@@ -1507,16 +1560,20 @@ const sampleAssignments: UpcomingAssignment[] = [
 const samplePlanningCenterTeams: PlanningCenterTeamSummary[] = [
   {
     href: "/groups/planning-center/demo-pco-tech",
-    id: "demo-pco-tech",
+    id: "demo-service-sunday-am-demo-pco-tech",
     leaders: "Daniel Demo, Maria Demo",
-    name: "Tech Team",
+    name: "Sunday Worship | Tech Team",
+    serviceTypeName: "Sunday Worship",
+    teamName: "Tech Team",
     type: "Planning Center Team",
   },
   {
     href: "/groups/planning-center/demo-pco-worship",
-    id: "demo-pco-worship",
+    id: "demo-service-sunday-pm-demo-pco-worship",
     leaders: "Avery Johnson",
-    name: "Worship Team",
+    name: "Sunday Evening | Worship Team",
+    serviceTypeName: "Sunday Evening",
+    teamName: "Worship Team",
     type: "Planning Center Team",
   },
 ];

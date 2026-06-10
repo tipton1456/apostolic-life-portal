@@ -55,7 +55,7 @@ export default async function MyGroupsPage({ searchParams }: PageProps) {
 
         <section className="mt-8">
           {activeGroups.length > 0 ? (
-            <GroupsTable groups={activeGroups} />
+            <GroupsTable groups={activeGroups} view={view} />
           ) : (
             <EmptyGroupsState view={view} />
           )}
@@ -74,28 +74,44 @@ export default async function MyGroupsPage({ searchParams }: PageProps) {
   );
 }
 
-function GroupsTable({ groups }: { groups: GroupListItem[] }) {
+function GroupsTable({
+  groups,
+  view,
+}: {
+  groups: GroupListItem[];
+  view: MyGroupsView;
+}) {
+  const showGroupType = view === "elvanto";
+
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table
+          className={`w-full text-left text-sm ${
+            showGroupType ? "min-w-[720px]" : "min-w-[560px]"
+          }`}
+        >
           <thead className="border-b border-white/10 text-xs uppercase tracking-[0.18em] text-neutral-500">
             <tr>
               <th className="px-5 py-3 font-medium">Name</th>
-              <th className="px-5 py-3 font-medium">Type of Group</th>
+              {showGroupType ? (
+                <th className="px-5 py-3 font-medium">Type of Group</th>
+              ) : null}
               <th className="px-5 py-3 font-medium">Group Leader</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/10">
             {groups.map((group) => (
               <tr
-                key={`${group.type}-${group.id}`}
+                key={`${view}-${group.id}`}
                 className="transition hover:bg-white/[0.06]"
               >
                 <td className="px-5 py-4 font-semibold text-neutral-100">
                   {group.name}
                 </td>
-                <td className="px-5 py-4 text-lime-300">{group.type}</td>
+                {showGroupType ? (
+                  <td className="px-5 py-4 text-lime-300">{group.type}</td>
+                ) : null}
                 <td className="px-5 py-4 text-neutral-300">{group.leaders}</td>
               </tr>
             ))}
