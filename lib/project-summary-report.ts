@@ -365,14 +365,20 @@ class ReportPdfRenderer {
 
     this.y = headerTop - headerHeight - 16;
 
-    const details = [
-      `Project Status: ${formatProjectStatus(context.project.status)}`,
-      `Start Date: ${formatDisplayDate(context.project.startDate)}    Target End Date: ${formatDisplayDate(context.project.targetEndDate)}`,
-      `PM: ${formatNameList(context.managerNames)}    Participants: ${formatNameList(context.participantNames)}`,
+    const details: DetailLineSegment[][] = [
+      [{ label: "Project Status:", value: formatProjectStatus(context.project.status) }],
+      [
+        { label: "Start Date:", value: formatDisplayDate(context.project.startDate) },
+        { label: "Target End Date:", value: formatDisplayDate(context.project.targetEndDate) },
+      ],
+      [
+        { label: "PM:", value: formatNameList(context.managerNames) },
+        { label: "Participants:", value: formatNameList(context.participantNames) },
+      ],
     ];
 
     for (const line of details) {
-      this.drawWrappedLine(line, 11, this.regular, COLORS.muted, 14);
+      this.drawLabeledDetailLine(line);
     }
 
     this.y -= 12;
@@ -542,6 +548,40 @@ class ReportPdfRenderer {
     }
   }
 
+  private drawLabeledDetailLine(
+    segments: DetailLineSegment[],
+    size = 11,
+    lineHeight = 14,
+  ) {
+    const parts: StyledTextPart[] = [];
+
+    for (const [index, segment] of segments.entries()) {
+      if (index > 0) {
+        parts.push({ text: "    ", font: this.regular });
+      }
+      parts.push({ text: `${segment.label} `, font: this.bold });
+      parts.push({ text: segment.value, font: this.regular });
+    }
+
+    for (const line of wrapStyledParts(parts, CONTENT_WIDTH, size)) {
+      this.ensureSpace(lineHeight);
+      let x = MARGIN;
+
+      for (const part of line) {
+        this.page.drawText(part.text, {
+          x,
+          y: this.y,
+          size,
+          font: part.font,
+          color: COLORS.muted,
+        });
+        x += part.font.widthOfTextAtSize(part.text, size);
+      }
+
+      this.y -= lineHeight;
+    }
+  }
+
   private drawWrappedLine(
     text: string,
     size: number,
@@ -574,6 +614,62 @@ class ReportPdfRenderer {
     const page = this.pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     return page;
   }
+}
+
+type DetailLineSegment = {
+  label: string;
+  value: string;
+};
+
+type StyledTextPart = {
+  text: string;
+  font: PDFFont;
+};
+
+function wrapStyledParts(parts: StyledTextPart[], maxWidth: number, size: number) {
+  const lines: StyledTextPart[][] = [];
+  let currentLine: StyledTextPart[] = [];
+  let currentWidth = 0;
+
+  const pushPart = (font: PDFFont, text: string) => {
+    if (!text) return;
+
+    const lastPart = currentLine[currentLine.length - 1];
+    if (lastPart?.font === font) {
+      lastPart.text += text;
+    } else {
+      currentLine.push({ text, font });
+    }
+    currentWidth += font.widthOfTextAtSize(text, size);
+  };
+
+  const startNewLine = () => {
+    if (currentLine.length > 0) {
+      lines.push(currentLine);
+    }
+    currentLine = [];
+    currentWidth = 0;
+  };
+
+  for (const part of parts) {
+    const tokens = part.text.split(/(\s+)/).filter((token) => token.length > 0);
+
+    for (const token of tokens) {
+      const tokenWidth = part.font.widthOfTextAtSize(token, size);
+
+      if (currentWidth + tokenWidth > maxWidth && currentWidth > 0) {
+        startNewLine();
+      }
+
+      pushPart(part.font, token);
+    }
+  }
+
+  if (currentLine.length > 0) {
+    lines.push(currentLine);
+  }
+
+  return lines;
 }
 
 function getColumnLayout() {
