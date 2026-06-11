@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, hasAdminClientConfig } from "@/lib/supabase/admin";
 import { sampleHousehold } from "./sample-household";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -116,34 +116,15 @@ export async function getElvantoProfilePicture(email?: string) {
 
   if (!email) return null;
 
-  const authorization = getElvantoAuthorization();
+  const person = await getElvantoPersonDetailByEmail(email);
 
-  if (!authorization) return null;
-
-  try {
-    const primaryResult = await searchPeople(authorization, {
-      "search[email]": email,
-    });
-    const primaryPeople = normalizeArray<ElvantoPerson>(
-      primaryResult?.people?.person,
-    );
-    const primaryPerson =
-      primaryPeople.find(
-        (person) => person.family_relationship === "Primary Contact",
-      ) ?? primaryPeople[0];
-
-    return primaryPerson?.picture?.trim() || null;
-  } catch (error) {
-    console.error("Elvanto profile picture lookup failed:", error);
-    return null;
-  }
+  return person?.picture?.trim() || null;
 }
 
-export async function refreshElvantoProfilePictureForCurrentUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function refreshElvantoProfilePictureForCurrentUser(
+  accessToken?: string,
+) {
+  const user = await resolveAuthenticatedUser(accessToken);
 
   if (!user?.email) {
     return null;
@@ -156,17 +137,14 @@ export async function refreshElvantoProfilePictureForCurrentUser() {
   }
 
   const refreshedAt = new Date().toISOString();
-  const admin = createAdminClient();
-  const { error } = await admin.auth.admin.updateUserById(user.id, {
-    user_metadata: {
-      ...user.user_metadata,
-      elvanto_profile_picture: picture,
-      elvanto_profile_picture_refreshed_at: refreshedAt,
-    },
-  });
+  const metadataUpdated = await persistElvantoProfilePictureMetadata(
+    user.id,
+    user.user_metadata,
+    picture,
+    refreshedAt,
+  );
 
-  if (error) {
-    console.error("Elvanto profile picture metadata update failed:", error);
+  if (!metadataUpdated) {
     return null;
   }
 
@@ -200,11 +178,27 @@ export async function getMenuProfilePicture(email?: string, isDemo = false) {
     typeof user?.user_metadata?.elvanto_profile_picture_refreshed_at === "string"
       ? user.user_metadata.elvanto_profile_picture_refreshed_at
       : null;
-  const livePicture = metadataPicture || (await getElvantoProfilePicture(email));
+  const livePicture = await getElvantoProfilePicture(email);
+  const picture = livePicture ?? metadataPicture;
+  const pictureChanged = Boolean(
+    livePicture && metadataPicture && livePicture !== metadataPicture,
+  );
+  const cacheKey = pictureChanged
+    ? new Date().toISOString()
+    : metadataCacheKey ?? (picture ? new Date().toISOString() : null);
+
+  if (user && livePicture && livePicture !== metadataPicture) {
+    void persistElvantoProfilePictureMetadata(
+      user.id,
+      user.user_metadata,
+      livePicture,
+      cacheKey ?? new Date().toISOString(),
+    );
+  }
 
   return {
-    cacheKey: metadataCacheKey,
-    picture: livePicture,
+    cacheKey,
+    picture,
   };
 }
 
@@ -248,40 +242,17 @@ async function getHouseholdForEmail(
   if (!authorization) return null;
 
   try {
-    const primaryResult = await searchPeople(authorization, {
-      "search[email]": email,
-    });
+    const personWithPicture = await getElvantoPersonDetailByEmail(email, authorization);
 
-    const primaryPeople = normalizeArray<ElvantoPerson>(
-      primaryResult?.people?.person,
-    );
-
-    const primaryPerson =
-      primaryPeople.find(
-        (person) => person.family_relationship === "Primary Contact",
-      ) ?? primaryPeople[0];
-
-    if (!primaryPerson?.id) return null;
-
-    const detailResult = await getPersonInfoWithFamily(
-      authorization,
-      primaryPerson.id,
-    );
-
-    const detailPerson =
-      normalizeArray<ElvantoPerson>(detailResult?.person)[0] ?? primaryPerson;
-    const personWithPicture = {
-      ...detailPerson,
-      picture: detailPerson.picture ?? primaryPerson.picture,
-    };
+    if (!personWithPicture?.id) return null;
 
     const familyMembers = normalizeArray<ElvantoFamilyMember>(
-      detailPerson?.family?.family_member,
+      personWithPicture?.family?.family_member,
     );
 
     const familyDetails = await Promise.all(
       familyMembers
-        .filter((member) => member.id && member.id !== detailPerson.id)
+        .filter((member) => member.id && member.id !== personWithPicture.id)
         .map(async (member) => {
           const memberDetail = await getPersonInfo(authorization, member.id!);
 
@@ -501,6 +472,118 @@ export async function updateContactFromAdminClone(formData: FormData) {
   );
 }
 
+async function getElvantoPersonDetailByEmail(
+  email: string,
+  authorization = getElvantoAuthorization(),
+) {
+  if (!authorization) return null;
+
+  try {
+    const primaryPerson = await findPrimaryElvantoPersonByEmail(
+      authorization,
+      email,
+    );
+
+    if (!primaryPerson?.id) return null;
+
+    const detailResult = await getPersonInfo(authorization, primaryPerson.id);
+    const detailPerson =
+      normalizeArray<ElvantoPerson>(detailResult?.person)[0] ?? primaryPerson;
+
+    return {
+      ...detailPerson,
+      picture: normalizeElvantoPictureUrl(
+        detailPerson.picture ?? primaryPerson.picture,
+      ),
+    };
+  } catch (error) {
+    console.error("Elvanto person detail lookup failed:", error);
+    return null;
+  }
+}
+
+async function findPrimaryElvantoPersonByEmail(
+  authorization: string,
+  email: string,
+) {
+  const primaryResult = await searchPeople(authorization, {
+    "search[email]": email,
+  });
+  const primaryPeople = normalizeArray<ElvantoPerson>(
+    primaryResult?.people?.person,
+  );
+
+  return (
+    primaryPeople.find(
+      (person) => person.family_relationship === "Primary Contact",
+    ) ?? primaryPeople[0] ??
+    null
+  );
+}
+
+async function resolveAuthenticatedUser(accessToken?: string) {
+  if (accessToken) {
+    if (!hasAdminClientConfig()) {
+      console.error("SUPABASE_SERVICE_ROLE_KEY is not configured.");
+      return null;
+    }
+
+    const admin = createAdminClient();
+    const { data, error } = await admin.auth.getUser(accessToken);
+
+    if (error || !data.user) {
+      console.error("Profile picture refresh user lookup failed:", error);
+      return null;
+    }
+
+    return data.user;
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return user ?? null;
+}
+
+async function persistElvantoProfilePictureMetadata(
+  userId: string,
+  existingMetadata: Record<string, unknown> | undefined,
+  picture: string,
+  refreshedAt: string,
+) {
+  if (!hasAdminClientConfig()) {
+    console.error("SUPABASE_SERVICE_ROLE_KEY is not configured.");
+    return false;
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      ...existingMetadata,
+      elvanto_profile_picture: picture,
+      elvanto_profile_picture_refreshed_at: refreshedAt,
+    },
+  });
+
+  if (error) {
+    console.error("Elvanto profile picture metadata update failed:", error);
+    return false;
+  }
+
+  return true;
+}
+
+function normalizeElvantoPictureUrl(picture?: string | null) {
+  const trimmed = picture?.trim();
+
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+
+  return trimmed;
+}
+
 function getElvantoAuthorization() {
   const apiKey = process.env.ELVANTO_API_KEY;
 
@@ -596,7 +679,7 @@ function mapElvantoPerson(person: Partial<ElvantoPerson>): HouseholdPerson {
     mobile: person.mobile || "Not listed",
     birthday: formatBirthday(person.birthday),
     birthdayValue: person.birthday || "",
-    picture: person.picture,
+    picture: normalizeElvantoPictureUrl(person.picture),
   };
 }
 

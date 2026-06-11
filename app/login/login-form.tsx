@@ -79,12 +79,12 @@ export default function LoginForm({ nextPath = "/dashboard" }: { nextPath?: stri
       }
 
       if (portalUser?.must_reset_password) {
-        await refreshElvantoProfilePicture();
+        await refreshElvantoProfilePicture(data.session.access_token);
         window.location.href = `/change-password?next=${encodeURIComponent(redirectPath)}`;
         return;
       }
 
-      await refreshElvantoProfilePicture();
+      await refreshElvantoProfilePicture(data.session.access_token);
       window.location.href = redirectPath;
     } catch (error) {
       setMessage(
@@ -151,10 +151,17 @@ export default function LoginForm({ nextPath = "/dashboard" }: { nextPath?: stri
   );
 }
 
-async function refreshElvantoProfilePicture() {
+async function refreshElvantoProfilePicture(accessToken?: string) {
   try {
+    const headers: HeadersInit = {};
+
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
     await fetch("/api/profile/refresh-elvanto-picture", {
       credentials: "include",
+      headers,
       method: "POST",
     });
   } catch (error) {

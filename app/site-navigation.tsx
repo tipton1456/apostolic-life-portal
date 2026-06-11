@@ -58,7 +58,7 @@ export default async function SiteNavigation({
       className={className}
       memberName={memberName}
       navigationItems={navigationItems}
-      picture={menuProfilePicture.picture ?? household?.primary.picture}
+      picture={menuProfilePicture.picture || household?.primary.picture}
       pictureCacheKey={menuProfilePicture.cacheKey ?? undefined}
     />
   );
