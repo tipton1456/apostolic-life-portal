@@ -114,6 +114,13 @@ async function testHttpRoutes(baseUrl) {
     results.push({ path, status: response.status, location });
   }
 
+  await checkRoute("/login?next=%2Fprojects%2Fdemo-project%3Ftask%3Ddemo-task", [
+    ({ response, body }) => {
+      assert(response.status === 200, "login page with next param should render");
+      assert(body.includes("Portal Login"), "login page should render login form");
+    },
+  ]);
+
   await checkRoute("/projects", [
     ({ response, location }) => {
       assert(
@@ -221,14 +228,20 @@ async function main() {
       );
     });
 
-    await runTest("projects and project_tasks tables exist", async () => {
-      const [{ error: projectError }, { error: taskError }] = await Promise.all([
+    await runTest("projects, project_tasks, and project_members tables exist", async () => {
+      const [
+        { error: projectError },
+        { error: taskError },
+        { error: memberError },
+      ] = await Promise.all([
         admin.from("projects").select("id").limit(1),
         admin.from("project_tasks").select("id").limit(1),
+        admin.from("project_members").select("id").limit(1),
       ]);
 
       assert(!projectError, projectError?.message ?? "projects table missing");
       assert(!taskError, taskError?.message ?? "project_tasks table missing");
+      assert(!memberError, memberError?.message ?? "project_members table missing");
     });
 
     await runTest("admin user can be used as project owner", async () => {
@@ -283,6 +296,48 @@ async function main() {
         fetchedProject?.description === "Updated by automated test",
         "project description did not persist",
       );
+    });
+
+    await runTest("project members can be added for task assignment", async () => {
+      assert(createdProjectId, "missing created project id");
+      assert(testUserId, "missing test user id");
+
+      const { data: member, error } = await admin
+        .from("project_members")
+        .insert({
+          project_id: createdProjectId,
+          user_id: testUserId,
+          added_by: testUserId,
+        })
+        .select("id,user_id")
+        .single();
+
+      assert(!error, error?.message ?? "project member insert failed");
+      assert(member?.user_id === testUserId, "project member user id mismatch");
+
+      const { data: assignedTask, error: taskError } = await admin
+        .from("project_tasks")
+        .insert({
+          project_id: createdProjectId,
+          title: "Assigned member task",
+          status: "todo",
+          priority: "medium",
+          sort_order: 99,
+          assigned_to: testUserId,
+          created_by: testUserId,
+        })
+        .select("id,assigned_to")
+        .single();
+
+      assert(!taskError, taskError?.message ?? "assigned task insert failed");
+      assert(
+        assignedTask?.assigned_to === testUserId,
+        "task should be assignable to a project member",
+      );
+
+      if (assignedTask?.id) {
+        createdTaskIds.push(assignedTask.id);
+      }
     });
 
     await runTest("task CRUD and dashboard stats", async () => {
@@ -445,6 +500,10 @@ async function main() {
       console.log("SKIP: production build (SKIP_BUILD=1)");
     }
   } finally {
+    if (createdProjectId) {
+      await admin.from("project_members").delete().eq("project_id", createdProjectId);
+    }
+
     if (createdTaskIds.length > 0) {
       await admin.from("project_tasks").delete().in("id", createdTaskIds);
     }

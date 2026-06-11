@@ -1,6 +1,6 @@
 import { getLeaderGroupsForEmail } from "@/lib/elvanto-groups";
 import { getHousehold } from "@/lib/elvanto";
-import { isCurrentUserProjectManager } from "@/lib/project-management";
+import { canCurrentUserAccessProjects } from "@/lib/project-management";
 import { isCurrentUserPortalAdmin } from "@/lib/portal-users";
 import {
   getPlanningCenterLeaderTeamsForEmail,
@@ -31,7 +31,7 @@ export default async function SiteNavigation({
     getPlanningCenterLeaderTeamsForEmail(user.email ?? undefined),
     getPlanningCenterProfilePicture(user.email ?? undefined),
     user.isDemo ? false : isCurrentUserPortalAdmin(),
-    user.isDemo ? false : isCurrentUserProjectManager(),
+    user.isDemo ? false : canCurrentUserAccessProjects(),
   ]);
   const memberName = household?.primary
     ? `${household.primary.firstName} ${household.primary.lastName}`

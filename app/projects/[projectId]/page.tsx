@@ -1,13 +1,18 @@
 import { notFound, redirect } from "next/navigation";
 import { PortalIcon } from "@/app/icons";
 import AdminFormButton from "@/app/admin/admin-form-button";
+import HighlightTask from "@/app/projects/highlight-task";
 import { getCurrentSessionUser } from "@/lib/demo";
+import { getCurrentPortalUser } from "@/lib/portal-users";
 import {
+  addProjectMember,
+  canCurrentUserAccessProjects,
   createProjectTask,
   deleteProject,
   deleteProjectTask,
   getProjectDashboard,
-  isCurrentUserProjectManager,
+  listAssignablePortalUsers,
+  removeProjectMember,
   updateProject,
   updateProjectTask,
   type ProjectTask,
@@ -22,39 +27,58 @@ import {
 
 export default async function ProjectDashboardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ task?: string }>;
 }) {
   const user = await getCurrentSessionUser();
 
   if (!user) {
-    redirect("/login");
+    redirect("/login?next=/projects");
   }
 
   if (user.isDemo) {
     redirect("/projects");
   }
 
-  const canAccessProjects = await isCurrentUserProjectManager();
+  const canAccessProjects = await canCurrentUserAccessProjects();
 
   if (!canAccessProjects) {
     redirect("/dashboard");
   }
 
   const { projectId } = await params;
-  const dashboard = await getProjectDashboard(projectId);
+  const { task: highlightedTaskId } = await searchParams;
+  const [dashboard, portalUser] = await Promise.all([
+    getProjectDashboard(projectId),
+    getCurrentPortalUser(),
+  ]);
+  const assignableUsers = dashboard?.permissions.canManageMembers
+    ? await listAssignablePortalUsers()
+    : [];
 
-  if (!dashboard) {
+  if (!dashboard || !portalUser) {
     notFound();
   }
 
-  const { project, tasks, stats } = dashboard;
+  const { project, members, tasks, stats, permissions } = dashboard;
   const outstandingTasks = tasks.filter((task) => task.status !== "completed");
   const overdueTasks = tasks.filter((task) => isTaskOverdue(task));
   const completedTasks = tasks.filter((task) => task.status === "completed");
+  const memberIds = new Set(members.map((member) => member.userId));
+  const availableUsers = assignableUsers.filter((candidate) => !memberIds.has(candidate.id));
+  const assigneeOptions = [
+    { value: "", label: "Unassigned" },
+    ...members.map((member) => ({
+      value: member.userId,
+      label: member.fullName,
+    })),
+  ];
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
+      <HighlightTask taskId={highlightedTaskId} />
       <div className="mx-auto max-w-7xl">
         <header className="border-b border-white/10 pb-6">
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
@@ -68,6 +92,9 @@ export default async function ProjectDashboardPage({
             <span>Status: {formatProjectStatus(project.status)}</span>
             <span>Start: {formatDisplayDate(project.startDate)}</span>
             <span>Target End: {formatDisplayDate(project.targetEndDate)}</span>
+            <span>
+              Role: {permissions.isManager ? "Project Manager" : "Project Participant"}
+            </span>
           </div>
         </header>
 
@@ -89,9 +116,9 @@ export default async function ProjectDashboardPage({
             highlight={stats.overdueTasks > 0}
           />
           <MetricCard
-            label="Total Tasks"
-            value={String(stats.totalTasks)}
-            detail="Across this project"
+            label="Participants"
+            value={String(members.length)}
+            detail="People on this project"
           />
         </section>
 
@@ -115,97 +142,180 @@ export default async function ProjectDashboardPage({
           </div>
         </section>
 
-        <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-2xl font-semibold marker:hidden">
-            <span>Project Settings</span>
-            <span className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-lime-300">
-              Edit Project
-            </span>
-          </summary>
-          <form
-            action={updateProject}
-            className="mt-6 grid gap-4 border-t border-white/10 pt-5 md:grid-cols-2 xl:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_0.8fr_auto]"
-          >
-            <input type="hidden" name="id" value={project.id} />
-            <Field label="Project name" name="name" defaultValue={project.name} required />
-            <Field
-              label="Description"
-              name="description"
-              defaultValue={project.description}
-            />
-            <Field
-              label="Start date"
-              name="startDate"
-              type="date"
-              defaultValue={project.startDate ?? ""}
-            />
-            <Field
-              label="Target end date"
-              name="targetEndDate"
-              type="date"
-              defaultValue={project.targetEndDate ?? ""}
-            />
-            <SelectField
-              label="Status"
-              name="status"
-              defaultValue={project.status}
-              options={[
-                { value: "active", label: "Active" },
-                { value: "on_hold", label: "On Hold" },
-                { value: "completed", label: "Completed" },
-                { value: "cancelled", label: "Cancelled" },
-              ]}
-            />
-            <AdminFormButton pendingLabel="Saving..." className="md:col-start-2 xl:col-start-6">
-              Save Project
-            </AdminFormButton>
-          </form>
-          <form action={deleteProject} className="mt-4 flex justify-end">
-            <input type="hidden" name="id" value={project.id} />
-            <AdminFormButton
-              pendingLabel="Deleting..."
-              variant="danger"
-              className="rounded-lg px-3 py-2"
-            >
-              <PortalIcon className="h-4 w-4" name="trash" />
-              Delete Project
-            </AdminFormButton>
-          </form>
-        </details>
+        {permissions.canManageMembers ? (
+          <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+            <div className="border-b border-white/10 px-5 py-4">
+              <h2 className="text-2xl font-semibold">Project Participants</h2>
+              <p className="mt-2 text-sm text-neutral-400">
+                Add portal users to this project so tasks can be assigned to them.
+              </p>
+            </div>
+            <div className="divide-y divide-white/10">
+              {members.length > 0 ? (
+                members.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold text-neutral-100">{member.fullName}</p>
+                      <p className="text-sm text-neutral-400">{member.email}</p>
+                    </div>
+                    <form action={removeProjectMember}>
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <input type="hidden" name="userId" value={member.userId} />
+                      <AdminFormButton
+                        pendingLabel="Removing..."
+                        variant="danger"
+                        className="rounded-lg px-3 py-2"
+                      >
+                        Remove
+                      </AdminFormButton>
+                    </form>
+                  </div>
+                ))
+              ) : (
+                <p className="px-5 py-4 text-sm text-neutral-400">
+                  No participants have been added yet.
+                </p>
+              )}
+            </div>
+            {availableUsers.length > 0 ? (
+              <form
+                action={addProjectMember}
+                className="grid gap-4 border-t border-white/10 px-5 py-5 md:grid-cols-[1fr_auto]"
+              >
+                <input type="hidden" name="projectId" value={project.id} />
+                <SelectField
+                  label="Add participant"
+                  name="userId"
+                  options={availableUsers.map((candidate) => ({
+                    value: candidate.id,
+                    label: `${candidate.fullName} (${candidate.email})`,
+                  }))}
+                />
+                <AdminFormButton pendingLabel="Adding..." className="md:mt-7">
+                  Add Participant
+                </AdminFormButton>
+              </form>
+            ) : (
+              <p className="border-t border-white/10 px-5 py-4 text-sm text-neutral-400">
+                All portal users are already on this project.
+              </p>
+            )}
+          </section>
+        ) : (
+          <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+            <div className="border-b border-white/10 px-5 py-4">
+              <h2 className="text-2xl font-semibold">Project Participants</h2>
+            </div>
+            <div className="divide-y divide-white/10">
+              {members.map((member) => (
+                <div key={member.id} className="px-5 py-4">
+                  <p className="font-semibold text-neutral-100">{member.fullName}</p>
+                  <p className="text-sm text-neutral-400">{member.email}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-        <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-2xl font-semibold marker:hidden">
-            <span>Add Task</span>
-            <span className="rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-neutral-950">
-              New Task
-            </span>
-          </summary>
-          <form
-            action={createProjectTask}
-            className="mt-6 grid gap-4 border-t border-white/10 pt-5 md:grid-cols-2 xl:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_auto]"
-          >
-            <input type="hidden" name="projectId" value={project.id} />
-            <Field label="Task title" name="title" required />
-            <Field label="Description" name="description" />
-            <Field label="Start date" name="startDate" type="date" />
-            <Field label="Due date" name="dueDate" type="date" />
-            <SelectField
-              label="Status"
-              name="status"
-              defaultValue="todo"
-              options={TASK_STATUS_OPTIONS}
-            />
-            <SelectField
-              label="Priority"
-              name="priority"
-              defaultValue="medium"
-              options={TASK_PRIORITY_OPTIONS}
-            />
-            <AdminFormButton pendingLabel="Adding..." className="md:col-start-2 xl:col-start-7">
-              Add Task
-            </AdminFormButton>
-          </form>
-        </details>
+        {permissions.canManageProject ? (
+          <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-2xl font-semibold marker:hidden">
+              <span>Project Settings</span>
+              <span className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-lime-300">
+                Edit Project
+              </span>
+            </summary>
+            <form
+              action={updateProject}
+              className="mt-6 grid gap-4 border-t border-white/10 pt-5 md:grid-cols-2 xl:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_0.8fr_auto]"
+            >
+              <input type="hidden" name="id" value={project.id} />
+              <Field label="Project name" name="name" defaultValue={project.name} required />
+              <Field
+                label="Description"
+                name="description"
+                defaultValue={project.description}
+              />
+              <Field
+                label="Start date"
+                name="startDate"
+                type="date"
+                defaultValue={project.startDate ?? ""}
+              />
+              <Field
+                label="Target end date"
+                name="targetEndDate"
+                type="date"
+                defaultValue={project.targetEndDate ?? ""}
+              />
+              <SelectField
+                label="Status"
+                name="status"
+                defaultValue={project.status}
+                options={PROJECT_STATUS_OPTIONS}
+              />
+              <AdminFormButton pendingLabel="Saving..." className="md:col-start-2 xl:col-start-6">
+                Save Project
+              </AdminFormButton>
+            </form>
+            <form action={deleteProject} className="mt-4 flex justify-end">
+              <input type="hidden" name="id" value={project.id} />
+              <AdminFormButton
+                pendingLabel="Deleting..."
+                variant="danger"
+                className="rounded-lg px-3 py-2"
+              >
+                <PortalIcon className="h-4 w-4" name="trash" />
+                Delete Project
+              </AdminFormButton>
+            </form>
+          </details>
+        ) : null}
+
+        {permissions.canManageTasks ? (
+          <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-2xl font-semibold marker:hidden">
+              <span>Add Task</span>
+              <span className="rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-neutral-950">
+                New Task
+              </span>
+            </summary>
+            <form
+              action={createProjectTask}
+              className="mt-6 grid gap-4 border-t border-white/10 pt-5 md:grid-cols-2 xl:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.9fr_auto]"
+            >
+              <input type="hidden" name="projectId" value={project.id} />
+              <Field label="Task title" name="title" required />
+              <Field label="Description" name="description" />
+              <Field label="Start date" name="startDate" type="date" />
+              <Field label="Due date" name="dueDate" type="date" />
+              <SelectField
+                label="Status"
+                name="status"
+                defaultValue="todo"
+                options={TASK_STATUS_OPTIONS}
+              />
+              <SelectField
+                label="Priority"
+                name="priority"
+                defaultValue="medium"
+                options={TASK_PRIORITY_OPTIONS}
+              />
+              <SelectField
+                label="Assigned to"
+                name="assignedTo"
+                defaultValue=""
+                options={assigneeOptions}
+              />
+              <AdminFormButton pendingLabel="Adding..." className="md:col-start-2 xl:col-start-8">
+                Add Task
+              </AdminFormButton>
+            </form>
+          </details>
+        ) : null}
 
         <TaskSection
           title="Outstanding Tasks"
@@ -213,6 +323,10 @@ export default async function ProjectDashboardPage({
           emptyMessage="No outstanding tasks. Everything is complete."
           tasks={outstandingTasks}
           projectId={project.id}
+          currentUserId={portalUser.id}
+          canManageTasks={permissions.canManageTasks}
+          assigneeOptions={assigneeOptions}
+          highlightedTaskId={highlightedTaskId}
         />
 
         <TaskSection
@@ -221,6 +335,10 @@ export default async function ProjectDashboardPage({
           emptyMessage="No overdue tasks."
           tasks={overdueTasks}
           projectId={project.id}
+          currentUserId={portalUser.id}
+          canManageTasks={permissions.canManageTasks}
+          assigneeOptions={assigneeOptions}
+          highlightedTaskId={highlightedTaskId}
           emphasizeOverdue
         />
 
@@ -230,11 +348,22 @@ export default async function ProjectDashboardPage({
           emptyMessage="No completed tasks yet."
           tasks={completedTasks}
           projectId={project.id}
+          currentUserId={portalUser.id}
+          canManageTasks={permissions.canManageTasks}
+          assigneeOptions={assigneeOptions}
+          highlightedTaskId={highlightedTaskId}
         />
       </div>
     </main>
   );
 }
+
+const PROJECT_STATUS_OPTIONS = [
+  { value: "active", label: "Active" },
+  { value: "on_hold", label: "On Hold" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+];
 
 const TASK_STATUS_OPTIONS = [
   { value: "todo", label: "To Do" },
@@ -256,6 +385,10 @@ function TaskSection({
   emptyMessage,
   tasks,
   projectId,
+  currentUserId,
+  canManageTasks,
+  assigneeOptions,
+  highlightedTaskId,
   emphasizeOverdue = false,
 }: {
   title: string;
@@ -263,6 +396,10 @@ function TaskSection({
   emptyMessage: string;
   tasks: ProjectTask[];
   projectId: string;
+  currentUserId: string;
+  canManageTasks: boolean;
+  assigneeOptions: Array<{ value: string; label: string }>;
+  highlightedTaskId?: string;
   emphasizeOverdue?: boolean;
 }) {
   return (
@@ -278,7 +415,11 @@ function TaskSection({
               key={task.id}
               task={task}
               projectId={projectId}
+              currentUserId={currentUserId}
+              canManageTasks={canManageTasks}
+              assigneeOptions={assigneeOptions}
               emphasizeOverdue={emphasizeOverdue || isTaskOverdue(task)}
+              highlighted={highlightedTaskId === task.id}
             />
           ))
         ) : (
@@ -292,15 +433,29 @@ function TaskSection({
 function TaskRow({
   task,
   projectId,
+  currentUserId,
+  canManageTasks,
+  assigneeOptions,
   emphasizeOverdue,
+  highlighted,
 }: {
   task: ProjectTask;
   projectId: string;
+  currentUserId: string;
+  canManageTasks: boolean;
+  assigneeOptions: Array<{ value: string; label: string }>;
   emphasizeOverdue: boolean;
+  highlighted: boolean;
 }) {
+  const canEdit =
+    canManageTasks || (task.assignedTo === currentUserId && task.status !== "completed");
+
   return (
-    <details className="group">
-      <summary className="grid cursor-pointer list-none gap-3 px-5 py-4 transition hover:bg-white/[0.05] marker:hidden lg:grid-cols-[1.4fr_0.8fr_0.8fr_0.8fr_0.8fr_auto] lg:items-center">
+    <details
+      id={`task-${task.id}`}
+      className={`group rounded-xl transition ${highlighted ? "bg-lime-400/5" : ""}`}
+    >
+      <summary className="grid cursor-pointer list-none gap-3 px-5 py-4 transition hover:bg-white/[0.05] marker:hidden lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr_auto] lg:items-center">
         <div>
           <p className="font-semibold text-neutral-100">{task.title}</p>
           {task.description ? (
@@ -308,6 +463,12 @@ function TaskRow({
               {task.description}
             </p>
           ) : null}
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 lg:hidden">
+            Assigned
+          </p>
+          <p className="text-neutral-300">{task.assignedName ?? "Unassigned"}</p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 lg:hidden">
@@ -343,64 +504,91 @@ function TaskRow({
             {formatDisplayDate(task.dueDate)}
           </p>
         </div>
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-lime-300 transition group-open:border-lime-300/60 group-open:bg-lime-400/10">
-          <PortalIcon className="h-4 w-4" name="update" />
-        </span>
+        {canEdit ? (
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-lime-300 transition group-open:border-lime-300/60 group-open:bg-lime-400/10">
+            <PortalIcon className="h-4 w-4" name="update" />
+          </span>
+        ) : (
+          <span className="text-xs text-neutral-500">View only</span>
+        )}
       </summary>
-      <div className="px-5 pb-5">
-        <form
-          action={updateProjectTask}
-          className="grid gap-4 rounded-xl border border-white/10 bg-neutral-950/40 p-5 md:grid-cols-2 xl:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_auto]"
-        >
-          <input type="hidden" name="id" value={task.id} />
-          <input type="hidden" name="projectId" value={projectId} />
-          <Field label="Task title" name="title" defaultValue={task.title} required />
-          <Field
-            label="Description"
-            name="description"
-            defaultValue={task.description}
-          />
-          <Field
-            label="Start date"
-            name="startDate"
-            type="date"
-            defaultValue={task.startDate ?? ""}
-          />
-          <Field
-            label="Due date"
-            name="dueDate"
-            type="date"
-            defaultValue={task.dueDate ?? ""}
-          />
-          <SelectField
-            label="Status"
-            name="status"
-            defaultValue={task.status}
-            options={TASK_STATUS_OPTIONS}
-          />
-          <SelectField
-            label="Priority"
-            name="priority"
-            defaultValue={task.priority}
-            options={TASK_PRIORITY_OPTIONS}
-          />
-          <AdminFormButton pendingLabel="Saving..." className="md:col-start-2 xl:col-start-7">
-            Save Task
-          </AdminFormButton>
-        </form>
-        <form action={deleteProjectTask} className="mt-3 flex justify-end">
-          <input type="hidden" name="id" value={task.id} />
-          <input type="hidden" name="projectId" value={projectId} />
-          <AdminFormButton
-            pendingLabel="Deleting..."
-            variant="danger"
-            className="rounded-lg px-3 py-2"
+      {canEdit ? (
+        <div className="px-5 pb-5">
+          <form
+            action={updateProjectTask}
+            className="grid gap-4 rounded-xl border border-white/10 bg-neutral-950/40 p-5 md:grid-cols-2 xl:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.9fr_auto]"
           >
-            <PortalIcon className="h-4 w-4" name="trash" />
-            Delete Task
-          </AdminFormButton>
-        </form>
-      </div>
+            <input type="hidden" name="id" value={task.id} />
+            <input type="hidden" name="projectId" value={projectId} />
+            {canManageTasks ? (
+              <>
+                <Field label="Task title" name="title" defaultValue={task.title} required />
+                <Field
+                  label="Description"
+                  name="description"
+                  defaultValue={task.description}
+                />
+                <Field
+                  label="Start date"
+                  name="startDate"
+                  type="date"
+                  defaultValue={task.startDate ?? ""}
+                />
+                <Field
+                  label="Due date"
+                  name="dueDate"
+                  type="date"
+                  defaultValue={task.dueDate ?? ""}
+                />
+                <SelectField
+                  label="Priority"
+                  name="priority"
+                  defaultValue={task.priority}
+                  options={TASK_PRIORITY_OPTIONS}
+                />
+                <SelectField
+                  label="Assigned to"
+                  name="assignedTo"
+                  defaultValue={task.assignedTo ?? ""}
+                  options={assigneeOptions}
+                />
+              </>
+            ) : (
+              <>
+                <input type="hidden" name="title" value={task.title} />
+                <input type="hidden" name="description" value={task.description} />
+                <input type="hidden" name="startDate" value={task.startDate ?? ""} />
+                <input type="hidden" name="dueDate" value={task.dueDate ?? ""} />
+                <input type="hidden" name="priority" value={task.priority} />
+                <input type="hidden" name="assignedTo" value={task.assignedTo ?? ""} />
+              </>
+            )}
+            <SelectField
+              label="Status"
+              name="status"
+              defaultValue={task.status}
+              options={TASK_STATUS_OPTIONS}
+            />
+            <AdminFormButton pendingLabel="Saving..." className="md:col-start-2 xl:col-start-8">
+              Save Task
+            </AdminFormButton>
+          </form>
+          {canManageTasks ? (
+            <form action={deleteProjectTask} className="mt-3 flex justify-end">
+              <input type="hidden" name="id" value={task.id} />
+              <input type="hidden" name="projectId" value={projectId} />
+              <AdminFormButton
+                pendingLabel="Deleting..."
+                variant="danger"
+                className="rounded-lg px-3 py-2"
+              >
+                <PortalIcon className="h-4 w-4" name="trash" />
+                Delete Task
+              </AdminFormButton>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
     </details>
   );
 }
@@ -482,7 +670,7 @@ function SelectField({
         className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
       >
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value || "unassigned"} value={option.value}>
             {option.label}
           </option>
         ))}

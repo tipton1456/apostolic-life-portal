@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sanitizeNextPath } from "@/lib/portal-url";
 
-export default function LoginForm() {
+export default function LoginForm({ nextPath = "/dashboard" }: { nextPath?: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const redirectPath = sanitizeNextPath(nextPath);
 
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,7 +37,9 @@ export default function LoginForm() {
           return;
         }
 
-        window.location.href = "/dashboard";
+        window.location.href = redirectPath.startsWith("/projects")
+          ? "/dashboard"
+          : redirectPath;
         return;
       }
 
@@ -75,11 +79,11 @@ export default function LoginForm() {
       }
 
       if (portalUser?.must_reset_password) {
-        window.location.href = "/change-password";
+        window.location.href = `/change-password?next=${encodeURIComponent(redirectPath)}`;
         return;
       }
 
-      window.location.href = "/dashboard";
+      window.location.href = redirectPath;
     } catch (error) {
       setMessage(
         `Unexpected error: ${

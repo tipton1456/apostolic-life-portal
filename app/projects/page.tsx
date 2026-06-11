@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import AdminFormButton from "@/app/admin/admin-form-button";
 import { getCurrentSessionUser } from "@/lib/demo";
 import {
+  canCurrentUserAccessProjects,
   createProject,
   isCurrentUserProjectManager,
   listProjects,
@@ -36,12 +37,13 @@ export default async function ProjectsPage() {
     );
   }
 
-  const canAccessProjects = await isCurrentUserProjectManager();
+  const canAccessProjects = await canCurrentUserAccessProjects();
 
   if (!canAccessProjects) {
     redirect("/dashboard");
   }
 
+  const isManager = await isCurrentUserProjectManager();
   const projects = await listProjects();
 
   return (
@@ -51,13 +53,17 @@ export default async function ProjectsPage() {
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
             Project Management
           </p>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight">Projects</h1>
+          <h1 className="mt-3 text-4xl font-bold tracking-tight">
+            {isManager ? "Projects" : "My Projects"}
+          </h1>
           <p className="mt-3 max-w-3xl text-neutral-400">
-            Manage church projects, track tasks, deadlines, and completion
-            progress from one dashboard.
+            {isManager
+              ? "Manage church projects, track tasks, deadlines, and completion progress from one dashboard."
+              : "View the projects you are on, your assigned tasks, and project progress."}
           </p>
         </header>
 
+        {isManager ? (
         <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-2xl font-semibold marker:hidden">
             <span>New Project</span>
@@ -89,6 +95,7 @@ export default async function ProjectsPage() {
             </AdminFormButton>
           </form>
         </details>
+        ) : null}
 
         <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {projects.length > 0 ? (
