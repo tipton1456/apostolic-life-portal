@@ -54,13 +54,16 @@ const PORTAL_USER_PROFILE_SELECT =
   "id,email,first_name,last_name,is_admin,project_role,can_access_projects,must_reset_password,created_at";
 
 function mapPortalUserProfile(profile: PortalUserProfile) {
-  const projectRole = profile.project_role ?? null;
+  const legacyManager = Boolean(profile.can_access_projects);
+  const projectRole =
+    profile.project_role ?? (legacyManager ? "project_manager" : null);
 
   return {
     projectRole,
     canAccessProjects: isPortalProjectManager({
       isAdmin: Boolean(profile.is_admin),
       projectRole,
+      canAccessProjects: legacyManager,
     }),
   };
 }

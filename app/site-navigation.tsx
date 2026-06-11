@@ -48,7 +48,7 @@ export default async function SiteNavigation({
     { href: "/prayer-board", label: "Prayer Board" },
     ...(canAccessProjects
       ? [
-          { href: "/projects", label: "Project Management" },
+          { href: "/projects", label: "Projects" },
           { href: "/projects/files", label: "Project Files" },
         ]
       : []),

@@ -20,8 +20,13 @@ export function parsePortalProjectRole(
 export function isPortalProjectManager(profile: {
   isAdmin?: boolean;
   projectRole?: PortalProjectRole | null;
+  canAccessProjects?: boolean;
 }) {
-  return Boolean(profile.isAdmin || profile.projectRole === "project_manager");
+  return Boolean(
+    profile.isAdmin ||
+      profile.projectRole === "project_manager" ||
+      profile.canAccessProjects,
+  );
 }
 
 export function formatPortalProjectRole(
