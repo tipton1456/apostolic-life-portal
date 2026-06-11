@@ -1,28 +1,36 @@
 const SEGMENT_COLORS = {
   completed: "#a3e635",
   overdue: "#fb923c",
+  atRisk: "#fbbf24",
   outstanding: "#7dd3fc",
 } as const;
 
 export default function TaskBreakdownPieCard({
   completedTasks,
-  outstandingTasks,
   overdueTasks,
+  atRiskTasks,
+  openOutstandingTasks,
   totalTasks,
 }: {
   completedTasks: number;
-  outstandingTasks: number;
   overdueTasks: number;
+  atRiskTasks: number;
+  openOutstandingTasks: number;
   totalTasks: number;
 }) {
-  const onTimeOutstanding = Math.max(outstandingTasks - overdueTasks, 0);
   const segments = [
-    { key: "completed", label: "Completed", value: completedTasks, color: SEGMENT_COLORS.completed },
+    {
+      key: "completed",
+      label: "Completed",
+      value: completedTasks,
+      color: SEGMENT_COLORS.completed,
+    },
     { key: "overdue", label: "Overdue", value: overdueTasks, color: SEGMENT_COLORS.overdue },
+    { key: "atRisk", label: "At Risk", value: atRiskTasks, color: SEGMENT_COLORS.atRisk },
     {
       key: "outstanding",
       label: "Outstanding",
-      value: onTimeOutstanding,
+      value: openOutstandingTasks,
       color: SEGMENT_COLORS.outstanding,
     },
   ] as const;
@@ -63,7 +71,7 @@ export default function TaskBreakdownPieCard({
           <p className="pt-1 text-xs text-neutral-500">
             {totalTasks === 0
               ? "No tasks on this project yet."
-              : "Outstanding shows open tasks that are not overdue."}
+              : "At Risk tasks are open and due within two days."}
           </p>
         </div>
       </div>

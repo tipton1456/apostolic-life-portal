@@ -10,12 +10,13 @@ import {
   TASK_STATUS_OPTIONS,
 } from "@/lib/project-task-options";
 import type { ProjectTaskUpdate } from "@/lib/project-task-updates";
-import { isTaskOverdue } from "@/lib/project-management-utils";
+import { isTaskAtRisk, isTaskOverdue } from "@/lib/project-management-utils";
 
-type TaskView = "outstanding" | "overdue" | "completed" | "all";
+type TaskView = "outstanding" | "at-risk" | "overdue" | "completed" | "all";
 
 const TASK_VIEWS: Array<{ id: TaskView; label: string }> = [
   { id: "outstanding", label: "Outstanding" },
+  { id: "at-risk", label: "At Risk" },
   { id: "overdue", label: "Overdue" },
   { id: "completed", label: "Completed" },
   { id: "all", label: "All Tasks" },
@@ -23,6 +24,7 @@ const TASK_VIEWS: Array<{ id: TaskView; label: string }> = [
 
 const EMPTY_MESSAGES: Record<TaskView, string> = {
   outstanding: "No outstanding tasks. Everything is complete.",
+  "at-risk": "No at-risk tasks. Nothing is due within the next two days.",
   overdue: "No overdue tasks.",
   completed: "No completed tasks yet.",
   all: "No tasks have been added to this project yet.",
@@ -147,6 +149,8 @@ function filterTasks(tasks: ProjectTask[], view: TaskView) {
   switch (view) {
     case "outstanding":
       return tasks.filter((task) => task.status !== "completed");
+    case "at-risk":
+      return tasks.filter((task) => isTaskAtRisk(task));
     case "overdue":
       return tasks.filter((task) => isTaskOverdue(task));
     case "completed":

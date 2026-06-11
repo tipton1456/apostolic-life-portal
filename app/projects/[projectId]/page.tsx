@@ -237,8 +237,9 @@ export default async function ProjectDashboardPage({
             highlight={stats.overdueTasks > 0}
           />
           <TaskBreakdownPieCard
+            atRiskTasks={stats.atRiskTasks}
             completedTasks={stats.completedTasks}
-            outstandingTasks={stats.outstandingTasks}
+            openOutstandingTasks={stats.openOutstandingTasks}
             overdueTasks={stats.overdueTasks}
             totalTasks={stats.totalTasks}
           />

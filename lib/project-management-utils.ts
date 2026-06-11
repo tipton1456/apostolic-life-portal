@@ -42,10 +42,37 @@ export function formatDisplayDate(value: string | null) {
   }).format(new Date(`${value}T12:00:00`));
 }
 
-export function isTaskOverdue(task: ProjectTask) {
+export type TaskBreakdownTask = Pick<ProjectTask, "status" | "dueDate">;
+
+export function isTaskOverdue(task: TaskBreakdownTask) {
   if (task.status === "completed" || !task.dueDate) return false;
 
-  return startOfDay(new Date(task.dueDate)) < startOfToday();
+  return startOfDay(parseDueDate(task.dueDate)) < startOfToday();
+}
+
+export function isTaskAtRisk(task: TaskBreakdownTask) {
+  if (task.status === "completed" || !task.dueDate || isTaskOverdue(task)) {
+    return false;
+  }
+
+  const daysUntilDue = daysUntilDueDate(task.dueDate);
+  return daysUntilDue >= 0 && daysUntilDue <= 2;
+}
+
+export function isTaskOpenOutstanding(task: TaskBreakdownTask) {
+  if (task.status === "completed" || isTaskOverdue(task) || isTaskAtRisk(task)) {
+    return false;
+  }
+
+  return true;
+}
+
+export function daysUntilDueDate(dueDate: string) {
+  const today = startOfToday();
+  const due = startOfDay(parseDueDate(dueDate));
+  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+
+  return Math.round((due.getTime() - today.getTime()) / millisecondsPerDay);
 }
 
 function startOfToday() {
@@ -54,4 +81,8 @@ function startOfToday() {
 
 function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function parseDueDate(dueDate: string) {
+  return new Date(`${dueDate}T12:00:00`);
 }

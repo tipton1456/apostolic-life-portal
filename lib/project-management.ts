@@ -15,7 +15,11 @@ import {
   resolveTaskAssigneeFromForm,
   sendTaskAssignmentNotifications,
 } from "@/lib/project-participant-onboarding";
-import { isTaskOverdue } from "@/lib/project-management-utils";
+import {
+  isTaskAtRisk,
+  isTaskOpenOutstanding,
+  isTaskOverdue,
+} from "@/lib/project-management-utils";
 import { isPortalProjectManager } from "@/lib/portal-project-roles";
 import { getCurrentPortalUser, setPortalUserProjectRole } from "@/lib/portal-users";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -74,6 +78,8 @@ export type ProjectSummary = Project & {
   completedTasks: number;
   outstandingTasks: number;
   overdueTasks: number;
+  atRiskTasks: number;
+  openOutstandingTasks: number;
   completionPercent: number;
 };
 
@@ -97,6 +103,8 @@ export type ProjectDashboard = {
     completedTasks: number;
     outstandingTasks: number;
     overdueTasks: number;
+    atRiskTasks: number;
+    openOutstandingTasks: number;
     completionPercent: number;
   };
   permissions: {
@@ -1433,15 +1441,17 @@ function calculateTaskStats(
     due_date: string | null;
   }>,
 ) {
-  const today = startOfToday();
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((task) => task.status === "completed").length;
   const outstandingTasks = totalTasks - completedTasks;
-  const overdueTasks = tasks.filter(
-    (task) =>
-      task.status !== "completed" &&
-      task.due_date &&
-      startOfDay(new Date(task.due_date)) < today,
+  const overdueTasks = tasks.filter((task) =>
+    isTaskOverdue({ status: task.status, dueDate: task.due_date }),
+  ).length;
+  const atRiskTasks = tasks.filter((task) =>
+    isTaskAtRisk({ status: task.status, dueDate: task.due_date }),
+  ).length;
+  const openOutstandingTasks = tasks.filter((task) =>
+    isTaskOpenOutstanding({ status: task.status, dueDate: task.due_date }),
   ).length;
   const completionPercent =
     totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
@@ -1451,6 +1461,8 @@ function calculateTaskStats(
     completedTasks,
     outstandingTasks,
     overdueTasks,
+    atRiskTasks,
+    openOutstandingTasks,
     completionPercent,
   };
 }

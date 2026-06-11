@@ -8,6 +8,7 @@ import {
   formatDisplayDate,
   formatTaskPriority,
   formatTaskStatus,
+  isTaskAtRisk,
   isTaskOverdue,
 } from "@/lib/project-management-utils";
 
@@ -138,7 +139,7 @@ export default function TaskListTable({
                 <p className="truncate text-neutral-300">
                   {task.assignedName ?? "Unassigned"}
                 </p>
-                <TaskStatusBadge status={task.status} />
+                <TaskStatusBadge task={task} />
                 <p className="text-right text-neutral-300">
                   {formatTaskPriority(task.priority)}
                 </p>
@@ -232,7 +233,7 @@ function compareTasks(
         { sensitivity: "base" },
       );
     case "status":
-      return STATUS_RANK[left.status] - STATUS_RANK[right.status];
+      return getStatusSortValue(left) - getStatusSortValue(right);
     case "priority":
       return PRIORITY_RANK[left.priority] - PRIORITY_RANK[right.priority];
     case "due":
@@ -253,7 +254,20 @@ function compareDueDates(left: string | null, right: string | null) {
   return leftValue - rightValue;
 }
 
-function TaskStatusBadge({ status }: { status: TaskStatus }) {
+function getStatusSortValue(task: ProjectTask) {
+  if (isTaskAtRisk(task)) return 1.5;
+  return STATUS_RANK[task.status];
+}
+
+function TaskStatusBadge({ task }: { task: ProjectTask }) {
+  if (isTaskAtRisk(task)) {
+    return (
+      <span className="inline-flex rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-xs font-semibold text-amber-200">
+        At Risk
+      </span>
+    );
+  }
+
   const styles: Record<TaskStatus, string> = {
     todo: "border-white/10 bg-white/[0.04] text-neutral-300",
     in_progress: "border-sky-400/30 bg-sky-400/10 text-sky-200",
@@ -263,9 +277,9 @@ function TaskStatusBadge({ status }: { status: TaskStatus }) {
 
   return (
     <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${styles[status]}`}
+      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${styles[task.status]}`}
     >
-      {formatTaskStatus(status)}
+      {formatTaskStatus(task.status)}
     </span>
   );
 }
