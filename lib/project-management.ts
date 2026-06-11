@@ -6,6 +6,12 @@ import {
   notifyProjectManagersTaskCompleted,
 } from "@/lib/project-notifications";
 import {
+  isMissingColumnError,
+  normalizeProjectRow,
+  PROJECT_BASE_SELECT,
+  PROJECT_SELECT_WITH_ARCHIVE,
+} from "@/lib/project-db-compat";
+import {
   resolveTaskAssigneeFromForm,
   sendTaskAssignmentNotifications,
 } from "@/lib/project-participant-onboarding";
@@ -180,12 +186,7 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   const isManager = currentUser.isAdmin || currentUser.canAccessProjects;
   const supabase = await createClient();
 
-  let projectQuery = supabase
-    .from("projects")
-    .select(
-      "id,name,description,status,start_date,target_end_date,image_url,archived_files_url,created_by,created_at,updated_at",
-    )
-    .order("created_at", { ascending: false });
+  let projectIds: string[] | null = null;
 
   if (!isManager) {
     const { data: memberships, error: membershipError } = await supabase
@@ -198,16 +199,14 @@ export async function listProjects(): Promise<ProjectSummary[]> {
       throw new Error("Unable to load project memberships.");
     }
 
-    const projectIds = (memberships ?? []).map((membership) => membership.project_id);
+    projectIds = (memberships ?? []).map((membership) => membership.project_id);
 
     if (projectIds.length === 0) return [];
-
-    projectQuery = projectQuery.in("id", projectIds);
   }
 
   const [{ data: projects, error: projectError }, { data: tasks, error: taskError }] =
     await Promise.all([
-      projectQuery,
+      fetchProjects(supabase, projectIds),
       supabase
         .from("project_tasks")
         .select("id,project_id,status,due_date"),
@@ -235,7 +234,7 @@ export async function listProjects(): Promise<ProjectSummary[]> {
     const stats = calculateTaskStats(projectTasks);
 
     return {
-      ...mapProject(project),
+      ...mapProject(normalizeProjectRow(project)),
       ...stats,
     };
   });
@@ -281,13 +280,7 @@ export async function getProjectDashboard(
   const supabase = await createClient();
   const [{ data: project, error: projectError }, { data: tasks, error: taskError }, members] =
     await Promise.all([
-      supabase
-        .from("projects")
-        .select(
-          "id,name,description,status,start_date,target_end_date,image_url,archived_files_url,created_by,created_at,updated_at",
-        )
-        .eq("id", projectId)
-        .maybeSingle<ProjectRow>(),
+      fetchProjectById(supabase, projectId),
       supabase
         .from("project_tasks")
         .select(
@@ -327,7 +320,7 @@ export async function getProjectDashboard(
   );
 
   return {
-    project: mapProject(project),
+    project: mapProject(normalizeProjectRow(project)),
     members,
     tasks: mappedTasks,
     stats,
@@ -404,10 +397,12 @@ export async function updateProject(formData: FormData) {
     );
   }
 
-  const { error } = await supabase
-    .from("projects")
-    .update(updatePayload)
-    .eq("id", id);
+  let { error } = await supabase.from("projects").update(updatePayload).eq("id", id);
+
+  if (error && isMissingColumnError(error, "archived_files_url")) {
+    delete updatePayload.archived_files_url;
+    ({ error } = await supabase.from("projects").update(updatePayload).eq("id", id));
+  }
 
   if (error) {
     console.error("Project update failed:", error);
@@ -992,6 +987,65 @@ async function requireProjectAreaAccess() {
   }
 
   return currentUser;
+}
+
+async function fetchProjects(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectIds: string[] | null,
+) {
+  const buildQuery = (select: string) => {
+    let query = supabase.from("projects").select(select).order("created_at", {
+      ascending: false,
+    });
+
+    if (projectIds) {
+      query = query.in("id", projectIds);
+    }
+
+    return query;
+  };
+
+  const primary = await buildQuery(PROJECT_SELECT_WITH_ARCHIVE);
+
+  if (primary.error && isMissingColumnError(primary.error, "archived_files_url")) {
+    const fallback = await buildQuery(PROJECT_BASE_SELECT);
+
+    return {
+      data: ((fallback.data ?? []) as unknown as ProjectRow[]).map((row) =>
+        normalizeProjectRow(row),
+      ),
+      error: fallback.error,
+    };
+  }
+
+  return {
+    data: (primary.data ?? []) as unknown as ProjectRow[] | null,
+    error: primary.error,
+  };
+}
+
+async function fetchProjectById(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectId: string,
+) {
+  let { data, error } = await supabase
+    .from("projects")
+    .select(PROJECT_SELECT_WITH_ARCHIVE)
+    .eq("id", projectId)
+    .maybeSingle<ProjectRow>();
+
+  if (error && isMissingColumnError(error, "archived_files_url")) {
+    const fallback = await supabase
+      .from("projects")
+      .select(PROJECT_BASE_SELECT)
+      .eq("id", projectId)
+      .maybeSingle();
+
+    data = fallback.data ? normalizeProjectRow(fallback.data as ProjectRow) : null;
+    error = fallback.error;
+  }
+
+  return { data: data as ProjectRow | null, error };
 }
 
 function mapProject(row: ProjectRow): Project {

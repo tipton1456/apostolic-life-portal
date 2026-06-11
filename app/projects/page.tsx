@@ -48,7 +48,10 @@ export default async function ProjectsPage() {
   const isManager = await isCurrentUserProjectManager();
   const [projects, recentFiles] = await Promise.all([
     listProjects(),
-    listAccessibleProjectFiles(8),
+    listAccessibleProjectFiles(8).catch((error) => {
+      console.error("Recent project files preview failed:", error);
+      return [];
+    }),
   ]);
 
   return (

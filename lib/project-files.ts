@@ -9,6 +9,14 @@ import {
   readProjectTaskFile,
   writeProjectTaskFile,
 } from "@/lib/project-file-storage";
+import {
+  FILE_ROW_SELECT_DROPBOX,
+  FILE_ROW_SELECT_STORAGE,
+  getFileInsertPayload,
+  isMissingColumnError,
+  isMissingRelationError,
+  normalizeFileRow,
+} from "@/lib/project-db-compat";
 import { canCurrentUserAccessProjects } from "@/lib/project-management";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -39,9 +47,6 @@ type ProjectTaskFileRow = {
   uploaded_by: string;
   created_at: string;
 };
-
-const FILE_ROW_SELECT =
-  "id,project_id,task_id,file_name,file_size,mime_type,storage_path,uploaded_by,created_at";
 
 const MAX_PROJECT_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES_PER_TASK = 20;
@@ -93,42 +98,21 @@ export async function listAccessibleProjectFiles(
     if (projectIds.length === 0) return [];
   }
 
-  let query = supabase
-    .from("project_task_files")
-    .select(FILE_ROW_SELECT)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const rows = await queryProjectTaskFileRows(supabase, {
+    limit,
+    projectIds: projectIds ?? undefined,
+  });
 
-  if (projectIds) {
-    query = query.in("project_id", projectIds);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("Project files lookup failed:", error);
-    throw new Error("Unable to load project files.");
-  }
-
-  return enrichProjectFiles((data ?? []) as ProjectTaskFileRow[]);
+  return enrichProjectFiles(rows);
 }
 
 export async function listProjectFiles(projectId: string): Promise<ProjectTaskFile[]> {
   await requireProjectFilesAccessForProject(projectId);
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("project_task_files")
-    .select(FILE_ROW_SELECT)
-    .eq("project_id", projectId)
-    .order("created_at", { ascending: false });
+  const rows = await queryProjectTaskFileRows(supabase, { projectId });
 
-  if (error) {
-    console.error("Project files lookup failed:", error);
-    throw new Error("Unable to load project files.");
-  }
-
-  return enrichProjectFiles((data ?? []) as ProjectTaskFileRow[]);
+  return enrichProjectFiles(rows);
 }
 
 export async function listTaskFiles(
@@ -138,19 +122,9 @@ export async function listTaskFiles(
   await requireProjectFilesAccessForProject(projectId);
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("project_task_files")
-    .select(FILE_ROW_SELECT)
-    .eq("project_id", projectId)
-    .eq("task_id", taskId)
-    .order("created_at", { ascending: false });
+  const rows = await queryProjectTaskFileRows(supabase, { projectId, taskId });
 
-  if (error) {
-    console.error("Task files lookup failed:", error);
-    throw new Error("Unable to load task files.");
-  }
-
-  return enrichProjectFiles((data ?? []) as ProjectTaskFileRow[]);
+  return enrichProjectFiles(rows);
 }
 
 export async function uploadProjectTaskFile(formData: FormData) {
@@ -226,15 +200,47 @@ export async function uploadProjectTaskFile(formData: FormData) {
     contents: fileBuffer,
   });
 
-  const { error: insertError } = await supabase.from("project_task_files").insert({
-    project_id: projectId,
-    task_id: taskId,
-    file_name: file.name,
-    file_size: file.size,
-    mime_type: file.type || "application/octet-stream",
-    storage_path: storagePath,
-    uploaded_by: user.id,
-  });
+  const insertPayload = {
+    projectId,
+    taskId,
+    fileName: file.name,
+    fileSize: file.size,
+    mimeType: file.type || "application/octet-stream",
+    storagePath,
+    uploadedBy: user.id,
+  };
+
+  let { error: insertError } = await supabase
+    .from("project_task_files")
+    .insert(
+      getFileInsertPayload({
+        ...insertPayload,
+        useDropboxColumn: false,
+      }) as Record<string, string | number>,
+    );
+
+  if (insertError && isMissingColumnError(insertError, "storage_path")) {
+    ({ error: insertError } = await supabase
+      .from("project_task_files")
+      .insert(
+        getFileInsertPayload({
+          ...insertPayload,
+          useDropboxColumn: true,
+        }) as Record<string, string | number>,
+      ));
+  }
+
+  if (insertError && isMissingRelationError(insertError, "project_task_files")) {
+    try {
+      await deleteStoredProjectTaskFile(storagePath);
+    } catch (cleanupError) {
+      console.error("Storage cleanup after missing files table:", cleanupError);
+    }
+
+    throw new Error(
+      "Project files are not enabled yet. Apply migration 202606110004 in Supabase.",
+    );
+  }
 
   if (insertError) {
     console.error("Project task file insert failed:", insertError);
@@ -283,16 +289,7 @@ export async function deleteProjectTaskFile(formData: FormData) {
       .select("status")
       .eq("id", projectId)
       .maybeSingle<{ status: string }>(),
-    supabase
-      .from("project_task_files")
-      .select("id,storage_path,uploaded_by")
-      .eq("id", fileId)
-      .eq("project_id", projectId)
-      .maybeSingle<{
-        id: string;
-        storage_path: string;
-        uploaded_by: string;
-      }>(),
+    fetchProjectTaskFileRecord(supabase, fileId, projectId),
   ]);
 
   if (error || !file) {
@@ -326,17 +323,10 @@ export async function getProjectFileForDownload(fileId: string) {
   await requireProjectFilesAccess();
 
   const supabase = await createClient();
-  const { data: file, error } = await supabase
-    .from("project_task_files")
-    .select("id,project_id,storage_path,file_name,mime_type")
-    .eq("id", fileId)
-    .maybeSingle<{
-      id: string;
-      project_id: string;
-      storage_path: string;
-      file_name: string;
-      mime_type: string;
-    }>();
+  const { data: file, error } = await fetchProjectTaskFileRecord(
+    supabase,
+    fileId,
+  );
 
   if (error || !file) {
     throw new Error("File not found.");
@@ -376,11 +366,7 @@ export async function buildProjectFilesZip(projectId: string) {
   const zip = new JSZip();
 
   for (const file of files) {
-    const { data: row, error } = await supabase
-      .from("project_task_files")
-      .select("storage_path")
-      .eq("id", file.id)
-      .maybeSingle<{ storage_path: string }>();
+    const { data: row, error } = await fetchProjectTaskFileRecord(supabase, file.id);
 
     if (error || !row) {
       continue;
@@ -536,4 +522,109 @@ function revalidateProjectFilePaths(projectId: string) {
 
 function sanitizeZipPathSegment(value: string) {
   return value.replace(/[^\w.\-() ]+/g, "_").trim() || "file";
+}
+
+async function queryProjectTaskFileRows(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  filters: {
+    projectId?: string;
+    taskId?: string;
+    projectIds?: string[];
+    limit?: number;
+  } = {},
+) {
+  const runQuery = async (select: string) => {
+    let query = supabase.from("project_task_files").select(select);
+
+    if (filters.projectId) {
+      query = query.eq("project_id", filters.projectId);
+    }
+
+    if (filters.taskId) {
+      query = query.eq("task_id", filters.taskId);
+    }
+
+    if (filters.projectIds?.length) {
+      query = query.in("project_id", filters.projectIds);
+    }
+
+    query = query.order("created_at", { ascending: false });
+
+    if (filters.limit) {
+      query = query.limit(filters.limit);
+    }
+
+    return query;
+  };
+
+  let { data, error } = await runQuery(FILE_ROW_SELECT_STORAGE);
+
+  if (error && isMissingColumnError(error, "storage_path")) {
+    ({ data, error } = await runQuery(FILE_ROW_SELECT_DROPBOX));
+  }
+
+  if (error && isMissingRelationError(error, "project_task_files")) {
+    console.warn("Project task files table is not available yet.");
+    return [] as ProjectTaskFileRow[];
+  }
+
+  if (error) {
+    console.error("Project files lookup failed:", error);
+    throw new Error("Unable to load project files.");
+  }
+
+  return ((data ?? []) as unknown as Array<ProjectTaskFileRow & { dropbox_path?: string }>).map(
+    (row) => normalizeFileRow(row) as ProjectTaskFileRow,
+  );
+}
+
+async function fetchProjectTaskFileRecord(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  fileId: string,
+  projectId?: string,
+) {
+  const build = (select: string) => {
+    let query = supabase
+      .from("project_task_files")
+      .select(select)
+      .eq("id", fileId);
+
+    if (projectId) {
+      query = query.eq("project_id", projectId);
+    }
+
+    return query.maybeSingle();
+  };
+
+  let { data, error } = await build("id,project_id,storage_path,file_name,mime_type,uploaded_by");
+
+  if (error && isMissingColumnError(error, "storage_path")) {
+    ({ data, error } = await build(
+      "id,project_id,dropbox_path,file_name,mime_type,uploaded_by",
+    ));
+  }
+
+  if (error && isMissingRelationError(error, "project_task_files")) {
+    return { data: null, error };
+  }
+
+  if (error || !data) {
+    return { data: null, error };
+  }
+
+  const normalized = normalizeFileRow(
+    data as unknown as ProjectTaskFileRow & { dropbox_path?: string },
+  );
+
+  return {
+    data: normalized as {
+      id: string;
+      project_id: string;
+      storage_path: string;
+      file_name: string;
+      mime_type: string;
+      uploaded_by: string;
+    },
+    error: null,
+  };
 }

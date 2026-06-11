@@ -23,7 +23,12 @@ export default async function DashboardPage() {
     getUpcomingEvents(3),
     user.isDemo ? Promise.resolve(false) : shouldShowProjectFilesForCurrentUser(),
   ]);
-  const projectFiles = showProjectFiles ? await listAccessibleProjectFiles(8) : [];
+  const projectFiles = showProjectFiles
+    ? await listAccessibleProjectFiles(8).catch((error) => {
+        console.error("Dashboard project files preview failed:", error);
+        return [];
+      })
+    : [];
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white">
