@@ -367,10 +367,8 @@ class ReportPdfRenderer {
 
     const details = [
       `Project Status: ${formatProjectStatus(context.project.status)}`,
-      `Start Date: ${formatDisplayDate(context.project.startDate)}`,
-      `Target End Date: ${formatDisplayDate(context.project.targetEndDate)}`,
-      `PM: ${formatNameList(context.managerNames)}`,
-      `Participants: ${formatNameList(context.participantNames)}`,
+      `Start Date: ${formatDisplayDate(context.project.startDate)}    Target End Date: ${formatDisplayDate(context.project.targetEndDate)}`,
+      `PM: ${formatNameList(context.managerNames)}    Participants: ${formatNameList(context.participantNames)}`,
     ];
 
     for (const line of details) {
