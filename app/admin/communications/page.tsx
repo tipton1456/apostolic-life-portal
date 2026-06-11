@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
+import type { CommunicationLog } from "@/lib/communications";
 import { listCommunicationLogs } from "@/lib/communications";
 import { getCurrentPortalUser } from "@/lib/portal-users";
+
+const GRID_COLUMNS =
+  "grid-cols-[2rem_minmax(0,1.4fr)_minmax(0,1fr)_4rem_5.5rem_3rem_3rem_3rem_6.5rem]";
 
 export default async function CommunicationLogPage() {
   const currentUser = await getCurrentPortalUser();
@@ -17,7 +21,7 @@ export default async function CommunicationLogPage() {
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl">
         <header className="border-b border-white/10 pb-6">
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
             Administration
@@ -31,96 +35,33 @@ export default async function CommunicationLogPage() {
           </p>
         </header>
 
-        <section className="mt-8 space-y-4">
+        <section className="mt-8">
           {logs.length > 0 ? (
-            logs.map((log) => (
-              <details
-                key={log.id}
-                className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]"
+            <div className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
+              <div
+                className={`grid ${GRID_COLUMNS} items-center gap-x-3 border-b border-white/10 bg-white/[0.04] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500`}
               >
-                <summary className="grid cursor-pointer list-none gap-3 px-5 py-4 transition hover:bg-white/[0.05] md:grid-cols-[1fr_8rem_12rem_10rem_10rem] [&::-webkit-details-marker]:hidden">
-                  <div>
-                    <h2 className="text-lg font-semibold text-neutral-100">
-                      {log.groupName}
-                    </h2>
-                    <p className="mt-1 text-sm text-neutral-400">
-                      {log.senderEmail} · {formatDateTime(log.createdAt)}
-                    </p>
-                  </div>
-                  <ChannelBadge channel={log.channel} />
-                  <StatusBadge status={log.status} />
-                  <p className="text-sm text-neutral-300 md:text-right">
-                    {log.successCount} sent
-                  </p>
-                  <p className="text-sm text-neutral-300 md:text-right">
-                    {log.failureCount} failed · {log.skippedCount} skipped
-                  </p>
-                </summary>
+                <span aria-hidden="true" />
+                <span>Group</span>
+                <span>Sender</span>
+                <span>Channel</span>
+                <span>Status</span>
+                <span className="text-right">Sent</span>
+                <span className="text-right">Fail</span>
+                <span className="text-right">Skip</span>
+                <span className="text-right">Date</span>
+              </div>
 
-                <div className="border-t border-white/10 p-5">
-                  {log.subject ? (
-                    <p className="mb-4 text-sm font-semibold text-neutral-100">
-                      Subject: {log.subject}
-                    </p>
-                  ) : null}
-
-                  {log.attachmentNames.length > 0 ? (
-                    <p className="mb-4 text-sm text-neutral-400">
-                      Attachments: {log.attachmentNames.join(", ")}
-                    </p>
-                  ) : null}
-
-                  <p className="whitespace-pre-line rounded-xl border border-white/10 bg-neutral-950/60 p-4 text-sm leading-6 text-neutral-300">
-                    {log.messageBody}
-                  </p>
-
-                  <div className="mt-5 overflow-x-auto">
-                    <table className="w-full min-w-[760px] text-left text-sm">
-                      <thead className="border-b border-white/10 text-xs uppercase tracking-[0.18em] text-neutral-500">
-                        <tr>
-                          <th className="px-3 py-2 font-medium">Recipient</th>
-                          <th className="px-3 py-2 font-medium">
-                            {log.channel === "email" ? "Email" : "Phone"}
-                          </th>
-                          <th className="px-3 py-2 font-medium">Status</th>
-                          <th className="px-3 py-2 font-medium">
-                            {log.channel === "email" ? "Resend ID" : "Twilio SID"}
-                          </th>
-                          <th className="px-3 py-2 font-medium">Failure</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/10">
-                        {log.recipients.map((recipient) => (
-                          <tr key={recipient.id}>
-                            <td className="px-3 py-3 font-semibold text-neutral-100">
-                              {recipient.personName}
-                            </td>
-                            <td className="px-3 py-3 text-neutral-300">
-                              {recipient.contactLabel || "Not listed"}
-                            </td>
-                            <td className="px-3 py-3 text-neutral-300">
-                              {recipient.status}
-                            </td>
-                            <td className="px-3 py-3 text-neutral-400">
-                              {recipient.providerMessageId || "-"}
-                            </td>
-                            <td className="px-3 py-3 text-neutral-400">
-                              {recipient.failureMessage ||
-                                recipient.failureCode ||
-                                "-"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </details>
-            ))
+              <div className="divide-y divide-white/10">
+                {logs.map((log) => (
+                  <CommunicationLogRow key={log.id} log={log} />
+                ))}
+              </div>
+            </div>
           ) : (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-              <h2 className="text-xl font-semibold">No messages sent yet</h2>
-              <p className="mt-3 text-sm text-neutral-400">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-6">
+              <h2 className="text-lg font-semibold">No messages sent yet</h2>
+              <p className="mt-2 text-sm text-neutral-400">
                 Group SMS and email messages will appear here after they are sent.
               </p>
             </div>
@@ -131,33 +72,140 @@ export default async function CommunicationLogPage() {
   );
 }
 
-function ChannelBadge({ channel }: { channel: string }) {
+function CommunicationLogRow({ log }: { log: CommunicationLog }) {
   return (
-    <span className="h-fit rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-300 md:justify-self-end">
-      {channel}
-    </span>
+    <details className="group">
+      <summary
+        className={`grid ${GRID_COLUMNS} cursor-pointer list-none items-center gap-x-3 px-3 py-2.5 text-sm transition hover:bg-white/[0.05] [&::-webkit-details-marker]:hidden`}
+      >
+        <span
+          aria-hidden="true"
+          className="text-xs text-lime-300 transition group-open:rotate-90"
+        >
+          ›
+        </span>
+        <span className="min-w-0 truncate font-medium text-neutral-100">
+          {log.groupName}
+        </span>
+        <span className="min-w-0 truncate text-neutral-400">{log.senderEmail}</span>
+        <span className="uppercase text-neutral-300">{log.channel}</span>
+        <StatusLabel status={log.status} />
+        <span className="text-right tabular-nums text-neutral-200">
+          {log.successCount}
+        </span>
+        <span
+          className={
+            log.failureCount > 0
+              ? "text-right tabular-nums text-yellow-300"
+              : "text-right tabular-nums text-neutral-400"
+          }
+        >
+          {log.failureCount}
+        </span>
+        <span className="text-right tabular-nums text-neutral-400">
+          {log.skippedCount}
+        </span>
+        <span className="text-right text-xs text-neutral-400">
+          {formatDateTime(log.createdAt)}
+        </span>
+      </summary>
+
+      <div className="border-t border-white/10 bg-neutral-950/50 px-3 py-3 pl-8">
+        {log.subject ? (
+          <p className="text-xs text-neutral-300">
+            <span className="font-semibold text-neutral-100">Subject:</span>{" "}
+            {log.subject}
+          </p>
+        ) : null}
+
+        {log.attachmentNames.length > 0 ? (
+          <p className="mt-1 text-xs text-neutral-400">
+            <span className="font-semibold text-neutral-300">Attachments:</span>{" "}
+            {log.attachmentNames.join(", ")}
+          </p>
+        ) : null}
+
+        <p className="mt-2 whitespace-pre-line rounded-lg border border-white/10 bg-neutral-950/80 px-3 py-2 text-xs leading-5 text-neutral-300">
+          {log.messageBody}
+        </p>
+
+        {log.recipients.length > 0 ? (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-xs">
+              <thead className="border-b border-white/10 text-[10px] uppercase tracking-[0.16em] text-neutral-500">
+                <tr>
+                  <th className="px-2 py-1.5 font-medium">Recipient</th>
+                  <th className="px-2 py-1.5 font-medium">
+                    {log.channel === "email" ? "Email" : "Phone"}
+                  </th>
+                  <th className="px-2 py-1.5 font-medium">Status</th>
+                  <th className="px-2 py-1.5 font-medium">
+                    {log.channel === "email" ? "Resend ID" : "Twilio SID"}
+                  </th>
+                  <th className="px-2 py-1.5 font-medium">Failure</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {log.recipients.map((recipient) => (
+                  <tr key={recipient.id}>
+                    <td className="px-2 py-2 font-medium text-neutral-100">
+                      {recipient.personName}
+                    </td>
+                    <td className="px-2 py-2 text-neutral-300">
+                      {recipient.contactLabel || "Not listed"}
+                    </td>
+                    <td className="px-2 py-2 text-neutral-300">
+                      {recipient.status}
+                    </td>
+                    <td className="px-2 py-2 text-neutral-400">
+                      {recipient.providerMessageId || "-"}
+                    </td>
+                    <td className="px-2 py-2 text-neutral-400">
+                      {recipient.failureMessage || recipient.failureCode || "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-neutral-500">No recipient records.</p>
+        )}
+      </div>
+    </details>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const isWarning = status.includes("failure") || status.includes("error");
+function StatusLabel({ status }: { status: string }) {
+  const isWarning =
+    status.includes("failure") ||
+    status.includes("error") ||
+    status.includes("failed") ||
+    status.includes("partial");
 
   return (
     <span
       className={
         isWarning
-          ? "h-fit rounded-full border border-yellow-400/30 bg-yellow-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-yellow-300 md:justify-self-end"
-          : "h-fit rounded-full border border-lime-400/30 bg-lime-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-lime-300 md:justify-self-end"
+          ? "truncate text-xs uppercase text-yellow-300"
+          : "truncate text-xs uppercase text-lime-300"
       }
+      title={status.replaceAll("_", " ")}
     >
-      {status.replaceAll("_", " ")}
+      {formatStatus(status)}
     </span>
   );
 }
 
+function formatStatus(status: string) {
+  return status.replaceAll("_", " ");
+}
+
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(new Date(value));
 }
