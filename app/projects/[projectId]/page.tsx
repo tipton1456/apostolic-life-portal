@@ -15,6 +15,7 @@ import {
   removeProjectMember,
   updateProject,
   updateProjectTask,
+  uploadProjectImage,
   type ProjectTask,
 } from "@/lib/project-management";
 import {
@@ -84,17 +85,38 @@ export default async function ProjectDashboardPage({
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
             Project Dashboard
           </p>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight">{project.name}</h1>
-          <p className="mt-3 max-w-3xl text-neutral-400">
-            {project.description || "Track tasks, deadlines, and project completion."}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-4 text-sm text-neutral-400">
-            <span>Status: {formatProjectStatus(project.status)}</span>
-            <span>Start: {formatDisplayDate(project.startDate)}</span>
-            <span>Target End: {formatDisplayDate(project.targetEndDate)}</span>
-            <span>
-              Role: {permissions.isManager ? "Project Manager" : "Project Participant"}
-            </span>
+          <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_min(42%,28rem)] lg:items-start">
+            <div className="min-w-0 text-left">
+              <h1 className="text-4xl font-bold tracking-tight">{project.name}</h1>
+              <p className="mt-3 max-w-3xl text-neutral-400">
+                {project.description ||
+                  "Track tasks, deadlines, and project completion."}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-neutral-400">
+                <span>Status: {formatProjectStatus(project.status)}</span>
+                <span>Start: {formatDisplayDate(project.startDate)}</span>
+                <span>Target End: {formatDisplayDate(project.targetEndDate)}</span>
+                <span>
+                  Role:{" "}
+                  {permissions.isManager
+                    ? "Project Manager"
+                    : "Project Participant"}
+                </span>
+              </div>
+            </div>
+            <div className="w-full">
+              {project.imageUrl ? (
+                <img
+                  src={project.imageUrl}
+                  alt={`${project.name} project`}
+                  className="aspect-video w-full rounded-2xl border border-white/10 object-cover"
+                />
+              ) : (
+                <div className="flex aspect-video w-full items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] text-sm text-neutral-500">
+                  No project image yet
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -261,6 +283,42 @@ export default async function ProjectDashboardPage({
                 Save Project
               </AdminFormButton>
             </form>
+            <form
+              action={uploadProjectImage}
+              encType="multipart/form-data"
+              className="mt-6 grid gap-4 rounded-xl border border-white/10 bg-neutral-950/40 p-5 md:grid-cols-[1fr_auto]"
+            >
+              <input type="hidden" name="projectId" value={project.id} />
+              <label className="block text-sm font-medium text-neutral-300">
+                Project image
+                <input
+                  name="projectImage"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="mt-2 block w-full text-sm text-neutral-300 file:mr-4 file:rounded-lg file:border-0 file:bg-lime-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-neutral-950 hover:file:bg-lime-300"
+                />
+                <span className="mt-2 block text-xs leading-5 text-neutral-500">
+                  Upload a 16:9 image (JPG, PNG, or WebP under 5MB). It appears
+                  beside the project details at the top of this dashboard.
+                </span>
+              </label>
+              <AdminFormButton pendingLabel="Uploading..." className="md:mt-7">
+                Save Image
+              </AdminFormButton>
+            </form>
+            {project.imageUrl ? (
+              <form action={uploadProjectImage} className="mt-3 flex justify-end">
+                <input type="hidden" name="projectId" value={project.id} />
+                <input type="hidden" name="removeImage" value="on" />
+                <AdminFormButton
+                  pendingLabel="Removing..."
+                  variant="danger"
+                  className="rounded-lg px-3 py-2"
+                >
+                  Remove Image
+                </AdminFormButton>
+              </form>
+            ) : null}
             <form action={deleteProject} className="mt-4 flex justify-end">
               <input type="hidden" name="id" value={project.id} />
               <AdminFormButton

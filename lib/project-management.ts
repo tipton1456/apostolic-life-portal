@@ -21,6 +21,7 @@ export type Project = {
   status: ProjectStatus;
   startDate: string | null;
   targetEndDate: string | null;
+  imageUrl: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -91,6 +92,7 @@ type ProjectRow = {
   status: ProjectStatus;
   start_date: string | null;
   target_end_date: string | null;
+  image_url: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -176,7 +178,7 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   let projectQuery = supabase
     .from("projects")
     .select(
-      "id,name,description,status,start_date,target_end_date,created_by,created_at,updated_at",
+      "id,name,description,status,start_date,target_end_date,image_url,created_by,created_at,updated_at",
     )
     .order("created_at", { ascending: false });
 
@@ -277,7 +279,7 @@ export async function getProjectDashboard(
       supabase
         .from("projects")
         .select(
-          "id,name,description,status,start_date,target_end_date,created_by,created_at,updated_at",
+          "id,name,description,status,start_date,target_end_date,image_url,created_by,created_at,updated_at",
         )
         .eq("id", projectId)
         .maybeSingle<ProjectRow>(),
@@ -404,6 +406,85 @@ export async function updateProject(formData: FormData) {
   revalidatePath(`/projects/${id}`);
 }
 
+export async function uploadProjectImage(formData: FormData) {
+  await requireProjectManager();
+
+  const projectId = String(formData.get("projectId") || "");
+  const imageFile = getProjectImageFile(formData.get("projectImage"));
+  const removeImage = formData.get("removeImage") === "on";
+
+  if (!projectId) {
+    throw new Error("Project ID is required.");
+  }
+
+  const supabase = await createClient();
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("image_url")
+    .eq("id", projectId)
+    .maybeSingle<{ image_url: string | null }>();
+
+  if (projectError || !project) {
+    throw new Error("Project not found.");
+  }
+
+  if (removeImage) {
+    await deleteProjectImageFile(project.image_url);
+    const { error } = await supabase
+      .from("projects")
+      .update({ image_url: null })
+      .eq("id", projectId);
+
+    if (error) {
+      console.error("Project image removal failed:", error);
+      throw new Error(error.message);
+    }
+
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath("/projects");
+    return;
+  }
+
+  if (!imageFile) {
+    throw new Error("Choose a project image to upload.");
+  }
+
+  if (project.image_url) {
+    await deleteProjectImageFile(project.image_url);
+  }
+
+  const storagePath = buildProjectImageStoragePath(projectId, imageFile.name);
+  const fileBuffer = Buffer.from(await imageFile.arrayBuffer());
+  const { error: uploadError } = await supabase.storage
+    .from("project-images")
+    .upload(storagePath, fileBuffer, {
+      contentType: imageFile.type,
+      upsert: true,
+    });
+
+  if (uploadError) {
+    console.error("Project image upload failed:", uploadError);
+    throw new Error(uploadError.message);
+  }
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("project-images").getPublicUrl(storagePath);
+
+  const { error: updateError } = await supabase
+    .from("projects")
+    .update({ image_url: publicUrl })
+    .eq("id", projectId);
+
+  if (updateError) {
+    console.error("Project image URL save failed:", updateError);
+    throw new Error(updateError.message);
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/projects");
+}
+
 export async function deleteProject(formData: FormData) {
   await requireProjectManager();
 
@@ -414,6 +495,21 @@ export async function deleteProject(formData: FormData) {
   }
 
   const supabase = await createClient();
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("image_url")
+    .eq("id", id)
+    .maybeSingle<{ image_url: string | null }>();
+
+  if (projectError) {
+    console.error("Project lookup failed:", projectError);
+    throw new Error(projectError.message);
+  }
+
+  if (project?.image_url) {
+    await deleteProjectImageFile(project.image_url);
+  }
+
   const { error } = await supabase.from("projects").delete().eq("id", id);
 
   if (error) {
@@ -889,6 +985,7 @@ function mapProject(row: ProjectRow): Project {
     status: row.status,
     startDate: row.start_date,
     targetEndDate: row.target_end_date,
+    imageUrl: row.image_url,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -1047,4 +1144,67 @@ function startOfToday() {
 
 function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+const PROJECT_IMAGE_BUCKET = "project-images";
+const PROJECT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const PROJECT_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+]);
+
+function getProjectImageFile(value: FormDataEntryValue | null) {
+  if (!(value instanceof File) || value.size === 0) return null;
+
+  if (!PROJECT_IMAGE_TYPES.has(value.type)) {
+    throw new Error("Project image must be a JPG, PNG, or WebP file.");
+  }
+
+  if (value.size > PROJECT_IMAGE_MAX_BYTES) {
+    throw new Error("Project image must be smaller than 5MB.");
+  }
+
+  return value;
+}
+
+function buildProjectImageStoragePath(projectId: string, filename: string) {
+  const extension = getProjectImageExtension(filename);
+
+  return `${projectId}/cover-${Date.now()}.${extension}`;
+}
+
+function getProjectImageExtension(filename: string) {
+  const normalized = filename.trim().toLowerCase();
+
+  if (normalized.endsWith(".png")) return "png";
+  if (normalized.endsWith(".webp")) return "webp";
+
+  return "jpg";
+}
+
+function getProjectImageStoragePath(imageUrl: string | null) {
+  if (!imageUrl) return null;
+
+  const marker = `/storage/v1/object/public/${PROJECT_IMAGE_BUCKET}/`;
+
+  if (!imageUrl.includes(marker)) return null;
+
+  return imageUrl.split(marker)[1] ?? null;
+}
+
+async function deleteProjectImageFile(imageUrl: string | null) {
+  const storagePath = getProjectImageStoragePath(imageUrl);
+
+  if (!storagePath) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase.storage
+    .from(PROJECT_IMAGE_BUCKET)
+    .remove([storagePath]);
+
+  if (error) {
+    console.error("Project image delete failed:", error);
+  }
 }
