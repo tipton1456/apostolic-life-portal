@@ -8,6 +8,7 @@ import ProjectTaskModals from "@/app/projects/project-task-modals";
 import ProjectTeamPanel from "@/app/projects/project-team-panel";
 import CompletionPieCard from "@/app/projects/completion-pie-card";
 import ProjectTaskGrid from "@/app/projects/project-task-grid";
+import TaskBreakdownPieCard from "@/app/projects/task-breakdown-pie-card";
 import { getCurrentSessionUser } from "@/lib/demo";
 import { listProjectFiles } from "@/lib/project-files";
 import type { ProjectTaskFile } from "@/lib/project-files";
@@ -235,10 +236,11 @@ export default async function ProjectDashboardPage({
             detail="Past due and still open"
             highlight={stats.overdueTasks > 0}
           />
-          <MetricCard
-            label="Participants"
-            value={String(members.length)}
-            detail="People on this project"
+          <TaskBreakdownPieCard
+            completedTasks={stats.completedTasks}
+            outstandingTasks={stats.outstandingTasks}
+            overdueTasks={stats.overdueTasks}
+            totalTasks={stats.totalTasks}
           />
         </section>
 
