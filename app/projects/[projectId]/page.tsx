@@ -5,6 +5,7 @@ import { PortalIcon } from "@/app/icons";
 import AdminFormButton from "@/app/admin/admin-form-button";
 import HighlightTask from "@/app/projects/highlight-task";
 import ProjectTaskModals from "@/app/projects/project-task-modals";
+import ProjectTeamPanel from "@/app/projects/project-team-panel";
 import TaskAssigneeField from "@/app/projects/task-assignee-field";
 import TaskListTable from "@/app/projects/task-list-table";
 import { getCurrentSessionUser } from "@/lib/demo";
@@ -12,14 +13,12 @@ import { listProjectFiles } from "@/lib/project-files";
 import type { ProjectTaskFile } from "@/lib/project-files";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import {
-  addProjectMember,
   canCurrentUserAccessProjects,
   createProjectTask,
   deleteProject,
   getProjectDashboard,
   listAssignablePortalUsers,
   listProjectManagersForAssignee,
-  removeProjectMember,
   updateProject,
   uploadProjectImage,
   type ProjectTask,
@@ -143,34 +142,53 @@ export default async function ProjectDashboardPage({
             </div>
             <div className="min-w-0 flex-1 text-left">
               <h1 className="text-4xl font-bold tracking-tight">{project.name}</h1>
-              <p className="mt-3 text-neutral-400">
-                {project.description ||
-                  "Track tasks, deadlines, and project completion."}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-neutral-400">
-                <span>Status: {formatProjectStatus(project.status)}</span>
-                <span>Start: {formatDisplayDate(project.startDate)}</span>
-                <span>Target End: {formatDisplayDate(project.targetEndDate)}</span>
-                <span>
-                  Role:{" "}
-                  {permissions.isManager
-                    ? "Project Manager"
-                    : "Project Participant"}
-                </span>
-              </div>
-              <div className="mt-5 flex flex-wrap gap-4 text-sm font-semibold">
-                <Link
-                  href={`/projects/${project.id}/files`}
-                  className="text-lime-400 transition hover:text-lime-300"
-                >
-                  Project Files ({projectFiles.length})
-                </Link>
-                <Link
-                  href="/projects/files"
-                  className="text-lime-400 transition hover:text-lime-300"
-                >
-                  All Project Files
-                </Link>
+              <div className="mt-3 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="text-neutral-400">
+                    {project.description ||
+                      "Track tasks, deadlines, and project completion."}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-neutral-400">
+                    <span>Status: {formatProjectStatus(project.status)}</span>
+                    <span>Start: {formatDisplayDate(project.startDate)}</span>
+                    <span>Target End: {formatDisplayDate(project.targetEndDate)}</span>
+                    <span>
+                      Role:{" "}
+                      {permissions.isManager
+                        ? "Project Manager"
+                        : "Project Participant"}
+                    </span>
+                  </div>
+                  <div className="mt-5 flex flex-wrap gap-4 text-sm font-semibold">
+                    <Link
+                      href={`/projects/${project.id}/files`}
+                      className="text-lime-400 transition hover:text-lime-300"
+                    >
+                      Project Files ({projectFiles.length})
+                    </Link>
+                    <Link
+                      href="/projects/files"
+                      className="text-lime-400 transition hover:text-lime-300"
+                    >
+                      All Project Files
+                    </Link>
+                  </div>
+                </div>
+                <ProjectTeamPanel
+                  availableUsers={availableUsers.map((candidate) => ({
+                    id: candidate.id,
+                    fullName: candidate.fullName,
+                    email: candidate.email,
+                  }))}
+                  canManageMembers={permissions.canManageMembers}
+                  managers={projectManagers.map((manager) => ({
+                    id: manager.id,
+                    fullName: manager.fullName,
+                    email: manager.email,
+                  }))}
+                  members={members}
+                  projectId={project.id}
+                />
               </div>
             </div>
           </div>
@@ -252,84 +270,6 @@ export default async function ProjectDashboardPage({
             />
           </div>
         </section>
-
-        {permissions.canManageMembers ? (
-          <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-            <div className="border-b border-white/10 px-5 py-4">
-              <h2 className="text-2xl font-semibold">Project Participants</h2>
-              <p className="mt-2 text-sm text-neutral-400">
-                Add portal users to this project so tasks can be assigned to them.
-              </p>
-            </div>
-            <div className="divide-y divide-white/10">
-              {members.length > 0 ? (
-                members.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between"
-                  >
-                    <div>
-                      <p className="font-semibold text-neutral-100">{member.fullName}</p>
-                      <p className="text-sm text-neutral-400">{member.email}</p>
-                    </div>
-                    <form action={removeProjectMember}>
-                      <input type="hidden" name="projectId" value={project.id} />
-                      <input type="hidden" name="userId" value={member.userId} />
-                      <AdminFormButton
-                        pendingLabel="Removing..."
-                        variant="danger"
-                        className="rounded-lg px-3 py-2"
-                      >
-                        Remove
-                      </AdminFormButton>
-                    </form>
-                  </div>
-                ))
-              ) : (
-                <p className="px-5 py-4 text-sm text-neutral-400">
-                  No participants have been added yet.
-                </p>
-              )}
-            </div>
-            {availableUsers.length > 0 ? (
-              <form
-                action={addProjectMember}
-                className="grid gap-4 border-t border-white/10 px-5 py-5 md:grid-cols-[1fr_auto]"
-              >
-                <input type="hidden" name="projectId" value={project.id} />
-                <SelectField
-                  label="Add participant"
-                  name="userId"
-                  options={availableUsers.map((candidate) => ({
-                    value: candidate.id,
-                    label: `${candidate.fullName} (${candidate.email})`,
-                  }))}
-                />
-                <AdminFormButton pendingLabel="Adding..." className="md:mt-7">
-                  Add Participant
-                </AdminFormButton>
-              </form>
-            ) : (
-              <p className="border-t border-white/10 px-5 py-4 text-sm text-neutral-400">
-                All portal users are already on this project.
-              </p>
-            )}
-          </section>
-        ) : (
-          <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-            <div className="border-b border-white/10 px-5 py-4">
-              <h2 className="text-2xl font-semibold">Project Participants</h2>
-            </div>
-            <div className="divide-y divide-white/10">
-              {members.map((member) => (
-                <div key={member.id} className="px-5 py-4">
-                  <p className="font-semibold text-neutral-100">{member.fullName}</p>
-                  <p className="text-sm text-neutral-400">{member.email}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
 
         {permissions.canManageProject ? (
           <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
