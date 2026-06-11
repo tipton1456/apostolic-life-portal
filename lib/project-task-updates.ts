@@ -195,6 +195,7 @@ export async function addProjectTaskUpdate(formData: FormData) {
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
   revalidatePath("/dashboard");
+  redirect(`/projects/${projectId}?task=${taskId}`);
 }
 
 async function enrichProjectTaskUpdates(rows: ProjectTaskUpdateRow[]) {

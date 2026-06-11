@@ -267,6 +267,7 @@ export async function uploadProjectTaskFile(formData: FormData) {
   });
 
   revalidateProjectFilePaths(projectId);
+  redirect(`/projects/${projectId}?task=${taskId}`);
 }
 
 export async function deleteProjectTaskFile(formData: FormData) {

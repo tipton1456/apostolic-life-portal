@@ -933,6 +933,7 @@ export async function updateProjectTask(formData: FormData) {
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
+  redirect(`/projects/${projectId}?task=${id}`);
 }
 
 export async function deleteProjectTask(formData: FormData) {
@@ -955,6 +956,7 @@ export async function deleteProjectTask(formData: FormData) {
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
+  redirect(`/projects/${projectId}`);
 }
 
 async function loadProjectMembers(projectId: string): Promise<ProjectMember[]> {
