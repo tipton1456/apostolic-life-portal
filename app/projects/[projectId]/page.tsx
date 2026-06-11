@@ -1,8 +1,16 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { PortalIcon } from "@/app/icons";
 import AdminFormButton from "@/app/admin/admin-form-button";
 import HighlightTask from "@/app/projects/highlight-task";
 import { getCurrentSessionUser } from "@/lib/demo";
+import { hasDropboxConfig } from "@/lib/dropbox";
+import { listProjectFiles, uploadProjectTaskFile } from "@/lib/project-files";
+import {
+  formatProjectFileDate,
+  formatProjectFileSize,
+} from "@/lib/project-files-utils";
+import type { ProjectTaskFile } from "@/lib/project-files";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import {
   addProjectMember,
@@ -51,10 +59,19 @@ export default async function ProjectDashboardPage({
 
   const { projectId } = await params;
   const { task: highlightedTaskId } = await searchParams;
-  const [dashboard, portalUser] = await Promise.all([
+  const [dashboard, portalUser, projectFiles] = await Promise.all([
     getProjectDashboard(projectId),
     getCurrentPortalUser(),
+    listProjectFiles(projectId).catch(() => [] as ProjectTaskFile[]),
   ]);
+  const dropboxConfigured = hasDropboxConfig();
+  const filesByTaskId = new Map<string, ProjectTaskFile[]>();
+
+  for (const file of projectFiles) {
+    const existing = filesByTaskId.get(file.taskId) ?? [];
+    existing.push(file);
+    filesByTaskId.set(file.taskId, existing);
+  }
   const assignableUsers = dashboard?.permissions.canManageMembers
     ? await listAssignablePortalUsers()
     : [];
@@ -102,6 +119,20 @@ export default async function ProjectDashboardPage({
                     ? "Project Manager"
                     : "Project Participant"}
                 </span>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-4 text-sm font-semibold">
+                <Link
+                  href={`/projects/${project.id}/files`}
+                  className="text-lime-400 transition hover:text-lime-300"
+                >
+                  Project Files ({projectFiles.length})
+                </Link>
+                <Link
+                  href="/projects/files"
+                  className="text-lime-400 transition hover:text-lime-300"
+                >
+                  All Project Files
+                </Link>
               </div>
             </div>
             <div className="w-full">
@@ -385,6 +416,8 @@ export default async function ProjectDashboardPage({
           canManageTasks={permissions.canManageTasks}
           assigneeOptions={assigneeOptions}
           highlightedTaskId={highlightedTaskId}
+          filesByTaskId={filesByTaskId}
+          dropboxConfigured={dropboxConfigured}
         />
 
         <TaskSection
@@ -397,6 +430,8 @@ export default async function ProjectDashboardPage({
           canManageTasks={permissions.canManageTasks}
           assigneeOptions={assigneeOptions}
           highlightedTaskId={highlightedTaskId}
+          filesByTaskId={filesByTaskId}
+          dropboxConfigured={dropboxConfigured}
           emphasizeOverdue
         />
 
@@ -410,6 +445,8 @@ export default async function ProjectDashboardPage({
           canManageTasks={permissions.canManageTasks}
           assigneeOptions={assigneeOptions}
           highlightedTaskId={highlightedTaskId}
+          filesByTaskId={filesByTaskId}
+          dropboxConfigured={dropboxConfigured}
         />
       </div>
     </main>
@@ -447,6 +484,8 @@ function TaskSection({
   canManageTasks,
   assigneeOptions,
   highlightedTaskId,
+  filesByTaskId,
+  dropboxConfigured,
   emphasizeOverdue = false,
 }: {
   title: string;
@@ -458,6 +497,8 @@ function TaskSection({
   canManageTasks: boolean;
   assigneeOptions: Array<{ value: string; label: string }>;
   highlightedTaskId?: string;
+  filesByTaskId: Map<string, ProjectTaskFile[]>;
+  dropboxConfigured: boolean;
   emphasizeOverdue?: boolean;
 }) {
   return (
@@ -478,6 +519,8 @@ function TaskSection({
               assigneeOptions={assigneeOptions}
               emphasizeOverdue={emphasizeOverdue || isTaskOverdue(task)}
               highlighted={highlightedTaskId === task.id}
+              taskFiles={filesByTaskId.get(task.id) ?? []}
+              dropboxConfigured={dropboxConfigured}
             />
           ))
         ) : (
@@ -496,6 +539,8 @@ function TaskRow({
   assigneeOptions,
   emphasizeOverdue,
   highlighted,
+  taskFiles,
+  dropboxConfigured,
 }: {
   task: ProjectTask;
   projectId: string;
@@ -504,6 +549,8 @@ function TaskRow({
   assigneeOptions: Array<{ value: string; label: string }>;
   emphasizeOverdue: boolean;
   highlighted: boolean;
+  taskFiles: ProjectTaskFile[];
+  dropboxConfigured: boolean;
 }) {
   const canEdit =
     canManageTasks || (task.assignedTo === currentUserId && task.status !== "completed");
@@ -647,6 +694,69 @@ function TaskRow({
           ) : null}
         </div>
       ) : null}
+      <div className="border-t border-white/10 px-5 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-500">
+            Task Files
+          </h3>
+          <span className="text-xs text-neutral-500">
+            {taskFiles.length} file{taskFiles.length === 1 ? "" : "s"}
+          </span>
+        </div>
+        {taskFiles.length > 0 ? (
+          <div className="mt-3 space-y-2">
+            {taskFiles.map((file) => (
+              <div
+                key={file.id}
+                className="flex flex-col gap-2 rounded-xl border border-white/10 bg-neutral-950/40 px-4 py-3 md:flex-row md:items-center md:justify-between"
+              >
+                <div>
+                  <p className="font-medium text-neutral-100">{file.fileName}</p>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    {formatProjectFileSize(file.fileSize)} ·{" "}
+                    {file.uploadedByName} · {formatProjectFileDate(file.createdAt)}
+                  </p>
+                </div>
+                <a
+                  href={`/api/projects/files/${file.id}/download`}
+                  className="inline-flex w-fit rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-lime-300 transition hover:border-lime-300/60 hover:bg-lime-400/10"
+                >
+                  Download
+                </a>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-neutral-500">No files attached to this task yet.</p>
+        )}
+        {dropboxConfigured ? (
+          <form
+            action={uploadProjectTaskFile}
+            encType="multipart/form-data"
+            className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-neutral-950/40 p-4 md:grid-cols-[1fr_auto]"
+          >
+            <input type="hidden" name="projectId" value={projectId} />
+            <input type="hidden" name="taskId" value={task.id} />
+            <label className="block text-sm font-medium text-neutral-300">
+              Attach file
+              <input
+                name="taskFile"
+                type="file"
+                required
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,image/*"
+                className="mt-2 block w-full text-sm text-neutral-300 file:mr-4 file:rounded-lg file:border-0 file:bg-lime-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-neutral-950 hover:file:bg-lime-300"
+              />
+            </label>
+            <AdminFormButton pendingLabel="Uploading..." className="md:mt-7">
+              Upload File
+            </AdminFormButton>
+          </form>
+        ) : (
+          <p className="mt-3 text-sm text-yellow-100">
+            Dropbox is not configured, so task file uploads are unavailable.
+          </p>
+        )}
+      </div>
     </details>
   );
 }

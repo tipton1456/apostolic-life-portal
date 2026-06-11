@@ -34,6 +34,19 @@ function getBackLink(pathname: string) {
     return { href: "/groups", label: "← Back to Group Management" };
   }
 
+  const projectFilesMatch = pathname.match(/^\/projects\/([^/]+)\/files$/);
+
+  if (projectFilesMatch) {
+    return {
+      href: `/projects/${projectFilesMatch[1]}`,
+      label: "← Back to Project Dashboard",
+    };
+  }
+
+  if (pathname === "/projects/files") {
+    return { href: "/projects", label: "← Back to Project Management" };
+  }
+
   if (pathname.startsWith("/projects/") && pathname !== "/projects") {
     return { href: "/projects", label: "← Back to Project Management" };
   }
@@ -69,6 +82,7 @@ function getBackLink(pathname: string) {
       "/my-groups",
       "/prayer-board",
       "/projects",
+      "/projects/files",
     ].includes(pathname)
   ) {
     return { href: "/dashboard", label: "← Back to Dashboard" };

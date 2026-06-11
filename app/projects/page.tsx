@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import AdminFormButton from "@/app/admin/admin-form-button";
+import ProjectFilesPreview from "@/app/projects/project-files-preview";
 import { getCurrentSessionUser } from "@/lib/demo";
+import { listAccessibleProjectFiles } from "@/lib/project-files";
 import {
   canCurrentUserAccessProjects,
   createProject,
@@ -44,7 +46,10 @@ export default async function ProjectsPage() {
   }
 
   const isManager = await isCurrentUserProjectManager();
-  const projects = await listProjects();
+  const [projects, recentFiles] = await Promise.all([
+    listProjects(),
+    listAccessibleProjectFiles(8),
+  ]);
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
@@ -62,6 +67,14 @@ export default async function ProjectsPage() {
               : "View the projects you are on, your assigned tasks, and project progress."}
           </p>
         </header>
+
+        <div className="mt-8">
+          <ProjectFilesPreview
+            files={recentFiles}
+            title="Recent Files"
+            viewAllHref="/projects/files"
+          />
+        </div>
 
         {isManager ? (
         <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">

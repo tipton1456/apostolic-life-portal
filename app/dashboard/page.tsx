@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import ProjectFilesPreview from "@/app/projects/project-files-preview";
 import { getUpcomingEvents } from "@/lib/events";
 import { getPrayerBoardMessages } from "@/lib/groupme";
 import { getUpcomingAssignments } from "@/lib/planning-center";
 import { getCurrentSessionUser } from "@/lib/demo";
+import {
+  listAccessibleProjectFiles,
+  shouldShowProjectFilesForCurrentUser,
+} from "@/lib/project-files";
 
 export default async function DashboardPage() {
   const user = await getCurrentSessionUser();
@@ -12,11 +17,13 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const [assignments, prayerBoard, events] = await Promise.all([
+  const [assignments, prayerBoard, events, showProjectFiles] = await Promise.all([
     getUpcomingAssignments(user.email ?? undefined),
     getPrayerBoardMessages(5),
     getUpcomingEvents(3),
+    user.isDemo ? Promise.resolve(false) : shouldShowProjectFilesForCurrentUser(),
   ]);
+  const projectFiles = showProjectFiles ? await listAccessibleProjectFiles(8) : [];
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white">
@@ -30,6 +37,16 @@ export default async function DashboardPage() {
             details, schedules, events, and future church resources.
           </p>
         </header>
+
+        {showProjectFiles ? (
+          <section className="mb-10">
+            <ProjectFilesPreview
+              files={projectFiles}
+              title="Your Project Files"
+              viewAllHref="/projects/files"
+            />
+          </section>
+        ) : null}
 
         <section className="mb-10">
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
