@@ -356,17 +356,18 @@ export default function ProjectTaskModals({
                   <input type="hidden" name="projectId" value={projectId} />
                   <input type="hidden" name="taskId" value={activeTask.id} />
                   <label className="block text-sm font-medium text-neutral-300">
-                    Attach file
+                    Attach files
                     <input
                       name="taskFile"
                       type="file"
+                      multiple
                       required
                       accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,image/*"
                       className="mt-2 block w-full text-sm text-neutral-300 file:mr-4 file:rounded-lg file:border-0 file:bg-lime-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-neutral-950 hover:file:bg-lime-300"
                     />
                   </label>
                   <AdminFormButton pendingLabel="Uploading..." className="md:mt-7">
-                    Upload File
+                    Upload Files
                   </AdminFormButton>
                 </form>
               ) : null}

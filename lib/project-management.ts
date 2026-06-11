@@ -1039,7 +1039,7 @@ export async function updateProjectTask(formData: FormData) {
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
-  redirect(`/projects/${projectId}?task=${id}`);
+  redirect(`/projects/${projectId}`);
 }
 
 export async function deleteProjectTask(formData: FormData) {

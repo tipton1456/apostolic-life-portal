@@ -9,7 +9,10 @@ import {
   readProjectTaskFile,
   writeProjectTaskFile,
 } from "@/lib/project-file-storage";
-import { parseProjectTaskUploadFile } from "@/lib/project-files-utils";
+import {
+  parseProjectTaskUploadFile,
+  parseProjectTaskUploadFiles,
+} from "@/lib/project-files-utils";
 import {
   FILE_ROW_SELECT_DROPBOX,
   FILE_ROW_SELECT_STORAGE,
@@ -21,6 +24,7 @@ import {
 import { canCurrentUserAccessProjects } from "@/lib/project-management";
 import { isPortalProjectManager } from "@/lib/portal-project-roles";
 import { getCurrentPortalUser } from "@/lib/portal-users";
+import { ProjectFileDownloadError } from "@/lib/project-file-download-error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -116,11 +120,13 @@ export async function storeProjectTaskFile({
   taskId,
   file,
   uploadedBy,
+  skipCapacityCheck = false,
 }: {
   projectId: string;
   taskId: string;
   file: File;
   uploadedBy: string;
+  skipCapacityCheck?: boolean;
 }) {
   const supabase = await createClient();
   const [{ data: project, error: projectError }, { data: task, error: taskError }, { count, error: countError }] =
@@ -158,7 +164,7 @@ export async function storeProjectTaskFile({
     throw new Error("Unable to validate task file count.");
   }
 
-  if ((count ?? 0) >= MAX_FILES_PER_TASK) {
+  if (!skipCapacityCheck && (count ?? 0) >= MAX_FILES_PER_TASK) {
     throw new Error(`Each task can have up to ${MAX_FILES_PER_TASK} files.`);
   }
 
@@ -172,6 +178,7 @@ export async function storeProjectTaskFile({
   await writeProjectTaskFile({
     relativePath: storagePath,
     contents: fileBuffer,
+    contentType: file.type || "application/octet-stream",
   });
 
   const insertPayload = {
@@ -243,10 +250,10 @@ export async function uploadProjectTaskFile(formData: FormData) {
 
   const projectId = String(formData.get("projectId") || "");
   const taskId = String(formData.get("taskId") || "");
-  const file = parseProjectTaskUploadFile(formData.get("taskFile"));
+  const files = parseProjectTaskUploadFiles(formData.getAll("taskFile"));
 
-  if (!projectId || !taskId || !file) {
-    throw new Error("Project ID, task ID, and file are required.");
+  if (!projectId || !taskId || files.length === 0) {
+    throw new Error("Project ID, task ID, and at least one file are required.");
   }
 
   await requireProjectFilesAccessForProject(projectId);
@@ -260,12 +267,28 @@ export async function uploadProjectTaskFile(formData: FormData) {
     redirect("/login?next=/projects");
   }
 
-  await storeProjectTaskFile({
-    file,
-    projectId,
-    taskId,
-    uploadedBy: user.id,
-  });
+  const { count, error: countError } = await supabase
+    .from("project_task_files")
+    .select("id", { count: "exact", head: true })
+    .eq("task_id", taskId);
+
+  if (countError) {
+    throw new Error("Unable to validate task file count.");
+  }
+
+  if ((count ?? 0) + files.length > MAX_FILES_PER_TASK) {
+    throw new Error(`Each task can have up to ${MAX_FILES_PER_TASK} files.`);
+  }
+
+  for (const file of files) {
+    await storeProjectTaskFile({
+      file,
+      projectId,
+      taskId,
+      uploadedBy: user.id,
+      skipCapacityCheck: true,
+    });
+  }
 
   revalidateProjectFilePaths(projectId);
   redirect(`/projects/${projectId}?task=${taskId}`);
@@ -334,7 +357,11 @@ export async function deleteProjectTaskFile(formData: FormData) {
 }
 
 export async function getProjectFileForDownload(fileId: string) {
-  await requireProjectFilesAccess();
+  const currentUser = await getCurrentPortalUser();
+
+  if (!currentUser) {
+    throw new ProjectFileDownloadError("You must be signed in to download files.", 401);
+  }
 
   const supabase = await createClient();
   const { data: file, error } = await fetchProjectTaskFileRecord(
@@ -343,10 +370,14 @@ export async function getProjectFileForDownload(fileId: string) {
   );
 
   if (error || !file) {
-    throw new Error("File not found.");
+    throw new ProjectFileDownloadError("File not found.", 404);
   }
 
-  await requireProjectFilesAccessForProject(file.project_id);
+  const canDownload = await userCanDownloadProjectFile(file.project_id, currentUser);
+
+  if (!canDownload) {
+    throw new ProjectFileDownloadError("You do not have access to this file.", 403);
+  }
 
   const contents = await readProjectTaskFile(file.storage_path);
 
@@ -508,6 +539,30 @@ async function requireProjectFilesAccessForProject(projectId: string) {
   }
 
   return currentUser;
+}
+
+async function userCanDownloadProjectFile(
+  projectId: string,
+  currentUser: NonNullable<Awaited<ReturnType<typeof getCurrentPortalUser>>>,
+) {
+  if (isPortalProjectManager(currentUser)) {
+    return true;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("project_members")
+    .select("id")
+    .eq("project_id", projectId)
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Project file download permission lookup failed:", error);
+    return false;
+  }
+
+  return Boolean(data);
 }
 
 function revalidateProjectFilePaths(projectId: string) {
