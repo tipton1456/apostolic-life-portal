@@ -9,6 +9,7 @@ import {
   readProjectTaskFile,
   writeProjectTaskFile,
 } from "@/lib/project-file-storage";
+import { parseProjectTaskUploadFile } from "@/lib/project-files-utils";
 import {
   FILE_ROW_SELECT_DROPBOX,
   FILE_ROW_SELECT_STORAGE,
@@ -48,25 +49,7 @@ type ProjectTaskFileRow = {
   created_at: string;
 };
 
-const MAX_PROJECT_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES_PER_TASK = 20;
-
-const ALLOWED_PROJECT_FILE_TYPES = new Set([
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "text/plain",
-  "text/csv",
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-]);
 
 export async function listAccessibleProjectFiles(
   limit = 100,
@@ -127,28 +110,18 @@ export async function listTaskFiles(
   return enrichProjectFiles(rows);
 }
 
-export async function uploadProjectTaskFile(formData: FormData) {
-  await requireProjectFilesAccess();
-
-  const projectId = String(formData.get("projectId") || "");
-  const taskId = String(formData.get("taskId") || "");
-  const file = getProjectTaskFile(formData.get("taskFile"));
-
-  if (!projectId || !taskId || !file) {
-    throw new Error("Project ID, task ID, and file are required.");
-  }
-
-  await requireProjectFilesAccessForProject(projectId);
-
+export async function storeProjectTaskFile({
+  projectId,
+  taskId,
+  file,
+  uploadedBy,
+}: {
+  projectId: string;
+  taskId: string;
+  file: File;
+  uploadedBy: string;
+}) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login?next=/projects");
-  }
-
   const [{ data: project, error: projectError }, { data: task, error: taskError }, { count, error: countError }] =
     await Promise.all([
       supabase
@@ -207,30 +180,37 @@ export async function uploadProjectTaskFile(formData: FormData) {
     fileSize: file.size,
     mimeType: file.type || "application/octet-stream",
     storagePath,
-    uploadedBy: user.id,
+    uploadedBy,
   };
 
-  let { error: insertError } = await supabase
+  let insertResult = await supabase
     .from("project_task_files")
     .insert(
       getFileInsertPayload({
         ...insertPayload,
         useDropboxColumn: false,
       }) as Record<string, string | number>,
-    );
+    )
+    .select("id")
+    .single<{ id: string }>();
 
-  if (insertError && isMissingColumnError(insertError, "storage_path")) {
-    ({ error: insertError } = await supabase
+  if (insertResult.error && isMissingColumnError(insertResult.error, "storage_path")) {
+    insertResult = await supabase
       .from("project_task_files")
       .insert(
         getFileInsertPayload({
           ...insertPayload,
           useDropboxColumn: true,
         }) as Record<string, string | number>,
-      ));
+      )
+      .select("id")
+      .single<{ id: string }>();
   }
 
-  if (insertError && isMissingRelationError(insertError, "project_task_files")) {
+  if (
+    insertResult.error &&
+    isMissingRelationError(insertResult.error, "project_task_files")
+  ) {
     try {
       await deleteStoredProjectTaskFile(storagePath);
     } catch (cleanupError) {
@@ -242,8 +222,8 @@ export async function uploadProjectTaskFile(formData: FormData) {
     );
   }
 
-  if (insertError) {
-    console.error("Project task file insert failed:", insertError);
+  if (insertResult.error || !insertResult.data?.id) {
+    console.error("Project task file insert failed:", insertResult.error);
 
     try {
       await deleteStoredProjectTaskFile(storagePath);
@@ -251,8 +231,40 @@ export async function uploadProjectTaskFile(formData: FormData) {
       console.error("Storage cleanup after failed insert:", cleanupError);
     }
 
-    throw new Error(insertError.message);
+    throw new Error(insertResult.error?.message ?? "Unable to save project file.");
   }
+
+  return insertResult.data.id;
+}
+
+export async function uploadProjectTaskFile(formData: FormData) {
+  await requireProjectFilesAccess();
+
+  const projectId = String(formData.get("projectId") || "");
+  const taskId = String(formData.get("taskId") || "");
+  const file = parseProjectTaskUploadFile(formData.get("taskFile"));
+
+  if (!projectId || !taskId || !file) {
+    throw new Error("Project ID, task ID, and file are required.");
+  }
+
+  await requireProjectFilesAccessForProject(projectId);
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login?next=/projects");
+  }
+
+  await storeProjectTaskFile({
+    file,
+    projectId,
+    taskId,
+    uploadedBy: user.id,
+  });
 
   revalidateProjectFilePaths(projectId);
 }
@@ -494,22 +506,6 @@ async function requireProjectFilesAccessForProject(projectId: string) {
   }
 
   return currentUser;
-}
-
-function getProjectTaskFile(value: FormDataEntryValue | null) {
-  if (!(value instanceof File) || value.size === 0) return null;
-
-  if (!ALLOWED_PROJECT_FILE_TYPES.has(value.type)) {
-    throw new Error(
-      "File type not allowed. Use PDF, Office documents, text, CSV, or images.",
-    );
-  }
-
-  if (value.size > MAX_PROJECT_FILE_BYTES) {
-    throw new Error("Project files must be smaller than 25MB.");
-  }
-
-  return value;
 }
 
 function revalidateProjectFilePaths(projectId: string) {

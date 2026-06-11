@@ -4,6 +4,7 @@ import { PortalIcon } from "@/app/icons";
 import AdminFormButton from "@/app/admin/admin-form-button";
 import HighlightTask from "@/app/projects/highlight-task";
 import TaskAssigneeField from "@/app/projects/task-assignee-field";
+import TaskUpdatesSection from "@/app/projects/task-updates-section";
 import { getCurrentSessionUser } from "@/lib/demo";
 import { listProjectFiles, uploadProjectTaskFile } from "@/lib/project-files";
 import {
@@ -26,6 +27,10 @@ import {
   uploadProjectImage,
   type ProjectTask,
 } from "@/lib/project-management";
+import {
+  listProjectTaskUpdates,
+  type ProjectTaskUpdate,
+} from "@/lib/project-task-updates";
 import {
   formatDisplayDate,
   formatProjectStatus,
@@ -59,17 +64,28 @@ export default async function ProjectDashboardPage({
 
   const { projectId } = await params;
   const { task: highlightedTaskId } = await searchParams;
-  const [dashboard, portalUser, projectFiles] = await Promise.all([
+  const [dashboard, portalUser, projectFiles, taskUpdates] = await Promise.all([
     getProjectDashboard(projectId),
     getCurrentPortalUser(),
     listProjectFiles(projectId).catch(() => [] as ProjectTaskFile[]),
+    listProjectTaskUpdates(projectId).catch((error) => {
+      console.error("Project task updates lookup failed:", error);
+      return [];
+    }),
   ]);
   const filesByTaskId = new Map<string, ProjectTaskFile[]>();
+  const updatesByTaskId = new Map<string, ProjectTaskUpdate[]>();
 
   for (const file of projectFiles) {
     const existing = filesByTaskId.get(file.taskId) ?? [];
     existing.push(file);
     filesByTaskId.set(file.taskId, existing);
+  }
+
+  for (const update of taskUpdates) {
+    const existing = updatesByTaskId.get(update.taskId) ?? [];
+    existing.push(update);
+    updatesByTaskId.set(update.taskId, existing);
   }
   const assignableUsers = dashboard?.permissions.canManageMembers
     ? await listAssignablePortalUsers()
@@ -483,6 +499,7 @@ export default async function ProjectDashboardPage({
           assigneeOptions={assigneeOptions}
           highlightedTaskId={highlightedTaskId}
           filesByTaskId={filesByTaskId}
+          updatesByTaskId={updatesByTaskId}
           isProjectCompleted={isProjectCompleted}
         />
 
@@ -497,6 +514,7 @@ export default async function ProjectDashboardPage({
           assigneeOptions={assigneeOptions}
           highlightedTaskId={highlightedTaskId}
           filesByTaskId={filesByTaskId}
+          updatesByTaskId={updatesByTaskId}
           isProjectCompleted={isProjectCompleted}
           emphasizeOverdue
         />
@@ -512,6 +530,7 @@ export default async function ProjectDashboardPage({
           assigneeOptions={assigneeOptions}
           highlightedTaskId={highlightedTaskId}
           filesByTaskId={filesByTaskId}
+          updatesByTaskId={updatesByTaskId}
           isProjectCompleted={isProjectCompleted}
         />
       </div>
@@ -551,6 +570,7 @@ function TaskSection({
   assigneeOptions,
   highlightedTaskId,
   filesByTaskId,
+  updatesByTaskId,
   isProjectCompleted,
   emphasizeOverdue = false,
 }: {
@@ -564,6 +584,7 @@ function TaskSection({
   assigneeOptions: Array<{ value: string; label: string }>;
   highlightedTaskId?: string;
   filesByTaskId: Map<string, ProjectTaskFile[]>;
+  updatesByTaskId: Map<string, ProjectTaskUpdate[]>;
   isProjectCompleted: boolean;
   emphasizeOverdue?: boolean;
 }) {
@@ -586,6 +607,7 @@ function TaskSection({
               emphasizeOverdue={emphasizeOverdue || isTaskOverdue(task)}
               highlighted={highlightedTaskId === task.id}
               taskFiles={filesByTaskId.get(task.id) ?? []}
+              taskUpdates={updatesByTaskId.get(task.id) ?? []}
               isProjectCompleted={isProjectCompleted}
             />
           ))
@@ -606,6 +628,7 @@ function TaskRow({
   emphasizeOverdue,
   highlighted,
   taskFiles,
+  taskUpdates,
   isProjectCompleted,
 }: {
   task: ProjectTask;
@@ -616,10 +639,12 @@ function TaskRow({
   emphasizeOverdue: boolean;
   highlighted: boolean;
   taskFiles: ProjectTaskFile[];
+  taskUpdates: ProjectTaskUpdate[];
   isProjectCompleted: boolean;
 }) {
   const canEdit =
     canManageTasks || (task.assignedTo === currentUserId && task.status !== "completed");
+  const canAddUpdates = canEdit && !isProjectCompleted;
 
   return (
     <details
@@ -632,6 +657,11 @@ function TaskRow({
           {task.description ? (
             <p className="mt-1 line-clamp-1 text-sm text-neutral-400">
               {task.description}
+            </p>
+          ) : null}
+          {taskUpdates.length > 0 ? (
+            <p className="mt-1 text-xs text-neutral-500">
+              {taskUpdates.length} update{taskUpdates.length === 1 ? "" : "s"}
             </p>
           ) : null}
         </div>
@@ -760,6 +790,12 @@ function TaskRow({
           ) : null}
         </div>
       ) : null}
+      <TaskUpdatesSection
+        canAddUpdates={canAddUpdates}
+        projectId={projectId}
+        task={task}
+        updates={taskUpdates}
+      />
       <div className="border-t border-white/10 px-5 py-4">
         <div className="flex items-center justify-between gap-4">
           <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-500">

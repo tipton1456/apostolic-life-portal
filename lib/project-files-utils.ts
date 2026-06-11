@@ -1,3 +1,38 @@
+const MAX_PROJECT_FILE_BYTES = 25 * 1024 * 1024;
+
+const ALLOWED_PROJECT_FILE_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
+export function parseProjectTaskUploadFile(value: FormDataEntryValue | null) {
+  if (!(value instanceof File) || value.size === 0) return null;
+
+  if (!ALLOWED_PROJECT_FILE_TYPES.has(value.type)) {
+    throw new Error(
+      "File type not allowed. Use PDF, Office documents, text, CSV, or images.",
+    );
+  }
+
+  if (value.size > MAX_PROJECT_FILE_BYTES) {
+    throw new Error("Project files must be smaller than 25MB.");
+  }
+
+  return value;
+}
+
 export function formatProjectFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
