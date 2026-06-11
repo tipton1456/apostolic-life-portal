@@ -102,10 +102,23 @@ export default async function ProjectDashboardPage({
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
             Project Dashboard
           </p>
-          <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_min(42%,28rem)] lg:items-start">
-            <div className="min-w-0 text-left">
+          <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-start">
+            <div className="shrink-0">
+              {project.imageUrl ? (
+                <img
+                  src={project.imageUrl}
+                  alt={`${project.name} project`}
+                  className="h-40 w-40 rounded-2xl border border-white/10 object-cover sm:h-48 sm:w-48"
+                />
+              ) : (
+                <div className="flex h-40 w-40 items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] text-sm text-neutral-500 sm:h-48 sm:w-48">
+                  No project image yet
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1 text-left">
               <h1 className="text-4xl font-bold tracking-tight">{project.name}</h1>
-              <p className="mt-3 max-w-3xl text-neutral-400">
+              <p className="mt-3 text-neutral-400">
                 {project.description ||
                   "Track tasks, deadlines, and project completion."}
               </p>
@@ -134,19 +147,6 @@ export default async function ProjectDashboardPage({
                   All Project Files
                 </Link>
               </div>
-            </div>
-            <div className="w-full">
-              {project.imageUrl ? (
-                <img
-                  src={project.imageUrl}
-                  alt={`${project.name} project`}
-                  className="aspect-video w-full rounded-2xl border border-white/10 object-cover"
-                />
-              ) : (
-                <div className="flex aspect-video w-full items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] text-sm text-neutral-500">
-                  No project image yet
-                </div>
-              )}
             </div>
           </div>
         </header>

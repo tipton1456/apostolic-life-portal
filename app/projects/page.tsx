@@ -121,18 +121,26 @@ export default async function ProjectsPage() {
                 href={`/projects/${project.id}`}
                 className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-lime-400/60 hover:bg-white/[0.06]"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">
-                      {formatProjectStatus(project.status)}
-                    </p>
-                    <h2 className="mt-2 text-2xl font-semibold text-neutral-100">
-                      {project.name}
-                    </h2>
+                <div className="flex items-start gap-4">
+                  <ProjectCardThumbnail
+                    imageUrl={project.imageUrl}
+                    projectName={project.name}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                          {formatProjectStatus(project.status)}
+                        </p>
+                        <h2 className="mt-2 text-2xl font-semibold text-neutral-100">
+                          {project.name}
+                        </h2>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-lime-400/30 bg-lime-400/10 px-3 py-1 text-sm font-semibold text-lime-300">
+                        {project.completionPercent}%
+                      </span>
+                    </div>
                   </div>
-                  <span className="rounded-full border border-lime-400/30 bg-lime-400/10 px-3 py-1 text-sm font-semibold text-lime-300">
-                    {project.completionPercent}%
-                  </span>
                 </div>
 
                 {project.description ? (
@@ -176,6 +184,30 @@ export default async function ProjectsPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function ProjectCardThumbnail({
+  imageUrl,
+  projectName,
+}: {
+  imageUrl: string | null;
+  projectName: string;
+}) {
+  if (imageUrl) {
+    return (
+      <img
+        src={imageUrl}
+        alt={`${projectName} project`}
+        className="h-20 w-20 shrink-0 rounded-xl border border-white/10 object-cover"
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border border-dashed border-white/15 bg-white/[0.03] text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
+      No image
+    </div>
   );
 }
 

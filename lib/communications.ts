@@ -4,6 +4,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { isDemoMode } from "@/lib/demo";
 import { getLeaderGroupDetail } from "@/lib/elvanto-groups";
+import {
+  queryCommunicationBatches,
+  queryCommunicationRecipients,
+} from "@/lib/communication-db-compat";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -486,20 +490,8 @@ export async function listCommunicationLogs(): Promise<CommunicationLog[]> {
   const admin = createAdminClient();
   const [{ data: batches, error: batchError }, { data: recipients, error: recipientError }] =
     await Promise.all([
-      admin
-        .from("communication_message_batches")
-        .select(
-          "id,channel,group_id,group_name,sender_email,message_body,subject,attachment_names,recipient_count,success_count,failure_count,skipped_count,status,created_at",
-        )
-        .order("created_at", { ascending: false })
-        .limit(50),
-      admin
-        .from("communication_message_recipients")
-        .select(
-          "id,batch_id,person_name,phone_number,phone_type,recipient_email,status,twilio_message_sid,resend_message_id,failure_code,failure_message,created_at",
-        )
-        .order("created_at", { ascending: false })
-        .limit(500),
+      queryCommunicationBatches(admin),
+      queryCommunicationRecipients(admin),
     ]);
 
   if (batchError) {
