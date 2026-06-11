@@ -5,6 +5,7 @@ import {
   ClipboardList,
   CreditCard,
   FileText,
+  FolderKanban,
   HandCoins,
   HeartHandshake,
   LayoutDashboard,
@@ -32,6 +33,7 @@ export type PortalIconName =
   | "giving"
   | "groups"
   | "prayer"
+  | "projects"
   | "resources"
   | "search"
   | "trash"
@@ -51,6 +53,7 @@ const iconMap: Record<PortalIconName, LucideIcon> = {
   giving: CreditCard,
   groups: Users,
   prayer: HeartHandshake,
+  projects: FolderKanban,
   resources: FileText,
   search: Search,
   trash: Trash2,

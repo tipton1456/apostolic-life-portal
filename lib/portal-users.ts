@@ -11,6 +11,7 @@ export type PortalUser = {
   firstName: string;
   lastName: string;
   isAdmin: boolean;
+  canAccessProjects: boolean;
   mustResetPassword: boolean;
   createdAt: string;
   lastSignInAt: string | null;
@@ -37,6 +38,7 @@ type PortalUserProfile = {
   first_name: string | null;
   last_name: string | null;
   is_admin: boolean | null;
+  can_access_projects: boolean | null;
   must_reset_password: boolean | null;
   created_at: string;
 };
@@ -61,7 +63,7 @@ export async function getCurrentPortalUser() {
   const { data, error } = await supabase
     .from("portal_users")
     .select(
-      "id,email,first_name,last_name,is_admin,must_reset_password,created_at",
+      "id,email,first_name,last_name,is_admin,can_access_projects,must_reset_password,created_at",
     )
     .eq("id", user.id)
     .maybeSingle<PortalUserProfile>();
@@ -77,6 +79,7 @@ export async function getCurrentPortalUser() {
     firstName: data?.first_name ?? "",
     lastName: data?.last_name ?? "",
     isAdmin: Boolean(data?.is_admin),
+    canAccessProjects: Boolean(data?.can_access_projects),
     mustResetPassword: Boolean(data?.must_reset_password),
     createdAt: data?.created_at ?? "",
   };
@@ -100,7 +103,7 @@ export async function listPortalUsers(): Promise<PortalUser[]> {
       admin
         .from("portal_users")
         .select(
-          "id,email,first_name,last_name,is_admin,must_reset_password,created_at",
+          "id,email,first_name,last_name,is_admin,can_access_projects,must_reset_password,created_at",
         )
         .order("email", { ascending: true }),
       admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
@@ -136,6 +139,7 @@ export async function listPortalUsers(): Promise<PortalUser[]> {
       firstName: profile.first_name ?? "",
       lastName: profile.last_name ?? "",
       isAdmin: Boolean(profile.is_admin),
+      canAccessProjects: Boolean(profile.can_access_projects),
       mustResetPassword: Boolean(profile.must_reset_password),
       createdAt: profile.created_at || authUser?.createdAt || "",
       lastSignInAt: authUser?.lastSignInAt ?? null,
@@ -187,6 +191,7 @@ export async function createPortalUser(formData: FormData) {
   const firstName = normalizeText(formData.get("firstName"));
   const lastName = normalizeText(formData.get("lastName"));
   const isAdmin = formData.get("isAdmin") === "on";
+  const canAccessProjects = formData.get("canAccessProjects") === "on";
 
   if (!email || password.length < 8) {
     throw new Error("Email and an 8 character password are required.");
@@ -213,6 +218,7 @@ export async function createPortalUser(formData: FormData) {
     firstName,
     lastName,
     isAdmin,
+    canAccessProjects,
     mustResetPassword: true,
   });
 
@@ -229,6 +235,7 @@ export async function createPortalUser(formData: FormData) {
         firstName,
         lastName,
         isAdmin,
+        canAccessProjects,
         mustResetPassword: true,
       },
       temporaryPasswordSet: true,
@@ -267,6 +274,7 @@ export async function updatePortalUser(formData: FormData) {
   const firstName = normalizeText(formData.get("firstName"));
   const lastName = normalizeText(formData.get("lastName"));
   const isAdmin = formData.get("isAdmin") === "on";
+  const canAccessProjects = formData.get("canAccessProjects") === "on";
 
   if (!id || !email) {
     throw new Error("User ID and email are required.");
@@ -313,6 +321,7 @@ export async function updatePortalUser(formData: FormData) {
     firstName,
     lastName,
     isAdmin,
+    canAccessProjects,
     mustResetPassword: password ? true : before?.mustResetPassword,
   });
 
@@ -458,6 +467,7 @@ async function upsertPortalUserProfile(
     firstName: string;
     lastName: string;
     isAdmin: boolean;
+    canAccessProjects: boolean;
     mustResetPassword?: boolean;
   },
 ) {
@@ -468,6 +478,7 @@ async function upsertPortalUserProfile(
     first_name: string;
     last_name: string;
     is_admin: boolean;
+    can_access_projects: boolean;
     must_reset_password?: boolean;
   } = {
     id,
@@ -475,6 +486,7 @@ async function upsertPortalUserProfile(
     first_name: user.firstName,
     last_name: user.lastName,
     is_admin: user.isAdmin,
+    can_access_projects: user.canAccessProjects,
   };
 
   if (user.mustResetPassword !== undefined) {
@@ -495,7 +507,7 @@ async function getPortalUserSnapshot(id: string) {
     admin
       .from("portal_users")
       .select(
-        "id,email,first_name,last_name,is_admin,must_reset_password,created_at,updated_at",
+        "id,email,first_name,last_name,is_admin,can_access_projects,must_reset_password,created_at,updated_at",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -508,6 +520,7 @@ async function getPortalUserSnapshot(id: string) {
     firstName: profile?.first_name ?? "",
     lastName: profile?.last_name ?? "",
     isAdmin: Boolean(profile?.is_admin),
+    canAccessProjects: Boolean(profile?.can_access_projects),
     mustResetPassword: Boolean(profile?.must_reset_password),
     createdAt: profile?.created_at ?? authUser.user?.created_at ?? null,
     updatedAt: profile?.updated_at ?? null,

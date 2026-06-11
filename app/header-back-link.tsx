@@ -34,6 +34,10 @@ function getBackLink(pathname: string) {
     return { href: "/groups", label: "← Back to Group Management" };
   }
 
+  if (pathname.startsWith("/projects/") && pathname !== "/projects") {
+    return { href: "/projects", label: "← Back to Project Management" };
+  }
+
   if (pathname.startsWith("/admin/") && pathname !== "/admin") {
     return { href: "/admin", label: "← Back to Administration" };
   }
@@ -64,6 +68,7 @@ function getBackLink(pathname: string) {
       "/groups",
       "/my-groups",
       "/prayer-board",
+      "/projects",
     ].includes(pathname)
   ) {
     return { href: "/dashboard", label: "← Back to Dashboard" };

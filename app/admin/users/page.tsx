@@ -82,10 +82,11 @@ export default async function AdminPage() {
         </details>
 
         <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-          <div className="grid grid-cols-[1.1fr_1.4fr_0.7fr_0.7fr_1fr_auto] gap-4 border-b border-white/10 px-5 py-3 text-xs uppercase tracking-[0.18em] text-neutral-500 max-lg:hidden">
+          <div className="grid grid-cols-[1.1fr_1.4fr_0.7fr_0.9fr_0.7fr_1fr_auto] gap-4 border-b border-white/10 px-5 py-3 text-xs uppercase tracking-[0.18em] text-neutral-500 max-lg:hidden">
             <span>Name</span>
             <span>Email</span>
             <span>Admin</span>
+            <span>Projects</span>
             <span>Reset</span>
             <span>Last Sign In</span>
             <span className="text-right">Actions</span>
@@ -179,6 +180,7 @@ function UserRow({
     firstName: string;
     lastName: string;
     isAdmin: boolean;
+    canAccessProjects: boolean;
     mustResetPassword: boolean;
     lastSignInAt: string | null;
   };
@@ -187,7 +189,7 @@ function UserRow({
 
   return (
     <details className="group">
-      <summary className="grid cursor-pointer list-none gap-3 px-5 py-4 transition hover:bg-white/[0.05] marker:hidden lg:grid-cols-[1.1fr_1.4fr_0.7fr_0.7fr_1fr_auto] lg:items-center lg:gap-4">
+      <summary className="grid cursor-pointer list-none gap-3 px-5 py-4 transition hover:bg-white/[0.05] marker:hidden lg:grid-cols-[1.1fr_1.4fr_0.7fr_0.9fr_0.7fr_1fr_auto] lg:items-center lg:gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 lg:hidden">
             Name
@@ -217,6 +219,16 @@ function UserRow({
             </span>
           ) : (
             <span className="text-neutral-500">User</span>
+          )}
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 lg:hidden">
+            Projects
+          </p>
+          {user.canAccessProjects ? (
+            <span className="text-neutral-200">Enabled</span>
+          ) : (
+            <span className="text-neutral-500">No</span>
           )}
         </div>
         <div>
@@ -292,6 +304,15 @@ function UserRow({
               className="h-4 w-4 rounded border-white/20 bg-neutral-900 text-lime-400 accent-lime-400 disabled:opacity-60"
             />
             Admin
+          </label>
+          <label className="flex items-end gap-2 pb-3 text-sm text-neutral-300">
+            <input
+              type="checkbox"
+              name="canAccessProjects"
+              defaultChecked={user.canAccessProjects}
+              className="h-4 w-4 rounded border-white/20 bg-neutral-900 text-lime-400 accent-lime-400"
+            />
+            Project Management
           </label>
           {user.id === currentUserId ? (
             <p className="text-xs text-neutral-500 md:col-span-2 xl:col-span-4">

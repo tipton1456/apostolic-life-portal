@@ -1,5 +1,6 @@
 import { getLeaderGroupsForEmail } from "@/lib/elvanto-groups";
 import { getHousehold } from "@/lib/elvanto";
+import { isCurrentUserProjectManager } from "@/lib/project-management";
 import { isCurrentUserPortalAdmin } from "@/lib/portal-users";
 import {
   getPlanningCenterLeaderTeamsForEmail,
@@ -23,12 +24,14 @@ export default async function SiteNavigation({
     planningCenterLeaderTeams,
     planningCenterProfilePicture,
     isPortalAdmin,
+    canAccessProjects,
   ] = await Promise.all([
     getHousehold(user.email ?? undefined),
     getLeaderGroupsForEmail(user.email ?? undefined),
     getPlanningCenterLeaderTeamsForEmail(user.email ?? undefined),
     getPlanningCenterProfilePicture(user.email ?? undefined),
     user.isDemo ? false : isCurrentUserPortalAdmin(),
+    user.isDemo ? false : isCurrentUserProjectManager(),
   ]);
   const memberName = household?.primary
     ? `${household.primary.firstName} ${household.primary.lastName}`
@@ -43,6 +46,9 @@ export default async function SiteNavigation({
     { href: "/resources", label: "Resources" },
     { href: "/my-groups", label: "My Groups" },
     { href: "/prayer-board", label: "Prayer Board" },
+    ...(canAccessProjects
+      ? [{ href: "/projects", label: "Project Management" }]
+      : []),
     ...(isPortalAdmin ? [{ href: "/admin", label: "Administration" }] : []),
     ...(leaderGroups.length > 0 || planningCenterLeaderTeams.length > 0
       ? [{ href: "/groups", label: "Group Management" }]

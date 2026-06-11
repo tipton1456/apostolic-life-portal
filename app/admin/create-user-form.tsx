@@ -60,6 +60,14 @@ export default function CreateUserForm() {
         />
         Admin
       </label>
+      <label className="flex items-end gap-2 pb-3 text-sm text-neutral-300">
+        <input
+          type="checkbox"
+          name="canAccessProjects"
+          className="h-4 w-4 rounded border-white/20 bg-neutral-900 text-lime-400 accent-lime-400"
+        />
+        Project Management
+      </label>
       <AdminFormButton pendingLabel="Creating..." className="lg:col-start-5">
         Create User
       </AdminFormButton>

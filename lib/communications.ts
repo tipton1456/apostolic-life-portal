@@ -40,6 +40,7 @@ type CommunicationRecipientRow = {
 };
 
 export type CommunicationLog = {
+  id: string;
   attachmentNames: string[];
   channel: string;
   createdAt: string;
@@ -540,6 +541,7 @@ export async function listCommunicationLogs(): Promise<CommunicationLog[]> {
   }
 
   return ((batches ?? []) as CommunicationBatchRow[]).map((batch) => ({
+    id: batch.id,
     attachmentNames: batch.attachment_names ?? [],
     channel: batch.channel,
     createdAt: batch.created_at,
