@@ -15,6 +15,7 @@ import {
   resolveTaskAssigneeFromForm,
   sendTaskAssignmentNotifications,
 } from "@/lib/project-participant-onboarding";
+import { isTaskOverdue } from "@/lib/project-management-utils";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -73,6 +74,17 @@ export type ProjectSummary = Project & {
   outstandingTasks: number;
   overdueTasks: number;
   completionPercent: number;
+};
+
+export type AccessibleProjectTask = {
+  id: string;
+  projectId: string;
+  projectName: string;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  dueDate: string | null;
+  isOverdue: boolean;
 };
 
 export type ProjectDashboard = {
@@ -238,6 +250,135 @@ export async function listProjects(): Promise<ProjectSummary[]> {
       ...stats,
     };
   });
+}
+
+export async function listAccessibleProjectTasks(
+  limit = 8,
+): Promise<AccessibleProjectTask[]> {
+  if (!(await canCurrentUserAccessProjects())) {
+    return [];
+  }
+
+  const currentUser = await getCurrentPortalUser();
+
+  if (!currentUser) {
+    return [];
+  }
+
+  const isManager = currentUser.isAdmin || currentUser.canAccessProjects;
+  const supabase = await createClient();
+  let projectIds: string[] | null = null;
+
+  if (!isManager) {
+    const { data: memberships, error } = await supabase
+      .from("project_members")
+      .select("project_id")
+      .eq("user_id", currentUser.id);
+
+    if (error) {
+      console.error("Project task membership lookup failed:", error);
+      throw new Error("Unable to load project tasks.");
+    }
+
+    projectIds = (memberships ?? []).map((membership) => membership.project_id);
+
+    if (projectIds.length === 0) {
+      return [];
+    }
+  }
+
+  let query = supabase
+    .from("project_tasks")
+    .select("id,project_id,title,status,priority,due_date")
+    .eq("assigned_to", currentUser.id)
+    .neq("status", "completed")
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .limit(limit);
+
+  if (projectIds) {
+    query = query.in("project_id", projectIds);
+  }
+
+  const { data: tasks, error: taskError } = await query;
+
+  if (taskError) {
+    console.error("Accessible project task lookup failed:", taskError);
+    throw new Error("Unable to load project tasks.");
+  }
+
+  const taskRows = (tasks ?? []) as Array<{
+    id: string;
+    project_id: string;
+    title: string;
+    status: TaskStatus;
+    priority: TaskPriority;
+    due_date: string | null;
+  }>;
+
+  if (taskRows.length === 0) {
+    return [];
+  }
+
+  const uniqueProjectIds = [...new Set(taskRows.map((task) => task.project_id))];
+  const { data: projects, error: projectError } = await supabase
+    .from("projects")
+    .select("id,name")
+    .in("id", uniqueProjectIds);
+
+  if (projectError) {
+    console.error("Accessible project task project lookup failed:", projectError);
+    throw new Error("Unable to load project tasks.");
+  }
+
+  const projectNameById = new Map(
+    (projects ?? []).map((project) => [project.id, project.name as string]),
+  );
+
+  return taskRows
+    .map((task) => {
+      const mappedTask: ProjectTask = {
+        id: task.id,
+        projectId: task.project_id,
+        title: task.title,
+        description: "",
+        status: task.status,
+        priority: task.priority,
+        startDate: null,
+        dueDate: task.due_date,
+        completedAt: null,
+        sortOrder: 0,
+        assignedTo: currentUser.id,
+        assignedName: null,
+        createdBy: "",
+        createdAt: "",
+        updatedAt: "",
+      };
+
+      return {
+        id: task.id,
+        projectId: task.project_id,
+        projectName: projectNameById.get(task.project_id) ?? "Unknown project",
+        title: task.title,
+        status: task.status,
+        priority: task.priority,
+        dueDate: task.due_date,
+        isOverdue: isTaskOverdue(mappedTask),
+      };
+    })
+    .sort((left, right) => {
+      if (left.isOverdue !== right.isOverdue) {
+        return left.isOverdue ? -1 : 1;
+      }
+
+      if (left.dueDate && right.dueDate) {
+        return left.dueDate.localeCompare(right.dueDate);
+      }
+
+      if (left.dueDate) return -1;
+      if (right.dueDate) return 1;
+
+      return left.title.localeCompare(right.title);
+    });
 }
 
 export async function listAssignablePortalUsers(): Promise<

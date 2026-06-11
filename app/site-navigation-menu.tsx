@@ -14,6 +14,7 @@ type SiteNavigationMenuProps = {
   memberName: string;
   navigationItems: NavigationItem[];
   picture?: string;
+  pictureCacheKey?: string;
 };
 
 export default function SiteNavigationMenu({
@@ -21,6 +22,7 @@ export default function SiteNavigationMenu({
   memberName,
   navigationItems,
   picture,
+  pictureCacheKey,
 }: SiteNavigationMenuProps) {
   const pathname = usePathname();
 
@@ -31,6 +33,7 @@ export default function SiteNavigationMenu({
       memberName={memberName}
       navigationItems={navigationItems}
       picture={picture}
+      pictureCacheKey={pictureCacheKey}
     />
   );
 }
@@ -40,10 +43,14 @@ function SiteNavigationMenuContent({
   memberName,
   navigationItems,
   picture,
+  pictureCacheKey,
 }: SiteNavigationMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pictureSrc = picture
+    ? appendCacheKeyToUrl(picture, pictureCacheKey)
+    : undefined;
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -82,9 +89,9 @@ function SiteNavigationMenuContent({
         onClick={() => setIsOpen((current) => !current)}
         className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-neutral-950/95 px-3 py-2 text-sm font-semibold text-neutral-100 shadow-lg shadow-black/30 transition hover:border-lime-400/60 sm:px-4 sm:py-3"
       >
-        {picture ? (
+        {pictureSrc ? (
           <img
-            src={picture}
+            src={pictureSrc}
             alt={memberName}
             className="h-7 w-7 rounded-full object-cover"
           />
@@ -142,4 +149,12 @@ function getInitials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
+}
+
+function appendCacheKeyToUrl(url: string, cacheKey?: string) {
+  if (!cacheKey) return url;
+
+  const separator = url.includes("?") ? "&" : "?";
+
+  return `${url}${separator}portal_cache=${encodeURIComponent(cacheKey)}`;
 }

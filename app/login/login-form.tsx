@@ -79,10 +79,12 @@ export default function LoginForm({ nextPath = "/dashboard" }: { nextPath?: stri
       }
 
       if (portalUser?.must_reset_password) {
+        await refreshElvantoProfilePicture();
         window.location.href = `/change-password?next=${encodeURIComponent(redirectPath)}`;
         return;
       }
 
+      await refreshElvantoProfilePicture();
       window.location.href = redirectPath;
     } catch (error) {
       setMessage(
@@ -147,6 +149,17 @@ export default function LoginForm({ nextPath = "/dashboard" }: { nextPath?: stri
       {message && <p className="text-sm text-neutral-300">{message}</p>}
     </form>
   );
+}
+
+async function refreshElvantoProfilePicture() {
+  try {
+    await fetch("/api/profile/refresh-elvanto-picture", {
+      credentials: "include",
+      method: "POST",
+    });
+  } catch (error) {
+    console.error("Profile picture refresh failed:", error);
+  }
 }
 
 function convertSupabaseCookiesToSessionCookies() {

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { sampleHousehold } from "./sample-household";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -80,6 +81,7 @@ type ContactUpdateInput = {
 };
 
 const PERSON_DETAIL_FIELDS = [
+  "picture",
   "family",
   "birthday",
   "mailing_address",
@@ -105,6 +107,105 @@ export async function getHousehold(email?: string): Promise<Household | null> {
   if (!email) return sampleHousehold;
 
   return getHouseholdForEmail(email, true);
+}
+
+export async function getElvantoProfilePicture(email?: string) {
+  if (isDemoEmail(email) || (await isDemoMode())) {
+    return sampleHousehold.primary.picture ?? null;
+  }
+
+  if (!email) return null;
+
+  const authorization = getElvantoAuthorization();
+
+  if (!authorization) return null;
+
+  try {
+    const primaryResult = await searchPeople(authorization, {
+      "search[email]": email,
+    });
+    const primaryPeople = normalizeArray<ElvantoPerson>(
+      primaryResult?.people?.person,
+    );
+    const primaryPerson =
+      primaryPeople.find(
+        (person) => person.family_relationship === "Primary Contact",
+      ) ?? primaryPeople[0];
+
+    return primaryPerson?.picture?.trim() || null;
+  } catch (error) {
+    console.error("Elvanto profile picture lookup failed:", error);
+    return null;
+  }
+}
+
+export async function refreshElvantoProfilePictureForCurrentUser() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user?.email) {
+    return null;
+  }
+
+  const picture = await getElvantoProfilePicture(user.email);
+
+  if (!picture) {
+    return null;
+  }
+
+  const refreshedAt = new Date().toISOString();
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(user.id, {
+    user_metadata: {
+      ...user.user_metadata,
+      elvanto_profile_picture: picture,
+      elvanto_profile_picture_refreshed_at: refreshedAt,
+    },
+  });
+
+  if (error) {
+    console.error("Elvanto profile picture metadata update failed:", error);
+    return null;
+  }
+
+  return {
+    cacheKey: refreshedAt,
+    picture,
+  };
+}
+
+export async function getMenuProfilePicture(email?: string, isDemo = false) {
+  if (isDemo || isDemoEmail(email)) {
+    return {
+      cacheKey: "demo",
+      picture: sampleHousehold.primary.picture ?? null,
+    };
+  }
+
+  if (!email) {
+    return { cacheKey: null, picture: null };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const metadataPicture =
+    typeof user?.user_metadata?.elvanto_profile_picture === "string"
+      ? user.user_metadata.elvanto_profile_picture
+      : null;
+  const metadataCacheKey =
+    typeof user?.user_metadata?.elvanto_profile_picture_refreshed_at === "string"
+      ? user.user_metadata.elvanto_profile_picture_refreshed_at
+      : null;
+  const livePicture = metadataPicture || (await getElvantoProfilePicture(email));
+
+  return {
+    cacheKey: metadataCacheKey,
+    picture: livePicture,
+  };
 }
 
 export async function getHouseholdForAdminClone(
@@ -169,6 +270,10 @@ async function getHouseholdForEmail(
 
     const detailPerson =
       normalizeArray<ElvantoPerson>(detailResult?.person)[0] ?? primaryPerson;
+    const personWithPicture = {
+      ...detailPerson,
+      picture: detailPerson.picture ?? primaryPerson.picture,
+    };
 
     const familyMembers = normalizeArray<ElvantoFamilyMember>(
       detailPerson?.family?.family_member,
@@ -194,9 +299,9 @@ async function getHouseholdForEmail(
 
     return {
       primary: {
-        ...mapElvantoPerson(detailPerson),
-        address: formatAddress(detailPerson),
-        addressFields: getAddressFields(detailPerson),
+        ...mapElvantoPerson(personWithPicture),
+        address: formatAddress(personWithPicture),
+        addressFields: getAddressFields(personWithPicture),
       },
       family: familyDetails,
     };

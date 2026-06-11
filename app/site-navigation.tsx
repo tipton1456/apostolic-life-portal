@@ -1,11 +1,9 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { getLeaderGroupsForEmail } from "@/lib/elvanto-groups";
-import { getHousehold } from "@/lib/elvanto";
+import { getHousehold, getMenuProfilePicture } from "@/lib/elvanto";
 import { canCurrentUserAccessProjects } from "@/lib/project-management";
 import { isCurrentUserPortalAdmin } from "@/lib/portal-users";
-import {
-  getPlanningCenterLeaderTeamsForEmail,
-  getPlanningCenterProfilePicture,
-} from "@/lib/planning-center";
+import { getPlanningCenterLeaderTeamsForEmail } from "@/lib/planning-center";
 import { getCurrentSessionUser } from "@/lib/demo";
 import SiteNavigationMenu from "./site-navigation-menu";
 
@@ -14,6 +12,8 @@ export default async function SiteNavigation({
 }: {
   className?: string;
 }) {
+  noStore();
+
   const user = await getCurrentSessionUser();
 
   if (!user) return null;
@@ -22,14 +22,14 @@ export default async function SiteNavigation({
     household,
     leaderGroups,
     planningCenterLeaderTeams,
-    planningCenterProfilePicture,
+    menuProfilePicture,
     isPortalAdmin,
     canAccessProjects,
   ] = await Promise.all([
     getHousehold(user.email ?? undefined),
     getLeaderGroupsForEmail(user.email ?? undefined),
     getPlanningCenterLeaderTeamsForEmail(user.email ?? undefined),
-    getPlanningCenterProfilePicture(user.email ?? undefined),
+    getMenuProfilePicture(user.email ?? undefined, user.isDemo),
     user.isDemo ? false : isCurrentUserPortalAdmin(),
     user.isDemo ? false : canCurrentUserAccessProjects(),
   ]);
@@ -63,7 +63,8 @@ export default async function SiteNavigation({
       className={className}
       memberName={memberName}
       navigationItems={navigationItems}
-      picture={planningCenterProfilePicture ?? household?.primary.picture}
+      picture={menuProfilePicture.picture ?? household?.primary.picture}
+      pictureCacheKey={menuProfilePicture.cacheKey ?? undefined}
     />
   );
 }

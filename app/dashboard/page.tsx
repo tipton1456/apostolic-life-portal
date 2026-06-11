@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import ProjectFilesPreview from "@/app/projects/project-files-preview";
+import ProjectTasksPreview from "@/app/projects/project-tasks-preview";
 import { getUpcomingEvents } from "@/lib/events";
 import { getPrayerBoardMessages } from "@/lib/groupme";
 import { getUpcomingAssignments } from "@/lib/planning-center";
 import { getCurrentSessionUser } from "@/lib/demo";
 import {
-  listAccessibleProjectFiles,
-  shouldShowProjectFilesForCurrentUser,
-} from "@/lib/project-files";
+  canCurrentUserAccessProjects,
+  listAccessibleProjectTasks,
+} from "@/lib/project-management";
 
 export default async function DashboardPage() {
   const user = await getCurrentSessionUser();
@@ -17,15 +17,15 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const [assignments, prayerBoard, events, showProjectFiles] = await Promise.all([
+  const [assignments, prayerBoard, events, showProjectTasks] = await Promise.all([
     getUpcomingAssignments(user.email ?? undefined),
     getPrayerBoardMessages(5),
     getUpcomingEvents(3),
-    user.isDemo ? Promise.resolve(false) : shouldShowProjectFilesForCurrentUser(),
+    user.isDemo ? Promise.resolve(false) : canCurrentUserAccessProjects(),
   ]);
-  const projectFiles = showProjectFiles
-    ? await listAccessibleProjectFiles(8).catch((error) => {
-        console.error("Dashboard project files preview failed:", error);
+  const projectTasks = showProjectTasks
+    ? await listAccessibleProjectTasks(8).catch((error) => {
+        console.error("Dashboard project tasks preview failed:", error);
         return [];
       })
     : [];
@@ -42,16 +42,6 @@ export default async function DashboardPage() {
             details, schedules, events, and future church resources.
           </p>
         </header>
-
-        {showProjectFiles ? (
-          <section className="mb-10">
-            <ProjectFilesPreview
-              files={projectFiles}
-              title="Your Project Files"
-              viewAllHref="/projects/files"
-            />
-          </section>
-        ) : null}
 
         <section className="mb-10">
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
@@ -127,6 +117,16 @@ export default async function DashboardPage() {
             )}
           </div>
         </section>
+
+        {showProjectTasks ? (
+          <section className="mb-10">
+            <ProjectTasksPreview
+              tasks={projectTasks}
+              title="Your Project Tasks"
+              viewAllHref="/projects"
+            />
+          </section>
+        ) : null}
 
         <section className="mb-10">
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
