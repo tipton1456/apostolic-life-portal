@@ -327,20 +327,44 @@ class ReportPdfRenderer {
     managerNames: string[];
     participantNames: string[];
   }) {
-    const logoDims = this.logo.scaleToFit(220, 56);
-    const logoX = (PAGE_WIDTH - logoDims.width) / 2;
+    const logoDims = this.logo.scaleToFit(180, 48);
+    const logoX = MARGIN;
+    const logoTop = this.y;
+    const logoBottom = logoTop - logoDims.height;
+
     this.page.drawImage(this.logo, {
       x: logoX,
-      y: this.y - logoDims.height,
+      y: logoBottom,
       width: logoDims.width,
       height: logoDims.height,
     });
-    this.y -= logoDims.height + 24;
 
-    this.drawCenteredText("Project Summary Report", 18, this.bold, COLORS.text);
-    this.y -= 10;
-    this.drawCenteredText(context.project.name, 14, this.bold, COLORS.text);
-    this.y -= 22;
+    const titleText = `${context.project.name.toUpperCase()} PROJECT SUMMARY REPORT`;
+    const titleX = logoX + logoDims.width + 16;
+    const titleSize = 14;
+    const titleLineHeight = titleSize + 4;
+    const titleLines = wrapText(
+      titleText,
+      PAGE_WIDTH - MARGIN - titleX,
+      this.bold,
+      titleSize,
+    );
+    const titleBlockHeight = titleLines.length * titleLineHeight;
+    let titleBaseline = logoBottom + (logoDims.height + titleBlockHeight) / 2 - 4;
+
+    for (const line of titleLines) {
+      this.page.drawText(line, {
+        x: titleX,
+        y: titleBaseline,
+        size: titleSize,
+        font: this.bold,
+        color: COLORS.text,
+      });
+      titleBaseline -= titleLineHeight;
+    }
+
+    const headerHeight = Math.max(logoDims.height, titleBlockHeight);
+    this.y = logoTop - headerHeight - 16;
 
     const details = [
       `Project Status: ${formatProjectStatus(context.project.status)}`,
@@ -348,16 +372,10 @@ class ReportPdfRenderer {
       `Target End Date: ${formatDisplayDate(context.project.targetEndDate)}`,
       `PM: ${formatNameList(context.managerNames)}`,
       `Participants: ${formatNameList(context.participantNames)}`,
-      `Report Generated: ${formatReportDateTime(context.generatedAt.toISOString())}`,
     ];
 
     for (const line of details) {
       this.drawWrappedLine(line, 11, this.regular, COLORS.muted, 14);
-    }
-
-    if (context.project.description.trim()) {
-      this.y -= 8;
-      this.drawWrappedLine(`Description: ${context.project.description}`, 11, this.regular, COLORS.muted, 14);
     }
 
     this.y -= 12;
@@ -525,23 +543,6 @@ class ReportPdfRenderer {
         color: COLORS.muted,
       });
     }
-  }
-
-  private drawCenteredText(
-    text: string,
-    size: number,
-    font: PDFFont,
-    color: ReturnType<typeof rgb>,
-  ) {
-    const width = font.widthOfTextAtSize(text, size);
-    this.page.drawText(text, {
-      x: (PAGE_WIDTH - width) / 2,
-      y: this.y,
-      size,
-      font,
-      color,
-    });
-    this.y -= size + 8;
   }
 
   private drawWrappedLine(
