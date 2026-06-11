@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ProjectTask } from "@/lib/project-management";
+import type { ProjectTask, TaskStatus } from "@/lib/project-management";
 import type { ProjectTaskUpdate } from "@/lib/project-task-updates";
 import {
   formatDisplayDate,
@@ -17,7 +17,6 @@ export default function TaskListTable({
   currentUserId,
   canManageTasks,
   taskUpdatesByTaskId,
-  emphasizeOverdue = false,
   highlightedTaskId,
 }: {
   tasks: ProjectTask[];
@@ -25,13 +24,8 @@ export default function TaskListTable({
   currentUserId: string;
   canManageTasks: boolean;
   taskUpdatesByTaskId: Record<string, ProjectTaskUpdate[]>;
-  emphasizeOverdue?: boolean;
   highlightedTaskId?: string;
 }) {
-  if (tasks.length === 0) {
-    return null;
-  }
-
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[920px]">
@@ -52,7 +46,7 @@ export default function TaskListTable({
             const canEdit =
               canManageTasks ||
               (task.assignedTo === currentUserId && task.status !== "completed");
-            const overdue = emphasizeOverdue || isTaskOverdue(task);
+            const overdue = isTaskOverdue(task);
 
             return (
               <div
@@ -73,7 +67,7 @@ export default function TaskListTable({
                 <p className="truncate text-neutral-300">
                   {task.assignedName ?? "Unassigned"}
                 </p>
-                <p className="text-neutral-300">{formatTaskStatus(task.status)}</p>
+                <TaskStatusBadge status={task.status} />
                 <p className="text-neutral-300">{formatTaskPriority(task.priority)}</p>
                 <p
                   className={
@@ -99,5 +93,22 @@ export default function TaskListTable({
         </div>
       </div>
     </div>
+  );
+}
+
+function TaskStatusBadge({ status }: { status: TaskStatus }) {
+  const styles: Record<TaskStatus, string> = {
+    todo: "border-white/10 bg-white/[0.04] text-neutral-300",
+    in_progress: "border-sky-400/30 bg-sky-400/10 text-sky-200",
+    completed: "border-lime-400/30 bg-lime-400/10 text-lime-200",
+    blocked: "border-red-400/30 bg-red-400/10 text-red-200",
+  };
+
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${styles[status]}`}
+    >
+      {formatTaskStatus(status)}
+    </span>
   );
 }

@@ -2,29 +2,21 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PortalIcon } from "@/app/icons";
-import AdminFormButton from "@/app/admin/admin-form-button";
 import HighlightTask from "@/app/projects/highlight-task";
 import ProjectSettingsModal from "@/app/projects/project-settings-modal";
 import ProjectTaskModals from "@/app/projects/project-task-modals";
 import ProjectTeamPanel from "@/app/projects/project-team-panel";
-import TaskAssigneeField from "@/app/projects/task-assignee-field";
-import TaskListTable from "@/app/projects/task-list-table";
+import ProjectTaskGrid from "@/app/projects/project-task-grid";
 import { getCurrentSessionUser } from "@/lib/demo";
 import { listProjectFiles } from "@/lib/project-files";
 import type { ProjectTaskFile } from "@/lib/project-files";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import {
   canCurrentUserAccessProjects,
-  createProjectTask,
   getProjectDashboard,
   listAssignablePortalUsers,
   listProjectManagersForAssignee,
-  type ProjectTask,
 } from "@/lib/project-management";
-import {
-  TASK_PRIORITY_OPTIONS,
-  TASK_STATUS_OPTIONS,
-} from "@/lib/project-task-options";
 import {
   listProjectTaskUpdates,
   type ProjectTaskUpdate,
@@ -33,7 +25,6 @@ import {
   formatDisplayDate,
   formatProjectStatus,
   getProjectStatusIconName,
-  isTaskOverdue,
 } from "@/lib/project-management-utils";
 
 export default async function ProjectDashboardPage({
@@ -97,9 +88,6 @@ export default async function ProjectDashboardPage({
 
   const { project, members, tasks, stats, permissions } = dashboard;
   const isProjectCompleted = project.status === "completed";
-  const outstandingTasks = tasks.filter((task) => task.status !== "completed");
-  const overdueTasks = tasks.filter((task) => isTaskOverdue(task));
-  const completedTasks = tasks.filter((task) => task.status === "completed");
   const memberIds = new Set(members.map((member) => member.userId));
   const availableUsers = assignableUsers.filter((candidate) => !memberIds.has(candidate.id));
   const assigneeOptions = [
@@ -273,83 +261,15 @@ export default async function ProjectDashboardPage({
           </div>
         </section>
 
-        {permissions.canManageTasks ? (
-          <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-2xl font-semibold marker:hidden">
-              <span>Add Task</span>
-              <span className="rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-neutral-950">
-                New Task
-              </span>
-            </summary>
-            <form
-              action={createProjectTask}
-              className="mt-6 grid gap-4 border-t border-white/10 pt-5 md:grid-cols-2 xl:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.9fr_auto]"
-            >
-              <input type="hidden" name="projectId" value={project.id} />
-              <Field label="Task title" name="title" required />
-              <Field label="Description" name="description" />
-              <Field label="Start date" name="startDate" type="date" />
-              <Field label="Due date" name="dueDate" type="date" />
-              <SelectField
-                label="Status"
-                name="status"
-                defaultValue="todo"
-                options={TASK_STATUS_OPTIONS}
-              />
-              <SelectField
-                label="Priority"
-                name="priority"
-                defaultValue="medium"
-                options={TASK_PRIORITY_OPTIONS}
-              />
-              <TaskAssigneeField
-                label="Assigned to"
-                name="assignedTo"
-                defaultValue=""
-                options={assigneeOptions}
-              />
-              <AdminFormButton pendingLabel="Adding..." className="md:col-start-2 xl:col-start-8">
-                Add Task
-              </AdminFormButton>
-            </form>
-          </details>
-        ) : null}
-
-        <TaskSection
-          title="Outstanding Tasks"
-          description="Open tasks that still need attention."
-          emptyMessage="No outstanding tasks. Everything is complete."
-          tasks={outstandingTasks}
-          projectId={project.id}
-          currentUserId={portalUser.id}
+        <ProjectTaskGrid
+          assigneeOptions={assigneeOptions}
           canManageTasks={permissions.canManageTasks}
-          highlightedTaskId={highlightedTaskId}
-          taskUpdatesByTaskId={taskUpdatesByTaskId}
-        />
-
-        <TaskSection
-          title="Overdue Tasks"
-          description="Tasks past their due date and not yet completed."
-          emptyMessage="No overdue tasks."
-          tasks={overdueTasks}
-          projectId={project.id}
           currentUserId={portalUser.id}
-          canManageTasks={permissions.canManageTasks}
           highlightedTaskId={highlightedTaskId}
-          taskUpdatesByTaskId={taskUpdatesByTaskId}
-          emphasizeOverdue
-        />
-
-        <TaskSection
-          title="Completed Tasks"
-          description="Finished work for this project."
-          emptyMessage="No completed tasks yet."
-          tasks={completedTasks}
+          isProjectCompleted={isProjectCompleted}
           projectId={project.id}
-          currentUserId={portalUser.id}
-          canManageTasks={permissions.canManageTasks}
-          highlightedTaskId={highlightedTaskId}
           taskUpdatesByTaskId={taskUpdatesByTaskId}
+          tasks={tasks}
         />
       </div>
 
@@ -399,52 +319,6 @@ function buildParticipantAssigneeOptions(
   return Array.from(options.entries()).map(([value, label]) => ({ value, label }));
 }
 
-function TaskSection({
-  title,
-  description,
-  emptyMessage,
-  tasks,
-  projectId,
-  currentUserId,
-  canManageTasks,
-  highlightedTaskId,
-  taskUpdatesByTaskId,
-  emphasizeOverdue = false,
-}: {
-  title: string;
-  description: string;
-  emptyMessage: string;
-  tasks: ProjectTask[];
-  projectId: string;
-  currentUserId: string;
-  canManageTasks: boolean;
-  highlightedTaskId?: string;
-  taskUpdatesByTaskId: Record<string, ProjectTaskUpdate[]>;
-  emphasizeOverdue?: boolean;
-}) {
-  return (
-    <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-      <div className="border-b border-white/10 px-5 py-4">
-        <h2 className="text-2xl font-semibold text-lime-200">{title}</h2>
-        <p className="mt-2 text-sm text-neutral-400">{description}</p>
-      </div>
-      {tasks.length > 0 ? (
-        <TaskListTable
-          canManageTasks={canManageTasks}
-          currentUserId={currentUserId}
-          emphasizeOverdue={emphasizeOverdue}
-          highlightedTaskId={highlightedTaskId}
-          projectId={projectId}
-          taskUpdatesByTaskId={taskUpdatesByTaskId}
-          tasks={tasks}
-        />
-      ) : (
-        <p className="px-5 py-4 text-sm text-neutral-400">{emptyMessage}</p>
-      )}
-    </section>
-  );
-}
-
 function MetricCard({
   label,
   value,
@@ -475,58 +349,3 @@ function MetricCard({
   );
 }
 
-function Field({
-  label,
-  name,
-  type = "text",
-  required,
-  defaultValue,
-}: {
-  label: string;
-  name: string;
-  type?: string;
-  required?: boolean;
-  defaultValue?: string;
-}) {
-  return (
-    <label className="block text-sm font-medium text-neutral-300">
-      {label}
-      <input
-        name={name}
-        type={type}
-        required={required}
-        defaultValue={defaultValue}
-        className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
-      />
-    </label>
-  );
-}
-
-function SelectField({
-  label,
-  name,
-  defaultValue,
-  options,
-}: {
-  label: string;
-  name: string;
-  defaultValue?: string;
-  options: ReadonlyArray<{ value: string; label: string }>;
-}) {
-  return (
-    <label className="block text-sm font-medium text-neutral-300">
-      {label}
-      <select
-        name={name}
-        defaultValue={defaultValue}
-        className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
-      >
-        {options.map((option) => (
-          <option key={option.value || "unassigned"} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
