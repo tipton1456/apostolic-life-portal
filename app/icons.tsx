@@ -18,6 +18,7 @@ import {
   PauseCircle,
   Pencil,
   Rocket,
+  ScrollText,
   Search,
   Settings,
   ShieldCheck,
@@ -47,6 +48,7 @@ export type PortalIconName =
   | "onHold"
   | "prayer"
   | "projects"
+  | "report"
   | "resources"
   | "search"
   | "settings"
@@ -75,6 +77,7 @@ const iconMap: Record<PortalIconName, LucideIcon> = {
   onHold: PauseCircle,
   prayer: HeartHandshake,
   projects: FolderKanban,
+  report: ScrollText,
   resources: FileText,
   search: Search,
   settings: Settings,
