@@ -8,6 +8,7 @@ import {
   notifyProjectParticipantTaskAssigned,
 } from "@/lib/project-notifications";
 import { CREATE_NEW_ASSIGNEE_VALUE } from "@/lib/project-participant-constants";
+import { setPortalUserProjectRole } from "@/lib/portal-users";
 import { normalizePhoneNumber } from "@/lib/twilio-sms";
 
 export type ResolvedTaskAssignee = {
@@ -112,6 +113,7 @@ async function createOrAttachProjectParticipantFromForm(
 
   if (existingUserId) {
     await ensureProjectMember(projectId, existingUserId, actor.id);
+    await ensurePortalUserIsProjectParticipant(existingUserId);
     await storePortalUserMobilePhone(existingUserId, phone);
 
     return {
@@ -146,6 +148,7 @@ async function createOrAttachProjectParticipantFromForm(
     first_name: firstName,
     last_name: lastName,
     is_admin: false,
+    project_role: "project_participant",
     can_access_projects: false,
     must_reset_password: true,
   });
@@ -200,6 +203,33 @@ async function storePortalUserMobilePhone(userId: string, phone: string) {
 
   if (updateError) {
     console.error("Portal user phone metadata update failed:", updateError);
+  }
+}
+
+async function ensurePortalUserIsProjectParticipant(userId: string) {
+  const admin = createAdminClient();
+  const { data: profile, error } = await admin
+    .from("portal_users")
+    .select("is_admin,project_role,can_access_projects")
+    .eq("id", userId)
+    .maybeSingle<{
+      is_admin: boolean | null;
+      project_role: string | null;
+      can_access_projects: boolean | null;
+    }>();
+
+  if (error) {
+    console.error("Portal user role lookup failed:", error);
+    throw new Error("Unable to validate portal user role.");
+  }
+
+  const isManager =
+    profile?.is_admin ||
+    profile?.project_role === "project_manager" ||
+    profile?.can_access_projects;
+
+  if (!isManager) {
+    await setPortalUserProjectRole(userId, "project_participant");
   }
 }
 

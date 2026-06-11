@@ -7,6 +7,7 @@ import { isMissingRelationError } from "@/lib/project-db-compat";
 import { storeProjectTaskFile } from "@/lib/project-files";
 import { parseProjectTaskUploadFile } from "@/lib/project-files-utils";
 import type { TaskStatus } from "@/lib/project-management";
+import { isPortalProjectManager } from "@/lib/portal-project-roles";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -119,7 +120,7 @@ export async function addProjectTaskUpdate(formData: FormData) {
     throw new Error("Task not found.");
   }
 
-  const isManager = currentUser.isAdmin || currentUser.canAccessProjects;
+  const isManager = isPortalProjectManager(currentUser);
   const isAssignee = task.assigned_to === currentUser.id;
 
   if (!isManager && !isAssignee) {

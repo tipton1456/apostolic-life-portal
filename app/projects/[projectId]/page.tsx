@@ -18,6 +18,7 @@ import {
   deleteProject,
   getProjectDashboard,
   listAssignablePortalUsers,
+  listProjectManagersForAssignee,
   removeProjectMember,
   updateProject,
   uploadProjectImage,
@@ -85,9 +86,12 @@ export default async function ProjectDashboardPage({
     existing.push(update);
     updatesByTaskId.set(update.taskId, existing);
   }
-  const assignableUsers = dashboard?.permissions.canManageMembers
-    ? await listAssignablePortalUsers()
-    : [];
+  const [assignableUsers, projectManagers] = dashboard?.permissions.canManageMembers
+    ? await Promise.all([
+        listAssignablePortalUsers(),
+        listProjectManagersForAssignee(),
+      ])
+    : [[], await listProjectManagersForAssignee().catch(() => [])];
 
   if (!dashboard || !portalUser) {
     notFound();
@@ -107,6 +111,11 @@ export default async function ProjectDashboardPage({
       label: member.fullName,
     })),
   ];
+  const participantAssigneeOptions = buildParticipantAssigneeOptions(
+    projectManagers,
+    members,
+    portalUser.id,
+  );
   const taskFilesByTaskId = Object.fromEntries(filesByTaskId.entries());
   const taskUpdatesByTaskId = Object.fromEntries(updatesByTaskId.entries());
 
@@ -530,8 +539,10 @@ export default async function ProjectDashboardPage({
         <ProjectTaskModals
           assigneeOptions={assigneeOptions}
           canManageTasks={permissions.canManageTasks}
+          canReassignTasks={permissions.canReassignTasks}
           currentUserId={portalUser.id}
           isProjectCompleted={isProjectCompleted}
+          participantAssigneeOptions={participantAssigneeOptions}
           projectId={project.id}
           taskFilesByTaskId={taskFilesByTaskId}
           taskUpdatesByTaskId={taskUpdatesByTaskId}
@@ -540,6 +551,30 @@ export default async function ProjectDashboardPage({
       </Suspense>
     </main>
   );
+}
+
+function buildParticipantAssigneeOptions(
+  managers: Array<{ id: string; fullName: string }>,
+  members: Array<{ userId: string; fullName: string }>,
+  currentUserId: string,
+) {
+  const options = new Map<string, string>([
+    [currentUserId, "Keep assigned to me"],
+  ]);
+
+  for (const manager of managers) {
+    if (manager.id !== currentUserId) {
+      options.set(manager.id, `${manager.fullName} (Project Manager)`);
+    }
+  }
+
+  for (const member of members) {
+    if (member.userId !== currentUserId) {
+      options.set(member.userId, member.fullName);
+    }
+  }
+
+  return Array.from(options.entries()).map(([value, label]) => ({ value, label }));
 }
 
 const PROJECT_STATUS_OPTIONS = [

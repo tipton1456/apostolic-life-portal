@@ -8,11 +8,15 @@ export default function TaskAssigneeField({
   label = "Assigned to",
   defaultValue = "",
   options,
+  allowCreateNew = true,
+  required = false,
 }: {
   name?: string;
   label?: string;
   defaultValue?: string;
   options: Array<{ value: string; label: string }>;
+  allowCreateNew?: boolean;
+  required?: boolean;
 }) {
   const [assignedTo, setAssignedTo] = useState(defaultValue);
   const showCreateFields = assignedTo === CREATE_NEW_ASSIGNEE_VALUE;
@@ -24,6 +28,7 @@ export default function TaskAssigneeField({
         <select
           name={name}
           value={assignedTo}
+          required={required}
           onChange={(event) => setAssignedTo(event.target.value)}
           className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
         >
@@ -32,9 +37,11 @@ export default function TaskAssigneeField({
               {option.label}
             </option>
           ))}
-          <option value={CREATE_NEW_ASSIGNEE_VALUE}>
-            Create account for someone not listed...
-          </option>
+          {allowCreateNew ? (
+            <option value={CREATE_NEW_ASSIGNEE_VALUE}>
+              Create account for someone not listed...
+            </option>
+          ) : null}
         </select>
       </label>
 

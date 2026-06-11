@@ -37,7 +37,9 @@ export default function ProjectTaskModals({
   tasks,
   currentUserId,
   canManageTasks,
+  canReassignTasks,
   assigneeOptions,
+  participantAssigneeOptions,
   taskFilesByTaskId,
   taskUpdatesByTaskId,
   isProjectCompleted,
@@ -46,7 +48,9 @@ export default function ProjectTaskModals({
   tasks: ProjectTask[];
   currentUserId: string;
   canManageTasks: boolean;
+  canReassignTasks: boolean;
   assigneeOptions: AssigneeOption[];
+  participantAssigneeOptions: AssigneeOption[];
   taskFilesByTaskId: Record<string, ProjectTaskFile[]>;
   taskUpdatesByTaskId: Record<string, ProjectTaskUpdate[]>;
   isProjectCompleted: boolean;
@@ -73,9 +77,11 @@ export default function ProjectTaskModals({
 
   const taskFiles = taskFilesByTaskId[activeTask.id] ?? [];
   const taskUpdates = taskUpdatesByTaskId[activeTask.id] ?? [];
+  const isAssignee = activeTask.assignedTo === currentUserId;
   const canEdit =
-    canManageTasks ||
-    (activeTask.assignedTo === currentUserId && activeTask.status !== "completed");
+    canManageTasks || (isAssignee && activeTask.status !== "completed");
+  const canReassignTask =
+    canManageTasks || (canReassignTasks && isAssignee && activeTask.status !== "completed");
   const canAddUpdates = canEdit && !isProjectCompleted;
   const taskHref = `/projects/${projectId}?task=${activeTask.id}`;
   const addUpdateHref = `/projects/${projectId}?task=${activeTask.id}&addUpdate=1`;
@@ -187,11 +193,21 @@ export default function ProjectTaskModals({
                       />
                       <input type="hidden" name="dueDate" value={activeTask.dueDate ?? ""} />
                       <input type="hidden" name="priority" value={activeTask.priority} />
-                      <input
-                        type="hidden"
-                        name="assignedTo"
-                        value={activeTask.assignedTo ?? ""}
-                      />
+                      {canReassignTask ? (
+                        <TaskAssigneeField
+                          label="Hand off to"
+                          name="assignedTo"
+                          defaultValue={activeTask.assignedTo ?? ""}
+                          options={participantAssigneeOptions}
+                          allowCreateNew={false}
+                        />
+                      ) : (
+                        <input
+                          type="hidden"
+                          name="assignedTo"
+                          value={activeTask.assignedTo ?? ""}
+                        />
+                      )}
                     </>
                   )}
                   <ModalSelectField

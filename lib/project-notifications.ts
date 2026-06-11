@@ -166,8 +166,10 @@ async function listProjectManagerContacts() {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("portal_users")
-    .select("id,email,first_name,last_name,is_admin,can_access_projects")
-    .or("is_admin.eq.true,can_access_projects.eq.true");
+    .select("id,email,first_name,last_name,is_admin,project_role,can_access_projects")
+    .or(
+      "is_admin.eq.true,project_role.eq.project_manager,can_access_projects.eq.true",
+    );
 
   if (error) {
     console.error("Project manager lookup failed:", error);

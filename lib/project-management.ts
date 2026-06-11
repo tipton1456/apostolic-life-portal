@@ -16,7 +16,8 @@ import {
   sendTaskAssignmentNotifications,
 } from "@/lib/project-participant-onboarding";
 import { isTaskOverdue } from "@/lib/project-management-utils";
-import { getCurrentPortalUser } from "@/lib/portal-users";
+import { isPortalProjectManager } from "@/lib/portal-project-roles";
+import { getCurrentPortalUser, setPortalUserProjectRole } from "@/lib/portal-users";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -104,6 +105,7 @@ export type ProjectDashboard = {
     canManageProject: boolean;
     canManageMembers: boolean;
     canManageTasks: boolean;
+    canReassignTasks: boolean;
   };
 };
 
@@ -161,7 +163,7 @@ export async function isCurrentUserProjectManager() {
 
   if (!currentUser) return false;
 
-  return currentUser.isAdmin || currentUser.canAccessProjects;
+  return isPortalProjectManager(currentUser);
 }
 
 export async function isCurrentUserProjectParticipant() {
@@ -171,6 +173,10 @@ export async function isCurrentUserProjectParticipant() {
   });
 
   if (!currentUser) return false;
+
+  if (currentUser.projectRole === "project_participant") {
+    return true;
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -195,7 +201,7 @@ export async function canCurrentUserAccessProjects() {
 
 export async function listProjects(): Promise<ProjectSummary[]> {
   const currentUser = await requireProjectAreaAccess();
-  const isManager = currentUser.isAdmin || currentUser.canAccessProjects;
+  const isManager = isPortalProjectManager(currentUser);
   const supabase = await createClient();
 
   let projectIds: string[] | null = null;
@@ -265,7 +271,7 @@ export async function listAccessibleProjectTasks(
     return [];
   }
 
-  const isManager = currentUser.isAdmin || currentUser.canAccessProjects;
+  const isManager = isPortalProjectManager(currentUser);
   const supabase = await createClient();
   let projectIds: string[] | null = null;
 
@@ -381,6 +387,50 @@ export async function listAccessibleProjectTasks(
     });
 }
 
+export async function listProjectManagersForAssignee(): Promise<
+  Array<{
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    fullName: string;
+  }>
+> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("portal_users")
+    .select("id,email,first_name,last_name,is_admin,project_role,can_access_projects")
+    .or(
+      "is_admin.eq.true,project_role.eq.project_manager,can_access_projects.eq.true",
+    )
+    .order("email", { ascending: true });
+
+  if (error) {
+    console.error("Project manager assignee lookup failed:", error);
+    throw new Error("Unable to load project managers.");
+  }
+
+  return ((data ?? []) as Array<PortalUserRow & {
+    is_admin: boolean | null;
+    project_role: string | null;
+    can_access_projects: boolean | null;
+  }>)
+    .filter(
+      (user) =>
+        user.is_admin ||
+        user.project_role === "project_manager" ||
+        user.can_access_projects,
+    )
+    .map((user) => ({
+      id: user.id,
+      email: user.email,
+      firstName: user.first_name ?? "",
+      lastName: user.last_name ?? "",
+      fullName:
+        [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email,
+    }));
+}
+
 export async function listAssignablePortalUsers(): Promise<
   Array<{
     id: string;
@@ -471,6 +521,7 @@ export async function getProjectDashboard(
       canManageProject: access.isManager,
       canManageMembers: access.isManager,
       canManageTasks: access.isManager,
+      canReassignTasks: access.isParticipant,
     },
   };
 }
@@ -691,6 +742,31 @@ export async function addProjectMember(formData: FormData) {
     throw new Error(error.message);
   }
 
+  const admin = createAdminClient();
+  const { data: profile, error: profileError } = await admin
+    .from("portal_users")
+    .select("is_admin,project_role,can_access_projects")
+    .eq("id", userId)
+    .maybeSingle<{
+      is_admin: boolean | null;
+      project_role: string | null;
+      can_access_projects: boolean | null;
+    }>();
+
+  if (profileError) {
+    console.error("Project member role lookup failed:", profileError);
+    throw new Error("Unable to update participant role.");
+  }
+
+  const isManagerProfile =
+    profile?.is_admin ||
+    profile?.project_role === "project_manager" ||
+    profile?.can_access_projects;
+
+  if (!isManagerProfile) {
+    await setPortalUserProjectRole(userId, "project_participant");
+  }
+
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
 }
@@ -845,6 +921,7 @@ export async function updateProjectTask(formData: FormData) {
 
   const isManager = access.isManager;
   const isAssignee = existingTask.assigned_to === currentUser.id;
+  const canReassignAsParticipant = access.isParticipant && isAssignee;
 
   if (!isManager && !isAssignee) {
     redirect("/dashboard");
@@ -864,10 +941,27 @@ export async function updateProjectTask(formData: FormData) {
     ? parseOptionalDate(formData.get("startDate"))
     : undefined;
   const dueDate = isManager ? parseOptionalDate(formData.get("dueDate")) : undefined;
-  const assignee = isManager
-    ? await resolveTaskAssigneeFromForm(formData, projectId, currentUser)
-    : { userId: existingTask.assigned_to, isNewAccount: false };
-  const assignedTo = isManager ? assignee.userId : existingTask.assigned_to;
+
+  let assignee: Awaited<ReturnType<typeof resolveTaskAssigneeFromForm>> = {
+    userId: existingTask.assigned_to,
+    isNewAccount: false,
+  };
+  let assignedTo = existingTask.assigned_to;
+
+  if (isManager) {
+    assignee = await resolveTaskAssigneeFromForm(formData, projectId, currentUser);
+    assignedTo = assignee.userId;
+  } else if (canReassignAsParticipant) {
+    const nextAssignee = String(formData.get("assignedTo") || "").trim();
+
+    if (!nextAssignee) {
+      throw new Error("Choose a project manager or participant to hand off this task.");
+    }
+
+    assignedTo = nextAssignee;
+    assignee = { userId: assignedTo, isNewAccount: false };
+    await ensureAssigneeIsValidParticipantHandoff(projectId, assignedTo);
+  }
 
   if (!id || !projectId || !title) {
     throw new Error("Task ID, project ID, and title are required.");
@@ -889,6 +983,8 @@ export async function updateProjectTask(formData: FormData) {
     updatePayload.start_date = startDate ?? null;
     updatePayload.due_date = dueDate ?? null;
     updatePayload.assigned_to = assignedTo ?? null;
+  } else if (canReassignAsParticipant && assignedTo !== existingTask.assigned_to) {
+    updatePayload.assigned_to = assignedTo ?? null;
   }
 
   const { error } = await supabase
@@ -903,7 +999,7 @@ export async function updateProjectTask(formData: FormData) {
 
   const project = await getProjectRecord(projectId);
   const assignmentChanged =
-    isManager && assignedTo && assignedTo !== existingTask.assigned_to;
+    assignedTo && assignedTo !== existingTask.assigned_to;
   const completedNow =
     status === "completed" && existingTask.status !== "completed";
 
@@ -1050,11 +1146,64 @@ async function ensureAssigneeIsProjectMember(
   }
 }
 
+async function ensureAssigneeIsValidParticipantHandoff(
+  projectId: string,
+  userId: string | null,
+) {
+  if (!userId) {
+    throw new Error("Choose a project manager or participant to hand off this task.");
+  }
+
+  const admin = createAdminClient();
+  const { data: profile, error: profileError } = await admin
+    .from("portal_users")
+    .select("is_admin,project_role,can_access_projects")
+    .eq("id", userId)
+    .maybeSingle<{
+      is_admin: boolean | null;
+      project_role: string | null;
+      can_access_projects: boolean | null;
+    }>();
+
+  if (profileError) {
+    console.error("Participant handoff profile lookup failed:", profileError);
+    throw new Error("Unable to validate assignee.");
+  }
+
+  const isManager =
+    profile?.is_admin ||
+    profile?.project_role === "project_manager" ||
+    profile?.can_access_projects;
+
+  if (isManager) {
+    return;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("project_members")
+    .select("id")
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Participant handoff member validation failed:", error);
+    throw new Error("Unable to validate project member.");
+  }
+
+  if (!data) {
+    throw new Error(
+      "Participants can only hand tasks to a project manager or someone already on this project.",
+    );
+  }
+}
+
 async function getProjectPermissions(
   projectId: string,
   currentUser: NonNullable<Awaited<ReturnType<typeof getCurrentPortalUser>>>,
 ) {
-  const isManager = currentUser.isAdmin || currentUser.canAccessProjects;
+  const isManager = isPortalProjectManager(currentUser);
 
   if (isManager) {
     return {
@@ -1095,7 +1244,7 @@ async function requireProjectManager() {
     redirect("/login?next=/projects");
   }
 
-  if (!currentUser.isAdmin && !currentUser.canAccessProjects) {
+  if (!isPortalProjectManager(currentUser)) {
     redirect("/dashboard");
   }
 
@@ -1109,7 +1258,7 @@ async function requireProjectAreaAccess() {
     redirect("/login?next=/projects");
   }
 
-  if (currentUser.isAdmin || currentUser.canAccessProjects) {
+  if (isPortalProjectManager(currentUser)) {
     return currentUser;
   }
 

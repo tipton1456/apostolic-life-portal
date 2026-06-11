@@ -19,6 +19,7 @@ import {
   normalizeFileRow,
 } from "@/lib/project-db-compat";
 import { canCurrentUserAccessProjects } from "@/lib/project-management";
+import { isPortalProjectManager } from "@/lib/portal-project-roles";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -60,7 +61,7 @@ export async function listAccessibleProjectFiles(
 
   if (!currentUser) return [];
 
-  const isManager = currentUser.isAdmin || currentUser.canAccessProjects;
+  const isManager = isPortalProjectManager(currentUser);
   const supabase = await createClient();
 
   let projectIds: string[] | null = null;
@@ -293,7 +294,7 @@ export async function deleteProjectTaskFile(formData: FormData) {
 
   const currentUser = await getCurrentPortalUser();
   const isManager = Boolean(
-    currentUser?.isAdmin || currentUser?.canAccessProjects,
+    isPortalProjectManager(currentUser ?? {}),
   );
 
   const [{ data: project }, { data: file, error }] = await Promise.all([
@@ -465,7 +466,7 @@ async function requireProjectFilesAccess() {
     redirect("/login?next=/projects/files");
   }
 
-  if (currentUser.isAdmin || currentUser.canAccessProjects) {
+  if (isPortalProjectManager(currentUser)) {
     return currentUser;
   }
 
@@ -490,7 +491,7 @@ async function requireProjectFilesAccess() {
 
 async function requireProjectFilesAccessForProject(projectId: string) {
   const currentUser = await requireProjectFilesAccess();
-  const isManager = currentUser.isAdmin || currentUser.canAccessProjects;
+  const isManager = isPortalProjectManager(currentUser);
 
   if (isManager) return currentUser;
 

@@ -2,6 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import {
+  isPortalProjectManager,
+  parsePortalProjectRole,
+  type PortalProjectRole,
+} from "@/lib/portal-project-roles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,6 +16,7 @@ export type PortalUser = {
   firstName: string;
   lastName: string;
   isAdmin: boolean;
+  projectRole: PortalProjectRole | null;
   canAccessProjects: boolean;
   mustResetPassword: boolean;
   createdAt: string;
@@ -38,10 +44,26 @@ type PortalUserProfile = {
   first_name: string | null;
   last_name: string | null;
   is_admin: boolean | null;
+  project_role: PortalProjectRole | null;
   can_access_projects: boolean | null;
   must_reset_password: boolean | null;
   created_at: string;
 };
+
+const PORTAL_USER_PROFILE_SELECT =
+  "id,email,first_name,last_name,is_admin,project_role,can_access_projects,must_reset_password,created_at";
+
+function mapPortalUserProfile(profile: PortalUserProfile) {
+  const projectRole = profile.project_role ?? null;
+
+  return {
+    projectRole,
+    canAccessProjects: isPortalProjectManager({
+      isAdmin: Boolean(profile.is_admin),
+      projectRole,
+    }),
+  };
+}
 
 type PortalUserAuditLogRow = {
   id: number;
@@ -62,9 +84,7 @@ export async function getCurrentPortalUser() {
 
   const { data, error } = await supabase
     .from("portal_users")
-    .select(
-      "id,email,first_name,last_name,is_admin,can_access_projects,must_reset_password,created_at",
-    )
+    .select(PORTAL_USER_PROFILE_SELECT)
     .eq("id", user.id)
     .maybeSingle<PortalUserProfile>();
 
@@ -73,13 +93,28 @@ export async function getCurrentPortalUser() {
     return null;
   }
 
+  const roleFields = mapPortalUserProfile(
+    data ?? {
+      id: user.id,
+      email: user.email ?? "",
+      first_name: null,
+      last_name: null,
+      is_admin: false,
+      project_role: null,
+      can_access_projects: false,
+      must_reset_password: false,
+      created_at: "",
+    },
+  );
+
   return {
     id: user.id,
     email: data?.email ?? user.email ?? "",
     firstName: data?.first_name ?? "",
     lastName: data?.last_name ?? "",
     isAdmin: Boolean(data?.is_admin),
-    canAccessProjects: Boolean(data?.can_access_projects),
+    projectRole: roleFields.projectRole,
+    canAccessProjects: roleFields.canAccessProjects,
     mustResetPassword: Boolean(data?.must_reset_password),
     createdAt: data?.created_at ?? "",
   };
@@ -102,9 +137,7 @@ export async function listPortalUsers(): Promise<PortalUser[]> {
     await Promise.all([
       admin
         .from("portal_users")
-        .select(
-          "id,email,first_name,last_name,is_admin,can_access_projects,must_reset_password,created_at",
-        )
+        .select(PORTAL_USER_PROFILE_SELECT)
         .order("email", { ascending: true }),
       admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
     ]);
@@ -132,6 +165,7 @@ export async function listPortalUsers(): Promise<PortalUser[]> {
 
   return (profileData as PortalUserProfile[]).map((profile) => {
     const authUser = authUsersById.get(profile.id);
+    const roleFields = mapPortalUserProfile(profile);
 
     return {
       id: profile.id,
@@ -139,7 +173,8 @@ export async function listPortalUsers(): Promise<PortalUser[]> {
       firstName: profile.first_name ?? "",
       lastName: profile.last_name ?? "",
       isAdmin: Boolean(profile.is_admin),
-      canAccessProjects: Boolean(profile.can_access_projects),
+      projectRole: roleFields.projectRole,
+      canAccessProjects: roleFields.canAccessProjects,
       mustResetPassword: Boolean(profile.must_reset_password),
       createdAt: profile.created_at || authUser?.createdAt || "",
       lastSignInAt: authUser?.lastSignInAt ?? null,
@@ -191,7 +226,7 @@ export async function createPortalUser(formData: FormData) {
   const firstName = normalizeText(formData.get("firstName"));
   const lastName = normalizeText(formData.get("lastName"));
   const isAdmin = formData.get("isAdmin") === "on";
-  const canAccessProjects = formData.get("canAccessProjects") === "on";
+  const projectRole = parsePortalProjectRole(formData.get("projectRole"));
 
   if (!email || password.length < 8) {
     throw new Error("Email and an 8 character password are required.");
@@ -218,7 +253,7 @@ export async function createPortalUser(formData: FormData) {
     firstName,
     lastName,
     isAdmin,
-    canAccessProjects,
+    projectRole,
     mustResetPassword: true,
   });
 
@@ -235,7 +270,7 @@ export async function createPortalUser(formData: FormData) {
         firstName,
         lastName,
         isAdmin,
-        canAccessProjects,
+        projectRole,
         mustResetPassword: true,
       },
       temporaryPasswordSet: true,
@@ -274,7 +309,7 @@ export async function updatePortalUser(formData: FormData) {
   const firstName = normalizeText(formData.get("firstName"));
   const lastName = normalizeText(formData.get("lastName"));
   const isAdmin = formData.get("isAdmin") === "on";
-  const canAccessProjects = formData.get("canAccessProjects") === "on";
+  const projectRole = parsePortalProjectRole(formData.get("projectRole"));
 
   if (!id || !email) {
     throw new Error("User ID and email are required.");
@@ -321,7 +356,7 @@ export async function updatePortalUser(formData: FormData) {
     firstName,
     lastName,
     isAdmin,
-    canAccessProjects,
+    projectRole,
     mustResetPassword: password ? true : before?.mustResetPassword,
   });
 
@@ -460,6 +495,25 @@ async function requirePortalAdmin() {
   return currentUser;
 }
 
+export async function setPortalUserProjectRole(
+  id: string,
+  projectRole: PortalProjectRole,
+) {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("portal_users")
+    .update({
+      project_role: projectRole,
+      can_access_projects: projectRole === "project_manager",
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Portal user project role update failed:", error);
+    throw new Error("Unable to update project role.");
+  }
+}
+
 async function upsertPortalUserProfile(
   id: string,
   user: {
@@ -467,7 +521,7 @@ async function upsertPortalUserProfile(
     firstName: string;
     lastName: string;
     isAdmin: boolean;
-    canAccessProjects: boolean;
+    projectRole: PortalProjectRole | null;
     mustResetPassword?: boolean;
   },
 ) {
@@ -478,6 +532,7 @@ async function upsertPortalUserProfile(
     first_name: string;
     last_name: string;
     is_admin: boolean;
+    project_role: PortalProjectRole | null;
     can_access_projects: boolean;
     must_reset_password?: boolean;
   } = {
@@ -486,7 +541,8 @@ async function upsertPortalUserProfile(
     first_name: user.firstName,
     last_name: user.lastName,
     is_admin: user.isAdmin,
-    can_access_projects: user.canAccessProjects,
+    project_role: user.projectRole,
+    can_access_projects: user.projectRole === "project_manager",
   };
 
   if (user.mustResetPassword !== undefined) {
@@ -507,12 +563,26 @@ async function getPortalUserSnapshot(id: string) {
     admin
       .from("portal_users")
       .select(
-        "id,email,first_name,last_name,is_admin,can_access_projects,must_reset_password,created_at,updated_at",
+        "id,email,first_name,last_name,is_admin,project_role,can_access_projects,must_reset_password,created_at,updated_at",
       )
       .eq("id", id)
       .maybeSingle(),
     admin.auth.admin.getUserById(id),
   ]);
+
+  const roleFields = mapPortalUserProfile(
+    (profile as PortalUserProfile | null) ?? {
+      id,
+      email: authUser.user?.email ?? "",
+      first_name: null,
+      last_name: null,
+      is_admin: false,
+      project_role: null,
+      can_access_projects: false,
+      must_reset_password: false,
+      created_at: "",
+    },
+  );
 
   return {
     id,
@@ -520,7 +590,8 @@ async function getPortalUserSnapshot(id: string) {
     firstName: profile?.first_name ?? "",
     lastName: profile?.last_name ?? "",
     isAdmin: Boolean(profile?.is_admin),
-    canAccessProjects: Boolean(profile?.can_access_projects),
+    projectRole: roleFields.projectRole,
+    canAccessProjects: roleFields.canAccessProjects,
     mustResetPassword: Boolean(profile?.must_reset_password),
     createdAt: profile?.created_at ?? authUser.user?.created_at ?? null,
     updatedAt: profile?.updated_at ?? null,

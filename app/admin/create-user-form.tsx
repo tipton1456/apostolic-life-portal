@@ -60,13 +60,17 @@ export default function CreateUserForm() {
         />
         Admin
       </label>
-      <label className="flex items-end gap-2 pb-3 text-sm text-neutral-300">
-        <input
-          type="checkbox"
-          name="canAccessProjects"
-          className="h-4 w-4 rounded border-white/20 bg-neutral-900 text-lime-400 accent-lime-400"
-        />
-        Project Management
+      <label className="block text-sm font-medium text-neutral-300 lg:col-span-2">
+        Project role
+        <select
+          name="projectRole"
+          defaultValue=""
+          className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
+        >
+          <option value="">No project access</option>
+          <option value="project_manager">Project Manager</option>
+          <option value="project_participant">Project Participant</option>
+        </select>
       </label>
       <AdminFormButton pendingLabel="Creating..." className="lg:col-start-5">
         Create User
