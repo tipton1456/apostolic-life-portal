@@ -603,6 +603,7 @@ export async function updateProject(formData: FormData) {
 
   revalidatePath("/projects");
   revalidatePath(`/projects/${id}`);
+  redirect(`/projects/${id}`);
 }
 
 export async function uploadProjectImage(formData: FormData) {
@@ -641,7 +642,7 @@ export async function uploadProjectImage(formData: FormData) {
 
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/projects");
-    return;
+    redirect(`/projects/${projectId}`);
   }
 
   if (!imageFile) {
@@ -682,6 +683,7 @@ export async function uploadProjectImage(formData: FormData) {
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
+  redirect(`/projects/${projectId}`);
 }
 
 export async function deleteProject(formData: FormData) {

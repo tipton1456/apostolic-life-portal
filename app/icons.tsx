@@ -13,6 +13,7 @@ import {
   Pencil,
   Rocket,
   Search,
+  Settings,
   ShieldCheck,
   Trash2,
   Users,
@@ -36,6 +37,7 @@ export type PortalIconName =
   | "projects"
   | "resources"
   | "search"
+  | "settings"
   | "trash"
   | "update";
 
@@ -56,6 +58,7 @@ const iconMap: Record<PortalIconName, LucideIcon> = {
   projects: FolderKanban,
   resources: FileText,
   search: Search,
+  settings: Settings,
   trash: Trash2,
   update: Pencil,
 };

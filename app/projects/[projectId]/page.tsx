@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { PortalIcon } from "@/app/icons";
 import AdminFormButton from "@/app/admin/admin-form-button";
 import HighlightTask from "@/app/projects/highlight-task";
+import ProjectSettingsModal from "@/app/projects/project-settings-modal";
 import ProjectTaskModals from "@/app/projects/project-task-modals";
 import ProjectTeamPanel from "@/app/projects/project-team-panel";
 import TaskAssigneeField from "@/app/projects/task-assignee-field";
@@ -15,12 +16,9 @@ import { getCurrentPortalUser } from "@/lib/portal-users";
 import {
   canCurrentUserAccessProjects,
   createProjectTask,
-  deleteProject,
   getProjectDashboard,
   listAssignablePortalUsers,
   listProjectManagersForAssignee,
-  updateProject,
-  uploadProjectImage,
   type ProjectTask,
 } from "@/lib/project-management";
 import {
@@ -157,7 +155,17 @@ export default async function ProjectDashboardPage({
                     : "Project Participant"}
                 </span>
               </div>
-              <div className="mt-5 flex flex-wrap gap-4 text-sm font-semibold">
+              <div className="mt-5 flex flex-wrap items-center gap-4 text-sm font-semibold">
+                {permissions.canManageProject ? (
+                  <Link
+                    href={`/projects/${project.id}?settings=1`}
+                    className="inline-flex items-center text-lime-400 transition hover:text-lime-300"
+                    aria-label="Project settings"
+                    title="Project settings"
+                  >
+                    <PortalIcon className="h-4 w-4" name="settings" />
+                  </Link>
+                ) : null}
                 <Link
                   href={`/projects/${project.id}/files`}
                   className="text-lime-400 transition hover:text-lime-300"
@@ -263,130 +271,6 @@ export default async function ProjectDashboardPage({
           </div>
         </section>
 
-        {permissions.canManageProject ? (
-          <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-2xl font-semibold marker:hidden">
-              <span>Project Settings</span>
-              <span className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-lime-300">
-                Edit Project
-              </span>
-            </summary>
-            <form
-              action={updateProject}
-              className="mt-6 grid gap-4 border-t border-white/10 pt-5 md:grid-cols-2 xl:grid-cols-[1.2fr_1.2fr_0.8fr_0.8fr_0.8fr_auto]"
-            >
-              <input type="hidden" name="id" value={project.id} />
-              <Field label="Project name" name="name" defaultValue={project.name} required />
-              <Field
-                label="Description"
-                name="description"
-                defaultValue={project.description}
-              />
-              <Field
-                label="Start date"
-                name="startDate"
-                type="date"
-                defaultValue={project.startDate ?? ""}
-              />
-              <Field
-                label="Target end date"
-                name="targetEndDate"
-                type="date"
-                defaultValue={project.targetEndDate ?? ""}
-              />
-              <SelectField
-                label="Status"
-                name="status"
-                defaultValue={project.status}
-                options={PROJECT_STATUS_OPTIONS}
-              />
-              <AdminFormButton pendingLabel="Saving..." className="md:col-start-2 xl:col-start-6">
-                Save Project
-              </AdminFormButton>
-            </form>
-            {project.status === "completed" ? (
-              <form
-                action={updateProject}
-                className="mt-6 grid gap-4 rounded-xl border border-white/10 bg-neutral-950/40 p-5 md:grid-cols-[1fr_auto]"
-              >
-                <input type="hidden" name="id" value={project.id} />
-                <input type="hidden" name="name" value={project.name} />
-                <input type="hidden" name="description" value={project.description} />
-                <input type="hidden" name="status" value={project.status} />
-                <input
-                  type="hidden"
-                  name="startDate"
-                  value={project.startDate ?? ""}
-                />
-                <input
-                  type="hidden"
-                  name="targetEndDate"
-                  value={project.targetEndDate ?? ""}
-                />
-                <Field
-                  label="Archived project files URL"
-                  name="archivedFilesUrl"
-                  defaultValue={project.archivedFilesUrl ?? ""}
-                />
-                <span className="text-xs leading-5 text-neutral-500 md:col-span-2">
-                  Paste the Dropbox shared-folder link after you upload the project
-                  files. This link is only shown once the project is completed.
-                </span>
-                <AdminFormButton pendingLabel="Saving..." className="md:mt-7">
-                  Save Archive Link
-                </AdminFormButton>
-              </form>
-            ) : null}
-            <form
-              action={uploadProjectImage}
-              encType="multipart/form-data"
-              className="mt-6 grid gap-4 rounded-xl border border-white/10 bg-neutral-950/40 p-5 md:grid-cols-[1fr_auto]"
-            >
-              <input type="hidden" name="projectId" value={project.id} />
-              <label className="block text-sm font-medium text-neutral-300">
-                Project image
-                <input
-                  name="projectImage"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="mt-2 block w-full text-sm text-neutral-300 file:mr-4 file:rounded-lg file:border-0 file:bg-lime-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-neutral-950 hover:file:bg-lime-300"
-                />
-                <span className="mt-2 block text-xs leading-5 text-neutral-500">
-                  Upload a 16:9 image (JPG, PNG, or WebP under 5MB). It appears
-                  beside the project details at the top of this dashboard.
-                </span>
-              </label>
-              <AdminFormButton pendingLabel="Uploading..." className="md:mt-7">
-                Save Image
-              </AdminFormButton>
-            </form>
-            {project.imageUrl ? (
-              <form action={uploadProjectImage} className="mt-3 flex justify-end">
-                <input type="hidden" name="projectId" value={project.id} />
-                <input type="hidden" name="removeImage" value="on" />
-                <AdminFormButton
-                  pendingLabel="Removing..."
-                  variant="danger"
-                  className="rounded-lg px-3 py-2"
-                >
-                  Remove Image
-                </AdminFormButton>
-              </form>
-            ) : null}
-            <form action={deleteProject} className="mt-4 flex justify-end">
-              <input type="hidden" name="id" value={project.id} />
-              <AdminFormButton
-                pendingLabel="Deleting..."
-                variant="danger"
-                className="rounded-lg px-3 py-2"
-              >
-                <PortalIcon className="h-4 w-4" name="trash" />
-                Delete Project
-              </AdminFormButton>
-            </form>
-          </details>
-        ) : null}
-
         {permissions.canManageTasks ? (
           <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-2xl font-semibold marker:hidden">
@@ -468,6 +352,10 @@ export default async function ProjectDashboardPage({
       </div>
 
       <Suspense fallback={null}>
+        <ProjectSettingsModal
+          canManageProject={permissions.canManageProject}
+          project={project}
+        />
         <ProjectTaskModals
           assigneeOptions={assigneeOptions}
           canManageTasks={permissions.canManageTasks}
@@ -508,13 +396,6 @@ function buildParticipantAssigneeOptions(
 
   return Array.from(options.entries()).map(([value, label]) => ({ value, label }));
 }
-
-const PROJECT_STATUS_OPTIONS = [
-  { value: "active", label: "Active" },
-  { value: "on_hold", label: "On Hold" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
-];
 
 function TaskSection({
   title,
