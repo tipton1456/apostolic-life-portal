@@ -57,9 +57,9 @@ async function getElvantoPhoneForEmail(email: string) {
           "Content-Type": "application/x-www-form-urlencoded",
         },
         body: new URLSearchParams({
-          email,
           page: "1",
-          page_size: "5",
+          page_size: "20",
+          "search[email]": email,
         }),
         cache: "no-store",
       },

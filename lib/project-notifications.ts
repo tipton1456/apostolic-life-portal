@@ -6,6 +6,10 @@ import {
 } from "@/lib/contact-phone";
 import { buildPortalLoginUrl } from "@/lib/portal-url";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  insertCommunicationBatch,
+  insertCommunicationRecipient,
+} from "@/lib/communication-db-compat";
 import { appendSmsOptOut, getTwilioConfig, sendTwilioSms } from "@/lib/twilio-sms";
 
 export async function notifyProjectManagersTaskCompleted({
@@ -235,21 +239,17 @@ async function sendProjectSmsBatch({
   }
 
   const admin = createAdminClient();
-  const { data: batch, error: batchError } = await admin
-    .from("communication_message_batches")
-    .insert({
-      channel: "sms",
-      group_id: projectId,
-      group_name: `Project: ${projectName}`,
-      message_body: message,
-      recipient_count: deliverableRecipients.length,
-      sender_email: senderEmail,
-      sender_user_id: senderUserId,
-      status: "sending",
-      subject,
-    })
-    .select("id")
-    .single<{ id: string }>();
+  const { data: batch, error: batchError } = await insertCommunicationBatch(admin, {
+    channel: "sms",
+    group_id: projectId,
+    group_name: `Project: ${projectName}`,
+    message_body: message,
+    recipient_count: deliverableRecipients.length,
+    sender_email: senderEmail,
+    sender_user_id: senderUserId,
+    status: "sending",
+    subject,
+  });
 
   if (batchError || !batch?.id) {
     console.error("Project SMS batch insert failed:", batchError);
@@ -263,7 +263,7 @@ async function sendProjectSmsBatch({
   for (const recipient of recipients) {
     if (!recipient.phone) {
       skippedCount += 1;
-      await admin.from("communication_message_recipients").insert({
+      await insertCommunicationRecipient(admin, {
         batch_id: batch.id,
         failure_message: "No contact phone number listed.",
         person_id: recipient.userId,
@@ -282,7 +282,7 @@ async function sendProjectSmsBatch({
 
     if (result.ok) {
       successCount += 1;
-      await admin.from("communication_message_recipients").insert({
+      await insertCommunicationRecipient(admin, {
         batch_id: batch.id,
         person_id: recipient.userId,
         person_name: recipient.name,
@@ -296,7 +296,7 @@ async function sendProjectSmsBatch({
     }
 
     failureCount += 1;
-    await admin.from("communication_message_recipients").insert({
+    await insertCommunicationRecipient(admin, {
       batch_id: batch.id,
       failure_code: result.failureCode,
       failure_message: result.failureMessage,
