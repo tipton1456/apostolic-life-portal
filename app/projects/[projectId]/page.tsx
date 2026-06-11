@@ -126,7 +126,7 @@ export default async function ProjectDashboardPage({
           <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
             Project Dashboard
           </p>
-          <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-start">
+          <div className="mt-4 grid gap-6 lg:grid-cols-[auto_minmax(0,1fr)_minmax(0,15rem)] xl:grid-cols-[auto_minmax(0,1fr)_minmax(0,18rem)] lg:items-start">
             <div className="shrink-0">
               {project.imageUrl ? (
                 <img
@@ -140,57 +140,49 @@ export default async function ProjectDashboardPage({
                 </div>
               )}
             </div>
-            <div className="min-w-0 flex-1 text-left">
+            <div className="min-w-0 text-left">
               <h1 className="text-4xl font-bold tracking-tight">{project.name}</h1>
-              <div className="mt-3 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-neutral-400">
-                    {project.description ||
-                      "Track tasks, deadlines, and project completion."}
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-neutral-400">
-                    <span>Status: {formatProjectStatus(project.status)}</span>
-                    <span>Start: {formatDisplayDate(project.startDate)}</span>
-                    <span>Target End: {formatDisplayDate(project.targetEndDate)}</span>
-                    <span>
-                      Role:{" "}
-                      {permissions.isManager
-                        ? "Project Manager"
-                        : "Project Participant"}
-                    </span>
-                  </div>
-                  <div className="mt-5 flex flex-wrap gap-4 text-sm font-semibold">
-                    <Link
-                      href={`/projects/${project.id}/files`}
-                      className="text-lime-400 transition hover:text-lime-300"
-                    >
-                      Project Files ({projectFiles.length})
-                    </Link>
-                    <Link
-                      href="/projects/files"
-                      className="text-lime-400 transition hover:text-lime-300"
-                    >
-                      All Project Files
-                    </Link>
-                  </div>
-                </div>
-                <ProjectTeamPanel
-                  availableUsers={availableUsers.map((candidate) => ({
-                    id: candidate.id,
-                    fullName: candidate.fullName,
-                    email: candidate.email,
-                  }))}
-                  canManageMembers={permissions.canManageMembers}
-                  managers={projectManagers.map((manager) => ({
-                    id: manager.id,
-                    fullName: manager.fullName,
-                    email: manager.email,
-                  }))}
-                  members={members}
-                  projectId={project.id}
-                />
+              <p className="mt-3 text-neutral-400">
+                {project.description ||
+                  "Track tasks, deadlines, and project completion."}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-neutral-400">
+                <span>Status: {formatProjectStatus(project.status)}</span>
+                <span>Start: {formatDisplayDate(project.startDate)}</span>
+                <span>Target End: {formatDisplayDate(project.targetEndDate)}</span>
+                <span>
+                  Role:{" "}
+                  {permissions.isManager
+                    ? "Project Manager"
+                    : "Project Participant"}
+                </span>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-4 text-sm font-semibold">
+                <Link
+                  href={`/projects/${project.id}/files`}
+                  className="text-lime-400 transition hover:text-lime-300"
+                >
+                  Project Files ({projectFiles.length})
+                </Link>
+                <Link
+                  href="/projects/files"
+                  className="text-lime-400 transition hover:text-lime-300"
+                >
+                  All Project Files
+                </Link>
               </div>
             </div>
+            <ProjectTeamPanel
+              availableUsers={availableUsers.map((candidate) => ({
+                id: candidate.id,
+                fullName: candidate.fullName,
+                email: candidate.email,
+              }))}
+              canManageMembers={permissions.canManageMembers}
+              managerNames={projectManagers.map((manager) => manager.fullName)}
+              participantNames={members.map((member) => member.fullName)}
+              projectId={project.id}
+            />
           </div>
         </header>
 
