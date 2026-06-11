@@ -46,12 +46,7 @@ export default async function SiteNavigation({
     { href: "/resources", label: "Resources" },
     { href: "/my-groups", label: "My Groups" },
     { href: "/prayer-board", label: "Prayer Board" },
-    ...(canAccessProjects
-      ? [
-          { href: "/projects", label: "Projects" },
-          { href: "/projects/files", label: "Project Files" },
-        ]
-      : []),
+    ...(canAccessProjects ? [{ href: "/projects", label: "Projects" }] : []),
     ...(isPortalAdmin ? [{ href: "/admin", label: "Administration" }] : []),
     ...(leaderGroups.length > 0 || planningCenterLeaderTeams.length > 0
       ? [{ href: "/groups", label: "Group Management" }]
