@@ -6,6 +6,7 @@ import HighlightTask from "@/app/projects/highlight-task";
 import ProjectSettingsModal from "@/app/projects/project-settings-modal";
 import ProjectTaskModals from "@/app/projects/project-task-modals";
 import ProjectTeamPanel from "@/app/projects/project-team-panel";
+import CompletionPieCard from "@/app/projects/completion-pie-card";
 import ProjectTaskGrid from "@/app/projects/project-task-grid";
 import { getCurrentSessionUser } from "@/lib/demo";
 import { listProjectFiles } from "@/lib/project-files";
@@ -218,10 +219,10 @@ export default async function ProjectDashboardPage({
         ) : null}
 
         <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            label="Completion"
-            value={`${stats.completionPercent}%`}
-            detail={`${stats.completedTasks} of ${stats.totalTasks} tasks done`}
+          <CompletionPieCard
+            completedTasks={stats.completedTasks}
+            percent={stats.completionPercent}
+            totalTasks={stats.totalTasks}
           />
           <MetricCard
             label="Outstanding"
@@ -239,26 +240,6 @@ export default async function ProjectDashboardPage({
             value={String(members.length)}
             detail="People on this project"
           />
-        </section>
-
-        <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
-                Progress
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold">Project Completion</h2>
-            </div>
-            <p className="text-3xl font-bold text-lime-300">
-              {stats.completionPercent}%
-            </p>
-          </div>
-          <div className="mt-5 h-3 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-lime-400 transition-all"
-              style={{ width: `${stats.completionPercent}%` }}
-            />
-          </div>
         </section>
 
         <ProjectTaskGrid
