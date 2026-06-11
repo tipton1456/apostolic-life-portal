@@ -1,4 +1,5 @@
 import AdminFormButton from "@/app/admin/admin-form-button";
+import { PortalIcon } from "@/app/icons";
 import { addProjectMember } from "@/lib/project-management";
 
 export default function ProjectTeamPanel({
@@ -27,7 +28,8 @@ export default function ProjectTeamPanel({
 
       {canManageMembers ? (
         <details className="mt-4">
-          <summary className="cursor-pointer text-sm font-semibold text-lime-400 marker:hidden hover:text-lime-300">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-semibold text-lime-400 marker:hidden hover:text-lime-300">
+            <PortalIcon className="h-4 w-4" name="userPlus" />
             Add participant
           </summary>
           <div className="mt-3">

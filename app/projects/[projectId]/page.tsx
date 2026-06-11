@@ -32,6 +32,7 @@ import {
 import {
   formatDisplayDate,
   formatProjectStatus,
+  getProjectStatusIconName,
   isTaskOverdue,
 } from "@/lib/project-management-utils";
 
@@ -145,38 +146,39 @@ export default async function ProjectDashboardPage({
                   "Track tasks, deadlines, and project completion."}
               </p>
               <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-neutral-400">
-                <span>Status: {formatProjectStatus(project.status)}</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <PortalIcon
+                    className="h-4 w-4 text-lime-400"
+                    name={getProjectStatusIconName(project.status)}
+                  />
+                  {formatProjectStatus(project.status)}
+                </span>
                 <span>Start: {formatDisplayDate(project.startDate)}</span>
                 <span>Target End: {formatDisplayDate(project.targetEndDate)}</span>
-                <span>
-                  Role:{" "}
-                  {permissions.isManager
-                    ? "Project Manager"
-                    : "Project Participant"}
+                <span className="inline-flex items-center gap-1.5">
+                  <PortalIcon
+                    className="h-4 w-4 text-lime-400"
+                    name={permissions.isManager ? "manager" : "worker"}
+                  />
+                  {permissions.isManager ? "Project Manager" : "Project Participant"}
                 </span>
               </div>
               <div className="mt-5 flex flex-wrap items-center gap-4 text-sm font-semibold">
                 {permissions.canManageProject ? (
                   <Link
                     href={`/projects/${project.id}?settings=1`}
-                    className="inline-flex items-center text-lime-400 transition hover:text-lime-300"
-                    aria-label="Project settings"
-                    title="Project settings"
+                    className="inline-flex items-center gap-2 text-lime-400 transition hover:text-lime-300"
                   >
                     <PortalIcon className="h-4 w-4" name="settings" />
+                    Project Settings
                   </Link>
                 ) : null}
                 <Link
                   href={`/projects/${project.id}/files`}
-                  className="text-lime-400 transition hover:text-lime-300"
+                  className="inline-flex items-center gap-2 text-lime-400 transition hover:text-lime-300"
                 >
+                  <PortalIcon className="h-4 w-4" name="files" />
                   Project Files ({projectFiles.length})
-                </Link>
-                <Link
-                  href="/projects/files"
-                  className="text-lime-400 transition hover:text-lime-300"
-                >
-                  All Project Files
                 </Link>
               </div>
             </div>

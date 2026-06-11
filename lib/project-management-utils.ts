@@ -9,6 +9,23 @@ export function formatProjectStatus(status: ProjectStatus) {
   return status.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+export function getProjectStatusIconName(
+  status: ProjectStatus,
+): "active" | "onHold" | "check" | "cancelled" {
+  switch (status) {
+    case "active":
+      return "active";
+    case "on_hold":
+      return "onHold";
+    case "completed":
+      return "check";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return "active";
+  }
+}
+
 export function formatTaskStatus(status: TaskStatus) {
   return status.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
