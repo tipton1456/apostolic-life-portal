@@ -570,7 +570,7 @@ function TaskSection({
   return (
     <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
       <div className="border-b border-white/10 px-5 py-4">
-        <h2 className="text-2xl font-semibold">{title}</h2>
+        <h2 className="text-2xl font-semibold text-lime-200">{title}</h2>
         <p className="mt-2 text-sm text-neutral-400">{description}</p>
       </div>
       <div className="divide-y divide-white/10">
