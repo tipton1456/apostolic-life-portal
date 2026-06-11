@@ -328,33 +328,33 @@ class ReportPdfRenderer {
     participantNames: string[];
   }) {
     const logoDims = this.logo.scaleToFit(180, 48);
-    const logoX = MARGIN;
-    const logoTop = this.y;
-    const logoBottom = logoTop - logoDims.height;
-
-    this.page.drawImage(this.logo, {
-      x: logoX,
-      y: logoBottom,
-      width: logoDims.width,
-      height: logoDims.height,
-    });
-
     const titleText = `${context.project.name.toUpperCase()} PROJECT SUMMARY REPORT`;
-    const titleX = logoX + logoDims.width + 16;
     const titleSize = 14;
     const titleLineHeight = titleSize + 4;
     const titleLines = wrapText(
       titleText,
-      PAGE_WIDTH - MARGIN - titleX,
+      PAGE_WIDTH - MARGIN * 2,
       this.bold,
       titleSize,
     );
     const titleBlockHeight = titleLines.length * titleLineHeight;
-    let titleBaseline = logoBottom + (logoDims.height + titleBlockHeight) / 2 - 4;
+    const headerHeight = Math.max(logoDims.height, titleBlockHeight);
+    const headerTop = this.y;
+    const headerCenterY = headerTop - headerHeight / 2;
+
+    this.page.drawImage(this.logo, {
+      x: MARGIN,
+      y: headerCenterY - logoDims.height / 2,
+      width: logoDims.width,
+      height: logoDims.height,
+    });
+
+    let titleBaseline = headerCenterY + ((titleLines.length - 1) * titleLineHeight) / 2;
 
     for (const line of titleLines) {
+      const lineWidth = this.bold.widthOfTextAtSize(line, titleSize);
       this.page.drawText(line, {
-        x: titleX,
+        x: PAGE_WIDTH - MARGIN - lineWidth,
         y: titleBaseline,
         size: titleSize,
         font: this.bold,
@@ -363,8 +363,7 @@ class ReportPdfRenderer {
       titleBaseline -= titleLineHeight;
     }
 
-    const headerHeight = Math.max(logoDims.height, titleBlockHeight);
-    this.y = logoTop - headerHeight - 16;
+    this.y = headerTop - headerHeight - 16;
 
     const details = [
       `Project Status: ${formatProjectStatus(context.project.status)}`,
