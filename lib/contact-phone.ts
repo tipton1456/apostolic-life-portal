@@ -196,10 +196,17 @@ export async function getPortalUserContactProfile(userId: string) {
   const firstName = profile?.first_name ?? "";
   const lastName = profile?.last_name ?? "";
   const fullName = [firstName, lastName].filter(Boolean).join(" ") || email;
+  const metadataPhone = normalizeListedPhone(
+    typeof authUser.user?.user_metadata?.mobile_phone === "string"
+      ? authUser.user.user_metadata.mobile_phone
+      : undefined,
+  );
 
-  const phone = email
-    ? await getMobilePhoneForPortalUser({ email, firstName, lastName })
-    : null;
+  const phone =
+    metadataPhone ??
+    (email
+      ? await getMobilePhoneForPortalUser({ email, firstName, lastName })
+      : null);
 
   return {
     email,

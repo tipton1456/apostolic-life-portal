@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { PortalIcon } from "@/app/icons";
 import AdminFormButton from "@/app/admin/admin-form-button";
 import HighlightTask from "@/app/projects/highlight-task";
+import TaskAssigneeField from "@/app/projects/task-assignee-field";
 import { getCurrentSessionUser } from "@/lib/demo";
 import { listProjectFiles, uploadProjectTaskFile } from "@/lib/project-files";
 import {
@@ -458,7 +459,7 @@ export default async function ProjectDashboardPage({
                 defaultValue="medium"
                 options={TASK_PRIORITY_OPTIONS}
               />
-              <SelectField
+              <TaskAssigneeField
                 label="Assigned to"
                 name="assignedTo"
                 defaultValue=""
@@ -716,7 +717,7 @@ function TaskRow({
                   defaultValue={task.priority}
                   options={TASK_PRIORITY_OPTIONS}
                 />
-                <SelectField
+                <TaskAssigneeField
                   label="Assigned to"
                   name="assignedTo"
                   defaultValue={task.assignedTo ?? ""}

@@ -40,8 +40,74 @@ export async function notifyProjectManagersTaskCompleted({
   });
 }
 
+export async function notifyNewProjectParticipantAccountCreated({
+  assigneeUserId,
+  email,
+  phone,
+  projectId,
+  projectName,
+  senderUserId,
+  senderEmail,
+  taskId,
+  taskTitle,
+  temporaryPassword,
+}: {
+  assigneeUserId: string;
+  email: string;
+  phone?: string | null;
+  projectId: string;
+  projectName: string;
+  senderUserId: string;
+  senderEmail: string;
+  taskId: string;
+  taskTitle: string;
+  temporaryPassword: string;
+}) {
+  const loginUrl = buildPortalLoginUrl(`/projects/${projectId}?task=${taskId}`);
+  const message = appendSmsOptOut(
+    [
+      "Apostolic Life Portal: Your account was created and a project task was assigned.",
+      `Username: ${email}`,
+      `Temp password: ${temporaryPassword}`,
+      `Sign in: ${loginUrl}`,
+      "You will be asked to change your password after login.",
+      `Task: "${taskTitle}" on ${projectName}.`,
+      "After login, open Project Management to view your task.",
+    ].join(" "),
+  );
+
+  const resolvedPhone =
+    phone || (await getPortalUserContactProfile(assigneeUserId)).phone;
+
+  if (!resolvedPhone) {
+    console.warn("Skipping new account SMS because no phone was found.", {
+      assigneeUserId,
+      email,
+    });
+    return;
+  }
+
+  await sendProjectSmsBatch({
+    message,
+    projectId,
+    projectName,
+    recipients: [
+      {
+        email,
+        name: email,
+        phone: resolvedPhone,
+        userId: assigneeUserId,
+      },
+    ],
+    senderEmail,
+    senderUserId,
+    subject: "Portal account created",
+  });
+}
+
 export async function notifyProjectParticipantTaskAssigned({
   assigneeUserId,
+  phone: phoneOverride,
   projectId,
   projectName,
   senderUserId,
@@ -50,6 +116,7 @@ export async function notifyProjectParticipantTaskAssigned({
   taskTitle,
 }: {
   assigneeUserId: string;
+  phone?: string | null;
   projectId: string;
   projectName: string;
   senderUserId: string;
@@ -58,8 +125,9 @@ export async function notifyProjectParticipantTaskAssigned({
   taskTitle: string;
 }) {
   const assignee = await getPortalUserContactProfile(assigneeUserId);
+  const phone = phoneOverride || assignee.phone;
 
-  if (!assignee.phone) {
+  if (!phone) {
     console.warn("Skipping task assignment SMS because no phone was found.", {
       assigneeUserId,
       email: assignee.email,
@@ -80,7 +148,7 @@ export async function notifyProjectParticipantTaskAssigned({
       {
         email: assignee.email,
         name: assignee.fullName,
-        phone: assignee.phone,
+        phone,
         userId: assigneeUserId,
       },
     ],

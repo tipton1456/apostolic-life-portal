@@ -4,8 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   notifyProjectManagersTaskCompleted,
-  notifyProjectParticipantTaskAssigned,
 } from "@/lib/project-notifications";
+import {
+  resolveTaskAssigneeFromForm,
+  sendTaskAssignmentNotifications,
+} from "@/lib/project-participant-onboarding";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -603,7 +606,8 @@ export async function createProjectTask(formData: FormData) {
   const priority = parseTaskPriority(formData.get("priority"));
   const startDate = parseOptionalDate(formData.get("startDate"));
   const dueDate = parseOptionalDate(formData.get("dueDate"));
-  const assignedTo = parseOptionalUserId(formData.get("assignedTo"));
+  const assignee = await resolveTaskAssigneeFromForm(formData, projectId, currentUser);
+  const assignedTo = assignee.userId;
 
   if (!projectId || !title) {
     throw new Error("Project ID and task title are required.");
@@ -653,7 +657,8 @@ export async function createProjectTask(formData: FormData) {
   const project = await getProjectRecord(projectId);
 
   if (assignedTo) {
-    await notifyProjectParticipantTaskAssigned({
+    await sendTaskAssignmentNotifications({
+      assignee,
       assigneeUserId: assignedTo,
       projectId,
       projectName: project.name,
@@ -663,6 +668,9 @@ export async function createProjectTask(formData: FormData) {
       taskTitle: createdTask.title,
     });
   }
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/projects");
 
   if (createdTask.status === "completed") {
     await notifyProjectManagersTaskCompleted({
@@ -675,8 +683,6 @@ export async function createProjectTask(formData: FormData) {
     });
   }
 
-  revalidatePath(`/projects/${projectId}`);
-  revalidatePath("/projects");
 }
 
 export async function updateProjectTask(formData: FormData) {
@@ -722,9 +728,10 @@ export async function updateProjectTask(formData: FormData) {
     ? parseOptionalDate(formData.get("startDate"))
     : undefined;
   const dueDate = isManager ? parseOptionalDate(formData.get("dueDate")) : undefined;
-  const assignedTo = isManager
-    ? parseOptionalUserId(formData.get("assignedTo"))
-    : existingTask.assigned_to;
+  const assignee = isManager
+    ? await resolveTaskAssigneeFromForm(formData, projectId, currentUser)
+    : { userId: existingTask.assigned_to, isNewAccount: false };
+  const assignedTo = isManager ? assignee.userId : existingTask.assigned_to;
 
   if (!id || !projectId || !title) {
     throw new Error("Task ID, project ID, and title are required.");
@@ -765,7 +772,8 @@ export async function updateProjectTask(formData: FormData) {
     status === "completed" && existingTask.status !== "completed";
 
   if (assignmentChanged && assignedTo) {
-    await notifyProjectParticipantTaskAssigned({
+    await sendTaskAssignmentNotifications({
+      assignee,
       assigneeUserId: assignedTo,
       projectId,
       projectName: project.name,

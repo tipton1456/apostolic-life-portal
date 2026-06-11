@@ -1,0 +1,1 @@
+export const CREATE_NEW_ASSIGNEE_VALUE = "__create_new__";
