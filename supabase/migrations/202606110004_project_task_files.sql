@@ -5,7 +5,7 @@ create table if not exists public.project_task_files (
   file_name text not null,
   file_size bigint not null default 0,
   mime_type text not null default 'application/octet-stream',
-  dropbox_path text not null unique,
+  storage_path text not null unique,
   uploaded_by uuid not null references auth.users(id) on delete restrict,
   created_at timestamptz not null default now()
 );

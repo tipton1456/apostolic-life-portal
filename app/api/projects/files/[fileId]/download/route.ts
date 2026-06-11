@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getProjectFileDownloadUrl } from "@/lib/project-files";
+import { getProjectFileForDownload } from "@/lib/project-files";
 
 export async function GET(
   _request: Request,
@@ -8,9 +8,15 @@ export async function GET(
   const { fileId } = await context.params;
 
   try {
-    const { downloadUrl } = await getProjectFileDownloadUrl(fileId);
+    const { contents, fileName, mimeType } = await getProjectFileForDownload(fileId);
 
-    return NextResponse.redirect(downloadUrl);
+    return new NextResponse(new Uint8Array(contents), {
+      headers: {
+        "Content-Type": mimeType,
+        "Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
   } catch (error) {
     console.error("Project file download failed:", error);
 

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentSessionUser } from "@/lib/demo";
 import { getCurrentPortalUser } from "@/lib/portal-users";
-import { hasDropboxConfig } from "@/lib/dropbox";
 import { getProjectDashboard } from "@/lib/project-management";
 import { listProjectFiles } from "@/lib/project-files";
 import ProjectFilesTable from "@/app/projects/project-files-table";
@@ -40,6 +39,7 @@ export default async function ProjectFilesMenuPage({
 
   const { project, permissions } = dashboard;
   const isManager = permissions.isManager;
+  const isProjectCompleted = project.status === "completed";
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
@@ -52,11 +52,27 @@ export default async function ProjectFilesMenuPage({
           <p className="mt-3 max-w-3xl text-neutral-400">
             All files attached to tasks in this project.
           </p>
-          {!hasDropboxConfig() ? (
-            <p className="mt-4 rounded-xl border border-yellow-400/30 bg-yellow-400/10 px-4 py-3 text-sm text-yellow-100">
-              Dropbox is not configured yet. Add the Dropbox environment variables
-              to enable uploads and downloads.
-            </p>
+          {isProjectCompleted ? (
+            <div className="mt-5 flex flex-wrap gap-4">
+              {files.length > 0 ? (
+                <a
+                  href={`/api/projects/${project.id}/files/download-all`}
+                  className="inline-flex rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
+                >
+                  Download All Files (.zip)
+                </a>
+              ) : null}
+              {project.archivedFilesUrl ? (
+                <a
+                  href={project.archivedFilesUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-lime-300 transition hover:border-lime-300/60 hover:bg-lime-400/10"
+                >
+                  Open Archived Project Files
+                </a>
+              ) : null}
+            </div>
           ) : null}
         </header>
 

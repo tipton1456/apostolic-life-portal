@@ -22,6 +22,7 @@ export type Project = {
   startDate: string | null;
   targetEndDate: string | null;
   imageUrl: string | null;
+  archivedFilesUrl: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -93,6 +94,7 @@ type ProjectRow = {
   start_date: string | null;
   target_end_date: string | null;
   image_url: string | null;
+  archived_files_url: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -178,7 +180,7 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   let projectQuery = supabase
     .from("projects")
     .select(
-      "id,name,description,status,start_date,target_end_date,image_url,created_by,created_at,updated_at",
+      "id,name,description,status,start_date,target_end_date,image_url,archived_files_url,created_by,created_at,updated_at",
     )
     .order("created_at", { ascending: false });
 
@@ -279,7 +281,7 @@ export async function getProjectDashboard(
       supabase
         .from("projects")
         .select(
-          "id,name,description,status,start_date,target_end_date,image_url,created_by,created_at,updated_at",
+          "id,name,description,status,start_date,target_end_date,image_url,archived_files_url,created_by,created_at,updated_at",
         )
         .eq("id", projectId)
         .maybeSingle<ProjectRow>(),
@@ -380,21 +382,28 @@ export async function updateProject(formData: FormData) {
   const status = parseProjectStatus(formData.get("status"));
   const startDate = parseOptionalDate(formData.get("startDate"));
   const targetEndDate = parseOptionalDate(formData.get("targetEndDate"));
-
   if (!id || !name) {
     throw new Error("Project ID and name are required.");
   }
 
   const supabase = await createClient();
+  const updatePayload: Record<string, string | null> = {
+    name,
+    description,
+    status,
+    start_date: startDate,
+    target_end_date: targetEndDate,
+  };
+
+  if (status === "completed" && formData.has("archivedFilesUrl")) {
+    updatePayload.archived_files_url = parseOptionalUrl(
+      formData.get("archivedFilesUrl"),
+    );
+  }
+
   const { error } = await supabase
     .from("projects")
-    .update({
-      name,
-      description,
-      status,
-      start_date: startDate,
-      target_end_date: targetEndDate,
-    })
+    .update(updatePayload)
     .eq("id", id);
 
   if (error) {
@@ -986,10 +995,31 @@ function mapProject(row: ProjectRow): Project {
     startDate: row.start_date,
     targetEndDate: row.target_end_date,
     imageUrl: row.image_url,
+    archivedFilesUrl: row.archived_files_url,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function parseOptionalUrl(value: FormDataEntryValue | null) {
+  const normalized = normalizeText(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  try {
+    const url = new URL(normalized);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("Archived files URL must start with http:// or https://");
+    }
+
+    return url.toString();
+  } catch {
+    throw new Error("Archived files URL must be a valid http:// or https:// link.");
+  }
 }
 
 function mapTask(row: ProjectTaskRow, assignedName: string | null): ProjectTask {

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentSessionUser } from "@/lib/demo";
 import { getCurrentPortalUser } from "@/lib/portal-users";
-import { hasDropboxConfig } from "@/lib/dropbox";
 import { listAccessibleProjectFiles } from "@/lib/project-files";
 import ProjectFilesTable from "@/app/projects/project-files-table";
 
@@ -50,15 +49,10 @@ export default async function ProjectFilesPage() {
           </p>
           <h1 className="mt-3 text-4xl font-bold tracking-tight">Project Files</h1>
           <p className="mt-3 max-w-3xl text-neutral-400">
-            All files attached to tasks across the projects you can access. Files
-            are stored in Dropbox, not on the portal server.
+            All files attached to tasks across the projects you can access. Active
+            project files are stored on the portal server. Completed projects can
+            also link to an archived Dropbox folder.
           </p>
-          {!hasDropboxConfig() ? (
-            <p className="mt-4 rounded-xl border border-yellow-400/30 bg-yellow-400/10 px-4 py-3 text-sm text-yellow-100">
-              Dropbox is not configured yet. Add the Dropbox environment variables
-              to enable uploads and downloads.
-            </p>
-          ) : null}
         </header>
 
         <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">

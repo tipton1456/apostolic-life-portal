@@ -4,7 +4,6 @@ import { PortalIcon } from "@/app/icons";
 import AdminFormButton from "@/app/admin/admin-form-button";
 import HighlightTask from "@/app/projects/highlight-task";
 import { getCurrentSessionUser } from "@/lib/demo";
-import { hasDropboxConfig } from "@/lib/dropbox";
 import { listProjectFiles, uploadProjectTaskFile } from "@/lib/project-files";
 import {
   formatProjectFileDate,
@@ -64,7 +63,6 @@ export default async function ProjectDashboardPage({
     getCurrentPortalUser(),
     listProjectFiles(projectId).catch(() => [] as ProjectTaskFile[]),
   ]);
-  const dropboxConfigured = hasDropboxConfig();
   const filesByTaskId = new Map<string, ProjectTaskFile[]>();
 
   for (const file of projectFiles) {
@@ -81,6 +79,7 @@ export default async function ProjectDashboardPage({
   }
 
   const { project, members, tasks, stats, permissions } = dashboard;
+  const isProjectCompleted = project.status === "completed";
   const outstandingTasks = tasks.filter((task) => task.status !== "completed");
   const overdueTasks = tasks.filter((task) => isTaskOverdue(task));
   const completedTasks = tasks.filter((task) => task.status === "completed");
@@ -150,6 +149,39 @@ export default async function ProjectDashboardPage({
             </div>
           </div>
         </header>
+
+        {isProjectCompleted ? (
+          <section className="mt-8 rounded-2xl border border-lime-400/30 bg-lime-400/10 p-6">
+            <h2 className="text-2xl font-semibold text-lime-200">Project Completed</h2>
+            <p className="mt-3 max-w-3xl text-sm text-neutral-200">
+              This project is complete. Download all task files as a zip, upload them
+              to Dropbox manually, then add the archived folder link in Project
+              Settings.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-4">
+              {projectFiles.length > 0 ? (
+                <a
+                  href={`/api/projects/${project.id}/files/download-all`}
+                  className="inline-flex rounded-xl bg-lime-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-lime-300"
+                >
+                  Download All Files (.zip)
+                </a>
+              ) : (
+                <p className="text-sm text-neutral-300">No files were attached to this project.</p>
+              )}
+              {project.archivedFilesUrl ? (
+                <a
+                  href={project.archivedFilesUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-lime-300 transition hover:border-lime-300/60 hover:bg-lime-400/10"
+                >
+                  Open Archived Project Files
+                </a>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
         <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
@@ -314,6 +346,39 @@ export default async function ProjectDashboardPage({
                 Save Project
               </AdminFormButton>
             </form>
+            {project.status === "completed" ? (
+              <form
+                action={updateProject}
+                className="mt-6 grid gap-4 rounded-xl border border-white/10 bg-neutral-950/40 p-5 md:grid-cols-[1fr_auto]"
+              >
+                <input type="hidden" name="id" value={project.id} />
+                <input type="hidden" name="name" value={project.name} />
+                <input type="hidden" name="description" value={project.description} />
+                <input type="hidden" name="status" value={project.status} />
+                <input
+                  type="hidden"
+                  name="startDate"
+                  value={project.startDate ?? ""}
+                />
+                <input
+                  type="hidden"
+                  name="targetEndDate"
+                  value={project.targetEndDate ?? ""}
+                />
+                <Field
+                  label="Archived project files URL"
+                  name="archivedFilesUrl"
+                  defaultValue={project.archivedFilesUrl ?? ""}
+                />
+                <span className="text-xs leading-5 text-neutral-500 md:col-span-2">
+                  Paste the Dropbox shared-folder link after you upload the project
+                  files. This link is only shown once the project is completed.
+                </span>
+                <AdminFormButton pendingLabel="Saving..." className="md:mt-7">
+                  Save Archive Link
+                </AdminFormButton>
+              </form>
+            ) : null}
             <form
               action={uploadProjectImage}
               encType="multipart/form-data"
@@ -417,7 +482,7 @@ export default async function ProjectDashboardPage({
           assigneeOptions={assigneeOptions}
           highlightedTaskId={highlightedTaskId}
           filesByTaskId={filesByTaskId}
-          dropboxConfigured={dropboxConfigured}
+          isProjectCompleted={isProjectCompleted}
         />
 
         <TaskSection
@@ -431,7 +496,7 @@ export default async function ProjectDashboardPage({
           assigneeOptions={assigneeOptions}
           highlightedTaskId={highlightedTaskId}
           filesByTaskId={filesByTaskId}
-          dropboxConfigured={dropboxConfigured}
+          isProjectCompleted={isProjectCompleted}
           emphasizeOverdue
         />
 
@@ -446,7 +511,7 @@ export default async function ProjectDashboardPage({
           assigneeOptions={assigneeOptions}
           highlightedTaskId={highlightedTaskId}
           filesByTaskId={filesByTaskId}
-          dropboxConfigured={dropboxConfigured}
+          isProjectCompleted={isProjectCompleted}
         />
       </div>
     </main>
@@ -485,7 +550,7 @@ function TaskSection({
   assigneeOptions,
   highlightedTaskId,
   filesByTaskId,
-  dropboxConfigured,
+  isProjectCompleted,
   emphasizeOverdue = false,
 }: {
   title: string;
@@ -498,7 +563,7 @@ function TaskSection({
   assigneeOptions: Array<{ value: string; label: string }>;
   highlightedTaskId?: string;
   filesByTaskId: Map<string, ProjectTaskFile[]>;
-  dropboxConfigured: boolean;
+  isProjectCompleted: boolean;
   emphasizeOverdue?: boolean;
 }) {
   return (
@@ -520,7 +585,7 @@ function TaskSection({
               emphasizeOverdue={emphasizeOverdue || isTaskOverdue(task)}
               highlighted={highlightedTaskId === task.id}
               taskFiles={filesByTaskId.get(task.id) ?? []}
-              dropboxConfigured={dropboxConfigured}
+              isProjectCompleted={isProjectCompleted}
             />
           ))
         ) : (
@@ -540,7 +605,7 @@ function TaskRow({
   emphasizeOverdue,
   highlighted,
   taskFiles,
-  dropboxConfigured,
+  isProjectCompleted,
 }: {
   task: ProjectTask;
   projectId: string;
@@ -550,7 +615,7 @@ function TaskRow({
   emphasizeOverdue: boolean;
   highlighted: boolean;
   taskFiles: ProjectTaskFile[];
-  dropboxConfigured: boolean;
+  isProjectCompleted: boolean;
 }) {
   const canEdit =
     canManageTasks || (task.assignedTo === currentUserId && task.status !== "completed");
@@ -729,7 +794,7 @@ function TaskRow({
         ) : (
           <p className="mt-3 text-sm text-neutral-500">No files attached to this task yet.</p>
         )}
-        {dropboxConfigured ? (
+        {!isProjectCompleted ? (
           <form
             action={uploadProjectTaskFile}
             encType="multipart/form-data"
@@ -752,8 +817,9 @@ function TaskRow({
             </AdminFormButton>
           </form>
         ) : (
-          <p className="mt-3 text-sm text-yellow-100">
-            Dropbox is not configured, so task file uploads are unavailable.
+          <p className="mt-3 text-sm text-neutral-400">
+            Uploads are closed for completed projects. Use Download All Files above,
+            then add the Dropbox archive link in Project Settings.
           </p>
         )}
       </div>

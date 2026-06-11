@@ -1,14 +1,14 @@
 "use server";
 
+import JSZip from "jszip";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  buildProjectTaskDropboxPath,
-  deleteDropboxFile,
-  getDropboxTemporaryDownloadLink,
-  hasDropboxConfig,
-  uploadDropboxFile,
-} from "@/lib/dropbox";
+  buildProjectTaskStoragePath,
+  deleteProjectTaskFile as deleteStoredProjectTaskFile,
+  readProjectTaskFile,
+  writeProjectTaskFile,
+} from "@/lib/project-file-storage";
 import { canCurrentUserAccessProjects } from "@/lib/project-management";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -35,10 +35,13 @@ type ProjectTaskFileRow = {
   file_name: string;
   file_size: number;
   mime_type: string;
-  dropbox_path: string;
+  storage_path: string;
   uploaded_by: string;
   created_at: string;
 };
+
+const FILE_ROW_SELECT =
+  "id,project_id,task_id,file_name,file_size,mime_type,storage_path,uploaded_by,created_at";
 
 const MAX_PROJECT_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES_PER_TASK = 20;
@@ -92,9 +95,7 @@ export async function listAccessibleProjectFiles(
 
   let query = supabase
     .from("project_task_files")
-    .select(
-      "id,project_id,task_id,file_name,file_size,mime_type,dropbox_path,uploaded_by,created_at",
-    )
+    .select(FILE_ROW_SELECT)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -118,9 +119,7 @@ export async function listProjectFiles(projectId: string): Promise<ProjectTaskFi
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("project_task_files")
-    .select(
-      "id,project_id,task_id,file_name,file_size,mime_type,dropbox_path,uploaded_by,created_at",
-    )
+    .select(FILE_ROW_SELECT)
     .eq("project_id", projectId)
     .order("created_at", { ascending: false });
 
@@ -141,9 +140,7 @@ export async function listTaskFiles(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("project_task_files")
-    .select(
-      "id,project_id,task_id,file_name,file_size,mime_type,dropbox_path,uploaded_by,created_at",
-    )
+    .select(FILE_ROW_SELECT)
     .eq("project_id", projectId)
     .eq("task_id", taskId)
     .order("created_at", { ascending: false });
@@ -158,10 +155,6 @@ export async function listTaskFiles(
 
 export async function uploadProjectTaskFile(formData: FormData) {
   await requireProjectFilesAccess();
-
-  if (!hasDropboxConfig()) {
-    throw new Error("Dropbox is not configured for project file storage.");
-  }
 
   const projectId = String(formData.get("projectId") || "");
   const taskId = String(formData.get("taskId") || "");
@@ -182,8 +175,13 @@ export async function uploadProjectTaskFile(formData: FormData) {
     redirect("/login?next=/projects");
   }
 
-  const [{ data: task, error: taskError }, { count, error: countError }] =
+  const [{ data: project, error: projectError }, { data: task, error: taskError }, { count, error: countError }] =
     await Promise.all([
+      supabase
+        .from("projects")
+        .select("status")
+        .eq("id", projectId)
+        .maybeSingle<{ status: string }>(),
       supabase
         .from("project_tasks")
         .select("id,title")
@@ -195,6 +193,14 @@ export async function uploadProjectTaskFile(formData: FormData) {
         .select("id", { count: "exact", head: true })
         .eq("task_id", taskId),
     ]);
+
+  if (projectError || !project) {
+    throw new Error("Project not found.");
+  }
+
+  if (project.status === "completed") {
+    throw new Error("Completed projects no longer accept new file uploads.");
+  }
 
   if (taskError || !task) {
     throw new Error("Task not found.");
@@ -208,24 +214,25 @@ export async function uploadProjectTaskFile(formData: FormData) {
     throw new Error(`Each task can have up to ${MAX_FILES_PER_TASK} files.`);
   }
 
-  const dropboxPath = buildProjectTaskDropboxPath({
+  const storagePath = buildProjectTaskStoragePath({
     fileName: file.name,
     projectId,
     taskId,
   });
   const fileBuffer = Buffer.from(await file.arrayBuffer());
-  const uploaded = await uploadDropboxFile({
+
+  await writeProjectTaskFile({
+    relativePath: storagePath,
     contents: fileBuffer,
-    destinationPath: dropboxPath,
   });
 
   const { error: insertError } = await supabase.from("project_task_files").insert({
     project_id: projectId,
     task_id: taskId,
-    file_name: uploaded.fileName || file.name,
-    file_size: uploaded.fileSize,
+    file_name: file.name,
+    file_size: file.size,
     mime_type: file.type || "application/octet-stream",
-    dropbox_path: uploaded.dropboxPath,
+    storage_path: storagePath,
     uploaded_by: user.id,
   });
 
@@ -233,9 +240,9 @@ export async function uploadProjectTaskFile(formData: FormData) {
     console.error("Project task file insert failed:", insertError);
 
     try {
-      await deleteDropboxFile(uploaded.dropboxPath);
+      await deleteStoredProjectTaskFile(storagePath);
     } catch (cleanupError) {
-      console.error("Dropbox cleanup after failed insert:", cleanupError);
+      console.error("Storage cleanup after failed insert:", cleanupError);
     }
 
     throw new Error(insertError.message);
@@ -270,26 +277,37 @@ export async function deleteProjectTaskFile(formData: FormData) {
     currentUser?.isAdmin || currentUser?.canAccessProjects,
   );
 
-  const { data: file, error } = await supabase
-    .from("project_task_files")
-    .select("id,dropbox_path,uploaded_by")
-    .eq("id", fileId)
-    .eq("project_id", projectId)
-    .maybeSingle<{
-      id: string;
-      dropbox_path: string;
-      uploaded_by: string;
-    }>();
+  const [{ data: project }, { data: file, error }] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("status")
+      .eq("id", projectId)
+      .maybeSingle<{ status: string }>(),
+    supabase
+      .from("project_task_files")
+      .select("id,storage_path,uploaded_by")
+      .eq("id", fileId)
+      .eq("project_id", projectId)
+      .maybeSingle<{
+        id: string;
+        storage_path: string;
+        uploaded_by: string;
+      }>(),
+  ]);
 
   if (error || !file) {
     throw new Error("File not found.");
+  }
+
+  if (project?.status === "completed") {
+    throw new Error("Files on completed projects cannot be deleted.");
   }
 
   if (!isManager && file.uploaded_by !== user.id) {
     throw new Error("You do not have permission to delete this file.");
   }
 
-  await deleteDropboxFile(file.dropbox_path);
+  await deleteStoredProjectTaskFile(file.storage_path);
 
   const { error: deleteError } = await supabase
     .from("project_task_files")
@@ -304,23 +322,20 @@ export async function deleteProjectTaskFile(formData: FormData) {
   revalidateProjectFilePaths(projectId);
 }
 
-export async function getProjectFileDownloadUrl(fileId: string) {
+export async function getProjectFileForDownload(fileId: string) {
   await requireProjectFilesAccess();
-
-  if (!hasDropboxConfig()) {
-    throw new Error("Dropbox is not configured.");
-  }
 
   const supabase = await createClient();
   const { data: file, error } = await supabase
     .from("project_task_files")
-    .select("id,project_id,dropbox_path,file_name")
+    .select("id,project_id,storage_path,file_name,mime_type")
     .eq("id", fileId)
     .maybeSingle<{
       id: string;
       project_id: string;
-      dropbox_path: string;
+      storage_path: string;
       file_name: string;
+      mime_type: string;
     }>();
 
   if (error || !file) {
@@ -329,11 +344,65 @@ export async function getProjectFileDownloadUrl(fileId: string) {
 
   await requireProjectFilesAccessForProject(file.project_id);
 
-  const downloadUrl = await getDropboxTemporaryDownloadLink(file.dropbox_path);
+  const contents = await readProjectTaskFile(file.storage_path);
 
   return {
-    downloadUrl,
+    contents,
     fileName: file.file_name,
+    mimeType: file.mime_type || "application/octet-stream",
+  };
+}
+
+export async function buildProjectFilesZip(projectId: string) {
+  await requireProjectFilesAccessForProject(projectId);
+
+  const supabase = await createClient();
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("name,status")
+    .eq("id", projectId)
+    .maybeSingle<{ name: string; status: string }>();
+
+  if (projectError || !project) {
+    throw new Error("Project not found.");
+  }
+
+  const files = await listProjectFiles(projectId);
+
+  if (files.length === 0) {
+    throw new Error("This project has no files to download.");
+  }
+
+  const zip = new JSZip();
+
+  for (const file of files) {
+    const { data: row, error } = await supabase
+      .from("project_task_files")
+      .select("storage_path")
+      .eq("id", file.id)
+      .maybeSingle<{ storage_path: string }>();
+
+    if (error || !row) {
+      continue;
+    }
+
+    const contents = await readProjectTaskFile(row.storage_path);
+    const folderName = sanitizeZipPathSegment(file.taskTitle || "task");
+    const fileName = sanitizeZipPathSegment(file.fileName);
+
+    zip.file(`${folderName}/${fileName}`, contents);
+  }
+
+  const zipBuffer = await zip.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+  });
+
+  const safeProjectName = sanitizeZipPathSegment(project.name || "project");
+
+  return {
+    buffer: zipBuffer,
+    fileName: `${safeProjectName}-files.zip`,
   };
 }
 
@@ -463,4 +532,8 @@ function revalidateProjectFilePaths(projectId: string) {
   revalidatePath("/dashboard");
   revalidatePath(`/projects/${projectId}`);
   revalidatePath(`/projects/${projectId}/files`);
+}
+
+function sanitizeZipPathSegment(value: string) {
+  return value.replace(/[^\w.\-() ]+/g, "_").trim() || "file";
 }
