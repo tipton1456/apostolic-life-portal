@@ -14,9 +14,16 @@ import {
 import type { ProjectTaskUpdate } from "@/lib/project-task-updates";
 import { isTaskAtRisk, isTaskOverdue } from "@/lib/project-management-utils";
 
-type TaskView = "outstanding" | "at-risk" | "overdue" | "completed" | "all";
+type TaskView =
+  | "my-tasks"
+  | "outstanding"
+  | "at-risk"
+  | "overdue"
+  | "completed"
+  | "all";
 
 const TASK_VIEWS: Array<{ id: TaskView; label: string }> = [
+  { id: "my-tasks", label: "My Tasks" },
   { id: "outstanding", label: "Outstanding" },
   { id: "at-risk", label: "At Risk" },
   { id: "overdue", label: "Overdue" },
@@ -25,6 +32,7 @@ const TASK_VIEWS: Array<{ id: TaskView; label: string }> = [
 ];
 
 const EMPTY_MESSAGES: Record<TaskView, string> = {
+  "my-tasks": "No tasks are assigned to you on this project.",
   outstanding: "No outstanding tasks. Everything is complete.",
   "at-risk": "No at-risk tasks. Nothing is due within the next two days.",
   overdue: "No overdue tasks.",
@@ -59,10 +67,13 @@ export default function ProjectTaskGrid({
   taskUpdatesByTaskId: Record<string, ProjectTaskUpdate[]>;
   highlightedTaskId?: string;
 }) {
-  const [view, setView] = useState<TaskView>("outstanding");
+  const [view, setView] = useState<TaskView>("my-tasks");
   const [showAddTask, setShowAddTask] = useState(false);
 
-  const filteredTasks = useMemo(() => filterTasks(tasks, view), [tasks, view]);
+  const filteredTasks = useMemo(
+    () => filterTasks(tasks, view, currentUserId),
+    [tasks, view, currentUserId],
+  );
   const canAddTasks = canManageTasks && !isProjectCompleted;
 
   return (
@@ -168,8 +179,10 @@ export default function ProjectTaskGrid({
   );
 }
 
-function filterTasks(tasks: ProjectTask[], view: TaskView) {
+function filterTasks(tasks: ProjectTask[], view: TaskView, currentUserId: string) {
   switch (view) {
+    case "my-tasks":
+      return tasks.filter((task) => task.assignedTo === currentUserId);
     case "outstanding":
       return tasks.filter((task) => task.status !== "completed");
     case "at-risk":
