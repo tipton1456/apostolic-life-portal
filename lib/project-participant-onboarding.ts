@@ -77,6 +77,10 @@ export async function sendTaskAssignmentNotifications({
   taskId: string;
   taskTitle: string;
 }) {
+  if (!assigneeUserId) {
+    return;
+  }
+
   if (assignee.isNewAccount && assignee.temporaryPassword && assignee.email) {
     await notifyNewProjectParticipantAccountCreated({
       assigneeUserId,

@@ -1162,18 +1162,6 @@ export async function createProjectTask(formData: FormData) {
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
-
-  if (createdTask.status === "completed") {
-    await notifyProjectManagersTaskCompleted({
-      completedByName: formatUserName(currentUser),
-      projectId,
-      projectName: project.name,
-      senderEmail: currentUser.email,
-      senderUserId: currentUser.id,
-      taskTitle: createdTask.title,
-    });
-  }
-
 }
 
 export async function updateProjectTask(formData: FormData) {

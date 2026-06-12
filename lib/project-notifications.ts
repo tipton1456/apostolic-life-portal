@@ -91,18 +91,14 @@ export async function notifyNewProjectParticipantAccountCreated({
     return;
   }
 
-  await sendProjectSmsBatch({
+  await sendSingleAssigneeProjectSms({
+    assigneeUserId,
+    email,
     message,
+    name: email,
+    phone: resolvedPhone,
     projectId,
     projectName,
-    recipients: [
-      {
-        email,
-        name: email,
-        phone: resolvedPhone,
-        userId: assigneeUserId,
-      },
-    ],
     senderEmail,
     senderUserId,
     subject: "Portal account created",
@@ -144,21 +140,62 @@ export async function notifyProjectParticipantTaskAssigned({
     `Apostolic Life Projects: You were assigned "${taskTitle}" on ${projectName}. Open: ${loginUrl}`,
   );
 
+  await sendSingleAssigneeProjectSms({
+    assigneeUserId,
+    email: assignee.email,
+    message,
+    name: assignee.fullName,
+    phone,
+    projectId,
+    projectName,
+    senderEmail,
+    senderUserId,
+    subject: "Task assigned",
+  });
+}
+
+async function sendSingleAssigneeProjectSms({
+  assigneeUserId,
+  email,
+  name,
+  phone,
+  message,
+  projectId,
+  projectName,
+  senderEmail,
+  senderUserId,
+  subject,
+}: {
+  assigneeUserId: string;
+  email: string;
+  name: string;
+  phone: string;
+  message: string;
+  projectId: string;
+  projectName: string;
+  senderEmail: string;
+  senderUserId: string;
+  subject: string;
+}) {
+  if (!assigneeUserId) {
+    throw new Error("Task assignment SMS requires an assignee.");
+  }
+
   await sendProjectSmsBatch({
     message,
     projectId,
     projectName,
     recipients: [
       {
-        email: assignee.email,
-        name: assignee.fullName,
+        email,
+        name,
         phone,
         userId: assigneeUserId,
       },
     ],
     senderEmail,
     senderUserId,
-    subject: "Task assigned",
+    subject,
   });
 }
 
@@ -249,6 +286,17 @@ async function sendProjectSmsBatch({
   if (deliverableRecipients.length === 0) {
     console.warn("Project SMS skipped because no recipient phone numbers were found.");
     return;
+  }
+
+  if (subject === "Task assigned" || subject === "Portal account created") {
+    if (deliverableRecipients.length !== 1) {
+      console.error("Assignment SMS blocked because multiple recipients were requested.", {
+        projectId,
+        recipientCount: deliverableRecipients.length,
+        subject,
+      });
+      return;
+    }
   }
 
   const admin = createAdminClient();
