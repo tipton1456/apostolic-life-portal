@@ -32,9 +32,9 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-8">
-        <header className="mb-10 border-b border-white/10 pb-6">
-          <h1 className="mt-3 text-4xl font-bold tracking-tight">
+      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 pb-8 pt-3 sm:px-6 sm:pt-4">
+        <header className="mb-8 border-b border-white/10 pb-5 sm:mb-10 sm:pb-6">
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
             Member Portal
           </h1>
           <p className="mt-3 max-w-2xl text-neutral-400">

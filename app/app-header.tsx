@@ -4,7 +4,7 @@ import SiteNavigation from "./site-navigation";
 
 export default async function AppHeader() {
   return (
-    <header className="bg-neutral-950 px-6 pt-5 text-white">
+    <header className="bg-neutral-950 px-4 pb-1 pt-3 text-white sm:px-6 sm:pt-4">
       <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-4">
         <div className="min-w-0 justify-self-start">
           <HeaderBackLink />
