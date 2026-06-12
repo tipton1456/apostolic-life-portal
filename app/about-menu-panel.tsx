@@ -6,13 +6,19 @@ import { useEffect } from "react";
 const INTEGRATION_LOGOS = [
   { alt: "Tithe.ly", src: "/integrations/tithely.svg" },
   { alt: "Elvanto", src: "/integrations/elvanto.svg" },
-  { alt: "Planning Center", src: "/integrations/NewPCO.png" },
+  { alt: "Planning Center", src: "/integrations/planning-center.png" },
   { alt: "Supabase", src: "/integrations/supabase-dark.svg" },
   { alt: "Twilio", src: "/integrations/twilio.svg" },
-  { alt: "Cognito Forms", src: "/integrations/NewCognito.webp" },
-  { alt: "GroupMe", src: "/integrations/NewGroupMe.webp" },
+  { alt: "Cognito Forms", src: "/integrations/cognito-forms.png" },
+  { alt: "GroupMe", src: "/integrations/groupme.png" },
   { alt: "Vercel", src: "/integrations/vercel.png" },
 ] as const;
+
+function withAssetCacheBust(src: string, cacheKey: string) {
+  const separator = src.includes("?") ? "&" : "?";
+
+  return `${src}${separator}portal_cache=${encodeURIComponent(cacheKey)}`;
+}
 
 export default function AboutMenuPanel({
   version,
@@ -82,7 +88,7 @@ export default function AboutMenuPanel({
                 className="flex min-h-16 items-center justify-center rounded-xl border border-white/10 bg-neutral-900/70 px-3 py-3"
               >
                 <img
-                  src={logo.src}
+                  src={withAssetCacheBust(logo.src, version)}
                   alt={logo.alt}
                   className="h-10 w-full max-w-[8.5rem] object-contain"
                 />
