@@ -7,13 +7,13 @@ import ProjectMilestoneTimelineProgress from "@/app/projects/project-milestone-t
 import ProjectSettingsModal from "@/app/projects/project-settings-modal";
 import ProjectTaskModals from "@/app/projects/project-task-modals";
 import ProjectTeamPanel from "@/app/projects/project-team-panel";
-import CompletionPieCard from "@/app/projects/completion-pie-card";
+import ProjectPieCardsSection from "@/app/projects/project-pie-cards-section";
 import ProjectExpenseModals from "@/app/projects/project-expense-modals";
 import ProjectFinancialsSection from "@/app/projects/project-financials-section";
 import ProjectReportsDropdown from "@/app/projects/project-reports-dropdown";
 import ProjectRevenueModals from "@/app/projects/project-revenue-modals";
 import ProjectTaskGrid from "@/app/projects/project-task-grid";
-import TaskBreakdownPieCard from "@/app/projects/task-breakdown-pie-card";
+
 import { getCurrentSessionUser } from "@/lib/demo";
 import { listProjectFiles } from "@/lib/project-files";
 import type { ProjectTaskFile } from "@/lib/project-files";
@@ -282,20 +282,14 @@ export default async function ProjectDashboardPage({
           />
         </section>
 
-        <section className="mt-6 grid gap-6 lg:grid-cols-2">
-          <CompletionPieCard
-            completedTasks={stats.completedTasks}
-            percent={stats.completionPercent}
-            totalTasks={stats.totalTasks}
-          />
-          <TaskBreakdownPieCard
-            atRiskTasks={stats.atRiskTasks}
-            completedTasks={stats.completedTasks}
-            openOutstandingTasks={stats.openOutstandingTasks}
-            overdueTasks={stats.overdueTasks}
-            totalTasks={stats.totalTasks}
-          />
-        </section>
+        <ProjectPieCardsSection
+          atRiskTasks={stats.atRiskTasks}
+          completedTasks={stats.completedTasks}
+          completionPercent={stats.completionPercent}
+          openOutstandingTasks={stats.openOutstandingTasks}
+          overdueTasks={stats.overdueTasks}
+          totalTasks={stats.totalTasks}
+        />
 
         <ProjectTaskGrid
           assigneeOptions={assigneeOptions}
