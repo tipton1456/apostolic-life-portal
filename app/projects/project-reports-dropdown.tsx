@@ -8,6 +8,7 @@ const REPORT_OPTIONS = [
   { label: "Expense Summary", path: "cost-summary-report" },
   { label: "Income Summary", path: "income-summary-report" },
   { label: "Financial Summary", path: "financial-summary-report" },
+  { label: "Financial Export", path: "financial-export" },
 ] as const;
 
 export default function ProjectReportsDropdown({
