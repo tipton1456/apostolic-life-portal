@@ -7,11 +7,11 @@ const INTEGRATION_LOGOS = [
   { alt: "Tithe.ly", src: "/integrations/tithely.svg" },
   { alt: "Elvanto", src: "/integrations/elvanto.svg" },
   { alt: "Planning Center", src: "/integrations/planning-center.svg" },
-  { alt: "Supabase", src: "/integrations/supabase.svg" },
+  { alt: "Supabase", src: "/integrations/supabase-dark.svg" },
   { alt: "Twilio", src: "/integrations/twilio.svg" },
-  { alt: "Cognito Forms", src: "/integrations/cognito-forms.svg" },
-  { alt: "GroupMe", src: "/integrations/groupme.svg" },
-  { alt: "Vercel", src: "/integrations/vercel.svg" },
+  { alt: "Cognito Forms", src: "/integrations/cognito-forms.png" },
+  { alt: "GroupMe", src: "/integrations/groupme.png" },
+  { alt: "Vercel", src: "/integrations/vercel.png" },
 ] as const;
 
 export default function AboutMenuPanel({
@@ -84,7 +84,7 @@ export default function AboutMenuPanel({
                 <img
                   src={logo.src}
                   alt={logo.alt}
-                  className="h-8 w-full max-w-[7.5rem] object-contain"
+                  className="h-10 w-full max-w-[8.5rem] object-contain"
                 />
               </div>
             ))}
