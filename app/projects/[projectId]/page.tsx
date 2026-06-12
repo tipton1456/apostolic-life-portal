@@ -274,13 +274,11 @@ export default async function ProjectDashboardPage({
           </section>
         ) : null}
 
-        <section className="mt-8">
-          <ProjectMilestoneTimelineProgress
-            milestones={milestones}
-            startDate={project.startDate}
-            targetEndDate={project.targetEndDate}
-          />
-        </section>
+        <ProjectMilestoneTimelineProgress
+          milestones={milestones}
+          startDate={project.startDate}
+          targetEndDate={project.targetEndDate}
+        />
 
         <ProjectPieCardsSection
           atRiskTasks={stats.atRiskTasks}
