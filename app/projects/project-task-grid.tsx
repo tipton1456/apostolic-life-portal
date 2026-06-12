@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AdminFormButton from "@/app/admin/admin-form-button";
 import TaskAssigneeField from "@/app/projects/task-assignee-field";
 import TaskDueDateField from "@/app/projects/task-due-date-field";
@@ -30,6 +30,9 @@ const TASK_VIEWS: Array<{ id: TaskView; label: string }> = [
   { id: "completed", label: "Completed" },
   { id: "all", label: "All Tasks" },
 ];
+
+const COLLAPSED_TASK_LIMIT = 3;
+const EXPANDED_VISIBLE_ROWS = 8;
 
 const EMPTY_MESSAGES: Record<TaskView, string> = {
   "my-tasks": "No tasks are assigned to you on this project.",
@@ -69,12 +72,23 @@ export default function ProjectTaskGrid({
 }) {
   const [view, setView] = useState<TaskView>("my-tasks");
   const [showAddTask, setShowAddTask] = useState(false);
+  const [isListExpanded, setIsListExpanded] = useState(false);
 
   const filteredTasks = useMemo(
     () => filterTasks(tasks, view, currentUserId),
     [tasks, view, currentUserId],
   );
+  const visibleTasks = isListExpanded
+    ? filteredTasks
+    : filteredTasks.slice(0, COLLAPSED_TASK_LIMIT);
+  const showExpandControl = filteredTasks.length > COLLAPSED_TASK_LIMIT;
+  const shouldScrollList =
+    isListExpanded && filteredTasks.length > EXPANDED_VISIBLE_ROWS;
   const canAddTasks = canManageTasks && !isProjectCompleted;
+
+  useEffect(() => {
+    setIsListExpanded(false);
+  }, [view]);
 
   return (
     <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
@@ -82,7 +96,9 @@ export default function ProjectTaskGrid({
         <div>
           <h2 className="text-2xl font-semibold text-lime-200">Project Tasks</h2>
           <p className="mt-1 text-sm text-neutral-400">
-            {filteredTasks.length} task{filteredTasks.length === 1 ? "" : "s"} shown
+            {isListExpanded
+              ? `${filteredTasks.length} task${filteredTasks.length === 1 ? "" : "s"}`
+              : `Showing ${visibleTasks.length} of ${filteredTasks.length} task${filteredTasks.length === 1 ? "" : "s"}`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -164,14 +180,32 @@ export default function ProjectTaskGrid({
       ) : null}
 
       {filteredTasks.length > 0 ? (
-        <TaskListTable
-          canManageTasks={canManageTasks}
-          currentUserId={currentUserId}
-          highlightedTaskId={highlightedTaskId}
-          projectId={projectId}
-          taskUpdatesByTaskId={taskUpdatesByTaskId}
-          tasks={filteredTasks}
-        />
+        <>
+          <TaskListTable
+            canManageTasks={canManageTasks}
+            currentUserId={currentUserId}
+            highlightedTaskId={highlightedTaskId}
+            maxVisibleRows={shouldScrollList ? EXPANDED_VISIBLE_ROWS : undefined}
+            projectId={projectId}
+            taskUpdatesByTaskId={taskUpdatesByTaskId}
+            tasks={visibleTasks}
+          />
+          {showExpandControl ? (
+            <div className="flex justify-end border-t border-white/10 px-5 py-3">
+              <button
+                type="button"
+                onClick={() => setIsListExpanded((current) => !current)}
+                aria-expanded={isListExpanded}
+                aria-label={
+                  isListExpanded ? "Collapse task list" : "Expand task list"
+                }
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-neutral-950/70 text-lg font-semibold text-lime-300 transition hover:border-lime-300/40 hover:bg-lime-400/10"
+              >
+                {isListExpanded ? "−" : "+"}
+              </button>
+            </div>
+          ) : null}
+        </>
       ) : (
         <p className="px-5 py-4 text-sm text-neutral-400">{EMPTY_MESSAGES[view]}</p>
       )}

@@ -32,6 +32,8 @@ const STATUS_RANK: Record<TaskStatus, number> = {
   completed: 3,
 };
 
+const TASK_ROW_HEIGHT_REM = 3.75;
+
 export default function TaskListTable({
   tasks,
   projectId,
@@ -39,6 +41,7 @@ export default function TaskListTable({
   canManageTasks,
   taskUpdatesByTaskId,
   highlightedTaskId,
+  maxVisibleRows,
 }: {
   tasks: ProjectTask[];
   projectId: string;
@@ -46,6 +49,7 @@ export default function TaskListTable({
   canManageTasks: boolean;
   taskUpdatesByTaskId: Record<string, ProjectTaskUpdate[]>;
   highlightedTaskId?: string;
+  maxVisibleRows?: number;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("title");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -112,7 +116,16 @@ export default function TaskListTable({
           />
           <span className="text-right">Action</span>
         </div>
-        <div className="divide-y divide-white/10">
+        <div
+          className={`divide-y divide-white/10 ${
+            maxVisibleRows ? "overflow-y-auto pr-1" : ""
+          }`}
+          style={
+            maxVisibleRows
+              ? { maxHeight: `${maxVisibleRows * TASK_ROW_HEIGHT_REM}rem` }
+              : undefined
+          }
+        >
           {sortedTasks.map((task) => {
             const updates = taskUpdatesByTaskId[task.id] ?? [];
             const canEdit =
