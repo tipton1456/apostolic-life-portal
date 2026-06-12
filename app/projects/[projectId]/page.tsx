@@ -265,19 +265,20 @@ export default async function ProjectDashboardPage({
           </section>
         ) : null}
 
-        <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <section className="mt-8">
+          <ProjectMilestoneTimelineProgress
+            milestones={milestones}
+            startDate={project.startDate}
+            targetEndDate={project.targetEndDate}
+          />
+        </section>
+
+        <section className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <CompletionPieCard
             completedTasks={stats.completedTasks}
             percent={stats.completionPercent}
             totalTasks={stats.totalTasks}
           />
-          <div className="md:col-span-2 xl:col-span-2">
-            <ProjectMilestoneTimelineProgress
-              milestones={milestones}
-              startDate={project.startDate}
-              targetEndDate={project.targetEndDate}
-            />
-          </div>
           <MetricCard
             label="Outstanding"
             value={String(stats.outstandingTasks)}
