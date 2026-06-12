@@ -11,6 +11,7 @@ import {
   normalizeProjectRow,
   PROJECT_SELECT_WITH_ARCHIVE,
 } from "@/lib/project-db-compat";
+import { buildAssigneeNameById } from "@/lib/project-assignee-options";
 import {
   formatDisplayDate,
   formatProjectStatus,
@@ -18,6 +19,10 @@ import {
   isTaskOpenOutstanding,
   isTaskOverdue,
 } from "@/lib/project-management-utils";
+import {
+  listPortalParticipantRoleUsers,
+  listProjectManagersForAssignee,
+} from "@/lib/project-management";
 import type { Project, ProjectStatus, ProjectTask } from "@/lib/project-management";
 import { isPortalProjectManager } from "@/lib/portal-project-roles";
 import { getCurrentPortalUser } from "@/lib/portal-users";
@@ -86,8 +91,15 @@ async function loadProjectSummaryReportContext(projectId: string) {
     throw new ProjectSummaryReportError("You do not have access to this project.", 403);
   }
 
-  const [{ data: projectRow, error: projectError }, { data: taskRows, error: taskError }, members, updates, managers] =
-    await Promise.all([
+  const [
+    { data: projectRow, error: projectError },
+    { data: taskRows, error: taskError },
+    members,
+    updates,
+    managers,
+    assigneeManagers,
+    portalParticipants,
+  ] = await Promise.all([
       supabase
         .from("projects")
         .select(PROJECT_SELECT_WITH_ARCHIVE)
@@ -103,6 +115,8 @@ async function loadProjectSummaryReportContext(projectId: string) {
       loadProjectMemberNames(projectId),
       listProjectTaskUpdates(projectId).catch(() => []),
       loadProjectManagerNames(),
+      listProjectManagersForAssignee().catch(() => []),
+      listPortalParticipantRoleUsers().catch(() => []),
     ]);
 
   if (projectError || !projectRow) {
@@ -114,7 +128,20 @@ async function loadProjectSummaryReportContext(projectId: string) {
   }
 
   const project = mapProject(normalizeProjectRow(projectRow));
-  const memberNameById = new Map(members.map((member) => [member.userId, member.fullName]));
+  const assigneeNameById = buildAssigneeNameById({
+    members: members.map((member) => ({
+      id: member.userId,
+      fullName: member.fullName,
+    })),
+    managers: assigneeManagers.map((manager) => ({
+      id: manager.id,
+      fullName: manager.fullName,
+    })),
+    portalParticipants: portalParticipants.map((participant) => ({
+      id: participant.id,
+      fullName: participant.fullName,
+    })),
+  });
   const tasks = ((taskRows ?? []) as Array<{
     id: string;
     title: string;
@@ -127,7 +154,7 @@ async function loadProjectSummaryReportContext(projectId: string) {
     title: task.title,
     status: task.status,
     dueDate: task.due_date,
-    assignedName: memberNameById.get(task.assigned_to ?? "") ?? "Unassigned",
+    assignedName: assigneeNameById.get(task.assigned_to ?? "") ?? "Unassigned",
     createdAt: task.created_at,
   }));
 

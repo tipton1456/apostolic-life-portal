@@ -80,3 +80,33 @@ export function buildPortalUserPickerOptions(
     label: user.fullName,
   }));
 }
+
+export function buildAssigneeNameById({
+  members,
+  managers,
+  portalParticipants,
+}: {
+  members: AssigneePerson[];
+  managers: AssigneePerson[];
+  portalParticipants: AssigneePerson[];
+}) {
+  const names = new Map<string, string>();
+
+  for (const member of members) {
+    names.set(member.id, member.fullName);
+  }
+
+  for (const manager of managers) {
+    if (!names.has(manager.id)) {
+      names.set(manager.id, manager.fullName);
+    }
+  }
+
+  for (const participant of portalParticipants) {
+    if (!names.has(participant.id)) {
+      names.set(participant.id, participant.fullName);
+    }
+  }
+
+  return names;
+}

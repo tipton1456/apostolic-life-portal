@@ -17,6 +17,7 @@ import {
   resolveTaskAssigneeFromForm,
   sendTaskAssignmentNotifications,
 } from "@/lib/project-participant-onboarding";
+import { buildAssigneeNameById } from "@/lib/project-assignee-options";
 import { CREATE_NEW_ASSIGNEE_VALUE } from "@/lib/project-participant-constants";
 import {
   isTaskAtRisk,
@@ -552,19 +553,32 @@ export async function getProjectDashboard(
   const currentUser = await requireProjectAreaAccess();
   const access = await getProjectPermissions(projectId, currentUser);
   const supabase = await createClient();
-  const [{ data: project, error: projectError }, { data: tasks, error: taskError }, members] =
-    await Promise.all([
-      fetchProjectById(supabase, projectId),
-      supabase
-        .from("project_tasks")
-        .select(
-          "id,project_id,title,description,status,priority,start_date,due_date,completed_at,sort_order,assigned_to,created_by,created_at,updated_at",
-        )
-        .eq("project_id", projectId)
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: true }),
-      loadProjectMembers(projectId),
-    ]);
+  const [
+    { data: project, error: projectError },
+    { data: tasks, error: taskError },
+    members,
+    managers,
+    portalParticipants,
+  ] = await Promise.all([
+    fetchProjectById(supabase, projectId),
+    supabase
+      .from("project_tasks")
+      .select(
+        "id,project_id,title,description,status,priority,start_date,due_date,completed_at,sort_order,assigned_to,created_by,created_at,updated_at",
+      )
+      .eq("project_id", projectId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+    loadProjectMembers(projectId),
+    listProjectManagersForAssignee().catch((error) => {
+      console.error("Project dashboard manager lookup failed:", error);
+      return [];
+    }),
+    listPortalParticipantRoleUsers().catch((error) => {
+      console.error("Project dashboard participant lookup failed:", error);
+      return [];
+    }),
+  ]);
 
   if (projectError) {
     console.error("Project lookup failed:", projectError);
@@ -578,11 +592,22 @@ export async function getProjectDashboard(
 
   if (!project || !access.canView) return null;
 
-  const memberNameById = new Map(
-    members.map((member) => [member.userId, member.fullName]),
-  );
+  const assigneeNameById = buildAssigneeNameById({
+    members: members.map((member) => ({
+      id: member.userId,
+      fullName: member.fullName,
+    })),
+    managers: managers.map((manager) => ({
+      id: manager.id,
+      fullName: manager.fullName,
+    })),
+    portalParticipants: portalParticipants.map((participant) => ({
+      id: participant.id,
+      fullName: participant.fullName,
+    })),
+  });
   const mappedTasks = ((tasks ?? []) as ProjectTaskRow[]).map((task) =>
-    mapTask(task, memberNameById.get(task.assigned_to ?? "") ?? null),
+    mapTask(task, assigneeNameById.get(task.assigned_to ?? "") ?? null),
   );
   const stats = calculateTaskStats(
     mappedTasks.map((task) => ({
