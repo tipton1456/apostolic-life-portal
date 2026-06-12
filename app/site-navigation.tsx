@@ -5,6 +5,7 @@ import { canCurrentUserAccessProjects } from "@/lib/project-management";
 import { isCurrentUserPortalAdmin } from "@/lib/portal-users";
 import { getPlanningCenterLeaderTeamsForEmail } from "@/lib/planning-center";
 import { getCurrentSessionUser } from "@/lib/demo";
+import { getPortalAboutInfo } from "@/lib/portal-about";
 import SiteNavigationMenu from "./site-navigation-menu";
 
 export default async function SiteNavigation({
@@ -25,6 +26,7 @@ export default async function SiteNavigation({
     menuProfilePicture,
     isPortalAdmin,
     canAccessProjects,
+    aboutInfo,
   ] = await Promise.all([
     getHousehold(user.email ?? undefined),
     getLeaderGroupsForEmail(user.email ?? undefined),
@@ -32,6 +34,7 @@ export default async function SiteNavigation({
     getMenuProfilePicture(user.email ?? undefined, user.isDemo),
     user.isDemo ? false : isCurrentUserPortalAdmin(),
     user.isDemo ? false : canCurrentUserAccessProjects(),
+    getPortalAboutInfo(),
   ]);
   const memberName = household?.primary
     ? `${household.primary.firstName} ${household.primary.lastName}`
@@ -55,6 +58,7 @@ export default async function SiteNavigation({
 
   return (
     <SiteNavigationMenu
+      aboutVersion={aboutInfo.version}
       className={className}
       memberName={memberName}
       navigationItems={navigationItems}

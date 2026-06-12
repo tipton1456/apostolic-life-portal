@@ -49,6 +49,55 @@ export function getVercelDeploymentConfig() {
   };
 }
 
+export async function countPortalDeploymentsThisMonth() {
+  const token = process.env.VERCEL_API_TOKEN;
+
+  if (!token) {
+    return 0;
+  }
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const { project, teamId } = getVercelDeploymentConfig();
+  const params = new URLSearchParams({
+    limit: "100",
+    projectId: project,
+    since: String(startOfMonth.getTime()),
+  });
+
+  if (teamId) {
+    params.set("teamId", teamId);
+  }
+
+  const response = await fetch(
+    `${VERCEL_API_BASE_URL}/v6/deployments?${params.toString()}`,
+    {
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    console.error("Vercel monthly deployment count failed:", response.status);
+    return 0;
+  }
+
+  const result = (await response.json()) as VercelDeploymentResponse;
+
+  return (result.deployments ?? []).filter((deployment) => {
+    if (!deployment.createdAt) return false;
+
+    const createdAt = new Date(deployment.createdAt);
+
+    return (
+      createdAt.getFullYear() === now.getFullYear() &&
+      createdAt.getMonth() === now.getMonth()
+    );
+  }).length;
+}
+
 export async function listPortalDeployments(): Promise<PortalDeployment[]> {
   const token = process.env.VERCEL_API_TOKEN;
 

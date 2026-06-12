@@ -1,5 +1,6 @@
 "use client";
 
+import AboutMenuPanel from "@/app/about-menu-panel";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -10,6 +11,7 @@ type NavigationItem = {
 };
 
 type SiteNavigationMenuProps = {
+  aboutVersion: string;
   className?: string;
   memberName: string;
   navigationItems: NavigationItem[];
@@ -18,6 +20,7 @@ type SiteNavigationMenuProps = {
 };
 
 export default function SiteNavigationMenu({
+  aboutVersion,
   className = "",
   memberName,
   navigationItems,
@@ -29,6 +32,7 @@ export default function SiteNavigationMenu({
   return (
     <SiteNavigationMenuContent
       key={pathname}
+      aboutVersion={aboutVersion}
       className={className}
       memberName={memberName}
       navigationItems={navigationItems}
@@ -39,6 +43,7 @@ export default function SiteNavigationMenu({
 }
 
 function SiteNavigationMenuContent({
+  aboutVersion,
   className = "",
   memberName,
   navigationItems,
@@ -46,6 +51,7 @@ function SiteNavigationMenuContent({
   pictureCacheKey,
 }: SiteNavigationMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const pictureSrc = picture
@@ -123,6 +129,16 @@ function SiteNavigationMenuContent({
           <div className="border-t border-white/10 pt-2">
             <button
               type="button"
+              onClick={() => {
+                setIsOpen(false);
+                setIsAboutOpen(true);
+              }}
+              className="block w-full rounded-lg px-3 py-3 text-left text-sm font-medium text-neutral-100 transition hover:bg-white/10 hover:text-lime-300"
+            >
+              About
+            </button>
+            <button
+              type="button"
               disabled={isLoggingOut}
               onClick={handleLogout}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-3 text-left text-sm font-medium text-neutral-100 transition hover:bg-white/10 hover:text-lime-300 disabled:cursor-wait disabled:opacity-70"
@@ -137,6 +153,13 @@ function SiteNavigationMenuContent({
             </button>
           </div>
         </nav>
+      ) : null}
+
+      {isAboutOpen ? (
+        <AboutMenuPanel
+          onClose={() => setIsAboutOpen(false)}
+          version={aboutVersion}
+        />
       ) : null}
     </div>
   );
