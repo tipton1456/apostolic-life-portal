@@ -6,11 +6,11 @@ import { useEffect } from "react";
 const INTEGRATION_LOGOS = [
   { alt: "Tithe.ly", src: "/integrations/tithely.svg" },
   { alt: "Elvanto", src: "/integrations/elvanto.svg" },
-  { alt: "Planning Center", src: "/integrations/planning-center.svg" },
+  { alt: "Planning Center", src: "/integrations/NewPCO.png" },
   { alt: "Supabase", src: "/integrations/supabase-dark.svg" },
   { alt: "Twilio", src: "/integrations/twilio.svg" },
-  { alt: "Cognito Forms", src: "/integrations/cognito-forms.png" },
-  { alt: "GroupMe", src: "/integrations/groupme.png" },
+  { alt: "Cognito Forms", src: "/integrations/NewCognito.webp" },
+  { alt: "GroupMe", src: "/integrations/NewGroupMe.webp" },
   { alt: "Vercel", src: "/integrations/vercel.png" },
 ] as const;
 
