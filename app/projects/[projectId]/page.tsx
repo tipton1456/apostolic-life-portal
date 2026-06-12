@@ -212,6 +212,15 @@ export default async function ProjectDashboardPage({
                   <PortalIcon className="h-4 w-4" name="report" />
                   Project Summary Report
                 </a>
+                <a
+                  href={`/api/projects/${project.id}/cost-summary-report`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-lime-400 transition hover:text-lime-300"
+                >
+                  <PortalIcon className="h-4 w-4" name="report" />
+                  Project Cost Summary Report
+                </a>
                 <Link
                   href={`/projects/${project.id}/files`}
                   className="inline-flex items-center gap-2 text-lime-400 transition hover:text-lime-300"
