@@ -92,8 +92,12 @@ as $$
 $$;
 
 drop policy if exists "Project managers can read projects" on public.projects;
+drop policy if exists "Project viewers can read projects" on public.projects;
+drop policy if exists "Project managers can create projects" on public.projects;
 drop policy if exists "Project managers can update projects" on public.projects;
 drop policy if exists "Project managers can delete projects" on public.projects;
+drop policy if exists "Assigned project managers can update projects" on public.projects;
+drop policy if exists "Assigned project managers can delete projects" on public.projects;
 
 create policy "Project viewers can read projects"
   on public.projects
@@ -118,7 +122,11 @@ create policy "Assigned project managers can delete projects"
 
 drop policy if exists "Project managers can create tasks" on public.project_tasks;
 drop policy if exists "Project managers can update tasks" on public.project_tasks;
+drop policy if exists "Project managers and assignees can update tasks" on public.project_tasks;
 drop policy if exists "Project managers can delete tasks" on public.project_tasks;
+drop policy if exists "Assigned project managers can create tasks" on public.project_tasks;
+drop policy if exists "Assigned project managers and assignees can update tasks" on public.project_tasks;
+drop policy if exists "Assigned project managers can delete tasks" on public.project_tasks;
 
 create policy "Assigned project managers can create tasks"
   on public.project_tasks
@@ -153,6 +161,8 @@ create policy "Assigned project managers can delete tasks"
 
 drop policy if exists "Project managers can add members" on public.project_members;
 drop policy if exists "Project managers can remove members" on public.project_members;
+drop policy if exists "Assigned project managers can add members" on public.project_members;
+drop policy if exists "Assigned project managers can remove members" on public.project_members;
 
 create policy "Assigned project managers can add members"
   on public.project_members
@@ -166,6 +176,10 @@ create policy "Assigned project managers can remove members"
   on public.project_members
   for delete
   using (public.user_can_manage_project(project_id));
+
+drop policy if exists "Project viewers can read project managers" on public.project_managers;
+drop policy if exists "Assigned project managers can add project managers" on public.project_managers;
+drop policy if exists "Assigned project managers can remove project managers" on public.project_managers;
 
 create policy "Project viewers can read project managers"
   on public.project_managers
@@ -184,6 +198,11 @@ create policy "Assigned project managers can remove project managers"
   on public.project_managers
   for delete
   using (public.user_can_manage_project(project_id));
+
+drop policy if exists "Project viewers can read milestones" on public.project_milestones;
+drop policy if exists "Assigned project managers can create milestones" on public.project_milestones;
+drop policy if exists "Assigned project managers can update milestones" on public.project_milestones;
+drop policy if exists "Assigned project managers can delete milestones" on public.project_milestones;
 
 create policy "Project viewers can read milestones"
   on public.project_milestones
