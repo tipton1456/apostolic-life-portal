@@ -7,6 +7,7 @@ import type {
   RevenueCategory,
   RevenueStatus,
 } from "@/lib/project-revenue-utils";
+import { canUserManageProject } from "@/lib/project-access";
 import { isPortalProjectManager } from "@/lib/portal-project-roles";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import { createClient } from "@/lib/supabase/server";
@@ -228,21 +229,15 @@ function parseRevenueStatus(value: FormDataEntryValue | null): RevenueStatus {
 }
 
 async function requireProjectRevenueAccess(projectId: string) {
-  const currentUser = await requireProjectRevenueAreaAccess();
+  const currentUser = await getCurrentPortalUser();
 
-  if (isPortalProjectManager(currentUser)) {
-    return currentUser;
+  if (!currentUser) {
+    redirect("/login?next=/projects");
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("project_members")
-    .select("id")
-    .eq("project_id", projectId)
-    .eq("user_id", currentUser.id)
-    .maybeSingle();
+  const canManage = await canUserManageProject(projectId, currentUser);
 
-  if (error || !data) {
+  if (!canManage) {
     redirect("/projects");
   }
 

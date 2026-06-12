@@ -24,7 +24,7 @@ import {
   formatProjectStatus,
 } from "@/lib/project-management-utils";
 import {
-  canUserViewProject,
+  canUserManageProject,
   loadProjectManagerNamesForProject,
 } from "@/lib/project-access";
 import type { Project, ProjectStatus } from "@/lib/project-management";
@@ -93,9 +93,12 @@ async function loadProjectCostSummaryReportContext(projectId: string) {
   }
 
   const supabase = await createClient();
-  const canView = await canUserViewProject(projectId, currentUser);
-  if (!canView) {
-    throw new ProjectCostSummaryReportError("You do not have access to this project.", 403);
+  const canManage = await canUserManageProject(projectId, currentUser);
+  if (!canManage) {
+    throw new ProjectCostSummaryReportError(
+      "Only project managers can access project financials.",
+      403,
+    );
   }
 
   const [{ data: projectRow, error: projectError }, { data: expenseRows, error: expenseError }, members, managers] =

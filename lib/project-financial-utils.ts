@@ -9,8 +9,9 @@ import {
 } from "@/lib/project-revenue-utils";
 
 export type ProjectFinancialStats = {
-  totalRevenue: number;
-  totalExpense: number;
+  grossRevenue: number;
+  committedRevenue: number;
+  expenses: number;
   outstandingExpenses: number;
   netRevenue: number;
   expenseStats: ReturnType<typeof calculateProjectExpenseStats>;
@@ -24,14 +25,17 @@ export function calculateProjectFinancialStats(
   const expenseStats = calculateProjectExpenseStats(expenses);
   const revenueStats = calculateProjectRevenueStats(revenue);
 
-  const totalRevenue = revenueStats.totalAmount;
-  const totalExpense = expenseStats.totalAmount;
+  const grossRevenue = revenueStats.totalAmount;
+  const committedRevenue = revenueStats.committedAmount;
+  const expensesTotal = expenseStats.totalAmount;
   const outstandingExpenses = expenseStats.outstandingAmount;
-  const netRevenue = totalRevenue - totalExpense + outstandingExpenses;
+  const netRevenue =
+    grossRevenue - expensesTotal - committedRevenue + outstandingExpenses;
 
   return {
-    totalRevenue,
-    totalExpense,
+    grossRevenue,
+    committedRevenue,
+    expenses: expensesTotal,
     outstandingExpenses,
     netRevenue,
     expenseStats,

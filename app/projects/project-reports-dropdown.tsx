@@ -2,9 +2,12 @@
 
 import { PortalIcon } from "@/app/icons";
 
-const REPORT_OPTIONS = [
+const BASE_REPORT_OPTIONS = [
   { label: "Project Summary", path: "summary-report" },
   { label: "Tasks by Milestone", path: "milestone-report" },
+] as const;
+
+const FINANCIAL_REPORT_OPTIONS = [
   { label: "Expense Summary", path: "cost-summary-report" },
   { label: "Income Summary", path: "income-summary-report" },
   { label: "Financial Summary", path: "financial-summary-report" },
@@ -13,9 +16,15 @@ const REPORT_OPTIONS = [
 
 export default function ProjectReportsDropdown({
   projectId,
+  canViewFinancialReports = false,
 }: {
   projectId: string;
+  canViewFinancialReports?: boolean;
 }) {
+  const reportOptions = canViewFinancialReports
+    ? [...BASE_REPORT_OPTIONS, ...FINANCIAL_REPORT_OPTIONS]
+    : [...BASE_REPORT_OPTIONS];
+
   return (
     <label className="inline-flex flex-wrap items-center gap-2 text-sm font-semibold text-lime-400">
       <span className="inline-flex items-center gap-2">
@@ -36,7 +45,7 @@ export default function ProjectReportsDropdown({
         <option value="" disabled>
           Select a report...
         </option>
-        {REPORT_OPTIONS.map((option) => (
+        {reportOptions.map((option) => (
           <option key={option.path} value={option.path}>
             {option.label}
           </option>

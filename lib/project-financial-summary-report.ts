@@ -32,7 +32,7 @@ import {
   formatProjectStatus,
 } from "@/lib/project-management-utils";
 import {
-  canUserViewProject,
+  canUserManageProject,
   loadProjectManagerNamesForProject,
 } from "@/lib/project-access";
 import type { Project, ProjectStatus } from "@/lib/project-management";
@@ -107,9 +107,12 @@ async function loadProjectFinancialSummaryReportContext(projectId: string) {
   }
 
   const supabase = await createClient();
-  const canView = await canUserViewProject(projectId, currentUser);
-  if (!canView) {
-    throw new ProjectFinancialSummaryReportError("You do not have access to this project.", 403);
+  const canManage = await canUserManageProject(projectId, currentUser);
+  if (!canManage) {
+    throw new ProjectFinancialSummaryReportError(
+      "Only project managers can access project financials.",
+      403,
+    );
   }
 
   const [
@@ -480,9 +483,9 @@ class FinancialReportPdfRenderer {
   private drawTotalSummary(stats: ReturnType<typeof calculateProjectFinancialStats>) {
     this.page.drawRectangle({
       x: MARGIN,
-      y: this.y - 72,
+      y: this.y - 88,
       width: CONTENT_WIDTH,
-      height: 76,
+      height: 94,
       color: COLORS.headerFill,
       borderColor: COLORS.total,
       borderWidth: 1,
@@ -490,13 +493,14 @@ class FinancialReportPdfRenderer {
 
     const summaryLines: DetailLineSegment[][] = [
       [
-        { label: "Total Revenue:", value: formatCurrency(stats.totalRevenue) },
-        { label: "Total Expenses:", value: formatCurrency(stats.totalExpense) },
+        { label: "Gross Revenue:", value: formatCurrency(stats.grossRevenue) },
+        { label: "Committed Revenue:", value: formatCurrency(stats.committedRevenue) },
       ],
       [
+        { label: "Expenses:", value: formatCurrency(stats.expenses) },
         { label: "Outstanding Expenses:", value: formatCurrency(stats.outstandingExpenses) },
-        { label: "Net Revenue:", value: formatCurrency(stats.netRevenue) },
       ],
+      [{ label: "Net Revenue:", value: formatCurrency(stats.netRevenue) }],
     ];
 
     let summaryY = this.y - 16;
@@ -525,7 +529,7 @@ class FinancialReportPdfRenderer {
       summaryY -= 18;
     }
 
-    this.y -= 84;
+    this.y -= 100;
   }
 
   private drawSectionHeader(section: ReportSection) {

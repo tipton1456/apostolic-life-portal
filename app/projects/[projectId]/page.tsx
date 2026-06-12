@@ -71,24 +71,15 @@ export default async function ProjectDashboardPage({
 
   const { projectId } = await params;
   const { task: highlightedTaskId } = await searchParams;
-  const [dashboard, portalUser, projectFiles, taskUpdates, expenses, revenue] =
-    await Promise.all([
-      getProjectDashboard(projectId),
-      getCurrentPortalUser(),
-      listProjectFiles(projectId).catch(() => [] as ProjectTaskFile[]),
-      listProjectTaskUpdates(projectId).catch((error) => {
-        console.error("Project task updates lookup failed:", error);
-        return [];
-      }),
-      listProjectExpenses(projectId).catch((error) => {
-        console.error("Project expenses lookup failed:", error);
-        return [];
-      }),
-      listProjectRevenue(projectId).catch((error) => {
-        console.error("Project revenue lookup failed:", error);
-        return [];
-      }),
-    ]);
+  const [dashboard, portalUser, projectFiles, taskUpdates] = await Promise.all([
+    getProjectDashboard(projectId),
+    getCurrentPortalUser(),
+    listProjectFiles(projectId).catch(() => [] as ProjectTaskFile[]),
+    listProjectTaskUpdates(projectId).catch((error) => {
+      console.error("Project task updates lookup failed:", error);
+      return [];
+    }),
+  ]);
   const filesByTaskId = new Map<string, ProjectTaskFile[]>();
   const updatesByTaskId = new Map<string, ProjectTaskUpdate[]>();
 
@@ -118,6 +109,19 @@ export default async function ProjectDashboardPage({
 
   const { project, members, managers, milestones, tasks, stats, permissions } =
     dashboard;
+  const canViewFinancials = permissions.isManager;
+  const [expenses, revenue] = canViewFinancials
+    ? await Promise.all([
+        listProjectExpenses(projectId).catch((error) => {
+          console.error("Project expenses lookup failed:", error);
+          return [];
+        }),
+        listProjectRevenue(projectId).catch((error) => {
+          console.error("Project revenue lookup failed:", error);
+          return [];
+        }),
+      ])
+    : [[], []];
   const isProjectCompleted = project.status === "completed";
   const assigneeOptions = buildManagerTaskAssigneeOptions({
     members,
@@ -150,7 +154,9 @@ export default async function ProjectDashboardPage({
   });
   const taskFilesByTaskId = Object.fromEntries(filesByTaskId.entries());
   const taskUpdatesByTaskId = Object.fromEntries(updatesByTaskId.entries());
-  const financialStats = calculateProjectFinancialStats(expenses, revenue);
+  const financialStats = canViewFinancials
+    ? calculateProjectFinancialStats(expenses, revenue)
+    : null;
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
@@ -208,7 +214,10 @@ export default async function ProjectDashboardPage({
                     Project Settings
                   </Link>
                 ) : null}
-                <ProjectReportsDropdown projectId={project.id} />
+                <ProjectReportsDropdown
+                  canViewFinancialReports={canViewFinancials}
+                  projectId={project.id}
+                />
                 <Link
                   href={`/projects/${project.id}/files`}
                   className="inline-flex items-center gap-2 text-lime-400 transition hover:text-lime-300"
@@ -314,38 +323,47 @@ export default async function ProjectDashboardPage({
           tasks={tasks}
         />
 
-        <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            label="Total Revenue"
-            value={formatCurrency(financialStats.totalRevenue)}
-            detail={`${financialStats.revenueStats.activeEntries} active income entr${financialStats.revenueStats.activeEntries === 1 ? "y" : "ies"}`}
-          />
-          <MetricCard
-            label="Total Expense"
-            value={formatCurrency(financialStats.totalExpense)}
-            detail={`${financialStats.expenseStats.activeExpenses} active expense${financialStats.expenseStats.activeExpenses === 1 ? "" : "s"}`}
-          />
-          <MetricCard
-            label="Outstanding Expenses"
-            value={formatCurrency(financialStats.outstandingExpenses)}
-            detail="Committed costs"
-            highlight={financialStats.outstandingExpenses > 0}
-          />
-          <MetricCard
-            label="Net Revenue"
-            value={formatCurrency(financialStats.netRevenue)}
-            detail="Total revenue - total expenses + outstanding expenses"
-            highlight={financialStats.netRevenue < 0}
-          />
-        </section>
+        {canViewFinancials && financialStats ? (
+          <>
+            <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <MetricCard
+                label="Gross Revenue"
+                value={formatCurrency(financialStats.grossRevenue)}
+                detail={`${financialStats.revenueStats.activeEntries} active income entr${financialStats.revenueStats.activeEntries === 1 ? "y" : "ies"}`}
+              />
+              <MetricCard
+                label="Committed Revenue"
+                value={formatCurrency(financialStats.committedRevenue)}
+                detail="Income not yet received"
+              />
+              <MetricCard
+                label="Expenses"
+                value={formatCurrency(financialStats.expenses)}
+                detail={`${financialStats.expenseStats.activeExpenses} active expense${financialStats.expenseStats.activeExpenses === 1 ? "" : "s"}`}
+              />
+              <MetricCard
+                label="Outstanding Expenses"
+                value={formatCurrency(financialStats.outstandingExpenses)}
+                detail="Committed costs"
+                highlight={financialStats.outstandingExpenses > 0}
+              />
+              <MetricCard
+                label="Net Revenue"
+                value={formatCurrency(financialStats.netRevenue)}
+                detail="Gross revenue - expenses - committed revenue + outstanding expenses"
+                highlight={financialStats.netRevenue < 0}
+              />
+            </section>
 
-        <ProjectFinancialsSection
-          canManageFinancials={permissions.canManageTasks}
-          expenses={expenses}
-          isProjectCompleted={isProjectCompleted}
-          projectId={project.id}
-          revenue={revenue}
-        />
+            <ProjectFinancialsSection
+              canManageFinancials={permissions.canManageTasks}
+              expenses={expenses}
+              isProjectCompleted={isProjectCompleted}
+              projectId={project.id}
+              revenue={revenue}
+            />
+          </>
+        ) : null}
       </div>
 
       <Suspense fallback={null}>
@@ -376,18 +394,22 @@ export default async function ProjectDashboardPage({
           taskUpdatesByTaskId={taskUpdatesByTaskId}
           tasks={tasks}
         />
-        <ProjectExpenseModals
-          canManageExpenses={permissions.canManageTasks}
-          expenses={expenses}
-          isProjectCompleted={isProjectCompleted}
-          projectId={project.id}
-        />
-        <ProjectRevenueModals
-          canManageRevenue={permissions.canManageTasks}
-          isProjectCompleted={isProjectCompleted}
-          projectId={project.id}
-          revenue={revenue}
-        />
+        {canViewFinancials ? (
+          <>
+            <ProjectExpenseModals
+              canManageExpenses={permissions.canManageTasks}
+              expenses={expenses}
+              isProjectCompleted={isProjectCompleted}
+              projectId={project.id}
+            />
+            <ProjectRevenueModals
+              canManageRevenue={permissions.canManageTasks}
+              isProjectCompleted={isProjectCompleted}
+              projectId={project.id}
+              revenue={revenue}
+            />
+          </>
+        ) : null}
       </Suspense>
     </main>
   );

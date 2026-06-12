@@ -3,7 +3,7 @@ import {
   normalizeProjectRow,
   PROJECT_SELECT_WITH_ARCHIVE,
 } from "@/lib/project-db-compat";
-import { canUserViewProject } from "@/lib/project-access";
+import { canUserManageProject } from "@/lib/project-access";
 import type { ProjectExpense } from "@/lib/project-expense-utils";
 import type { ProjectRevenue } from "@/lib/project-revenue-utils";
 import { getCurrentPortalUser } from "@/lib/portal-users";
@@ -45,10 +45,13 @@ async function loadProjectFinancialExportContext(projectId: string) {
     );
   }
 
-  const canView = await canUserViewProject(projectId, currentUser);
+  const canManage = await canUserManageProject(projectId, currentUser);
 
-  if (!canView) {
-    throw new ProjectFinancialExportError("You do not have access to this project.", 403);
+  if (!canManage) {
+    throw new ProjectFinancialExportError(
+      "Only project managers can access project financials.",
+      403,
+    );
   }
 
   const supabase = await createClient();
