@@ -5,6 +5,8 @@ import { PortalIcon } from "@/app/icons";
 const BASE_REPORT_OPTIONS = [
   { label: "Project Summary", path: "summary-report" },
   { label: "Tasks by Milestone", path: "milestone-report" },
+  { label: "Tasks by User", path: "tasks-by-user-report" },
+  { label: "My Tasks", path: "my-tasks-report" },
 ] as const;
 
 const FINANCIAL_REPORT_OPTIONS = [
