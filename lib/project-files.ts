@@ -247,15 +247,15 @@ export async function storeProjectTaskFile({
   return insertResult.data.id;
 }
 
-export async function uploadProjectTaskFile(formData: FormData) {
+export async function uploadOneProjectTaskFile(formData: FormData) {
   await requireProjectFilesAccess();
 
   const projectId = String(formData.get("projectId") || "");
   const taskId = String(formData.get("taskId") || "");
-  const files = parseProjectTaskUploadFiles(formData.getAll("taskFile"));
+  const file = parseProjectTaskUploadFile(formData.get("taskFile"));
 
-  if (!projectId || !taskId || files.length === 0) {
-    throw new Error("Project ID, task ID, and at least one file are required.");
+  if (!projectId || !taskId || !file) {
+    throw new Error("Project ID, task ID, and file are required.");
   }
 
   await requireProjectFilesAccessForProject(projectId);
@@ -269,30 +269,34 @@ export async function uploadProjectTaskFile(formData: FormData) {
     redirect("/login?next=/projects");
   }
 
-  const { count, error: countError } = await supabase
-    .from("project_task_files")
-    .select("id", { count: "exact", head: true })
-    .eq("task_id", taskId);
-
-  if (countError) {
-    throw new Error("Unable to validate task file count.");
-  }
-
-  if ((count ?? 0) + files.length > MAX_FILES_PER_TASK) {
-    throw new Error(`Each task can have up to ${MAX_FILES_PER_TASK} files.`);
-  }
-
-  for (const file of files) {
-    await storeProjectTaskFile({
-      file,
-      projectId,
-      taskId,
-      uploadedBy: user.id,
-      skipCapacityCheck: true,
-    });
-  }
+  await storeProjectTaskFile({
+    file,
+    projectId,
+    taskId,
+    uploadedBy: user.id,
+  });
 
   revalidateProjectFilePaths(projectId);
+
+  return { ok: true as const };
+}
+
+export async function uploadProjectTaskFile(formData: FormData) {
+  const projectId = String(formData.get("projectId") || "");
+  const taskId = String(formData.get("taskId") || "");
+  const files = parseProjectTaskUploadFiles(formData.getAll("taskFile"));
+
+  if (!projectId || !taskId || files.length === 0) {
+    throw new Error("Project ID, task ID, and at least one file are required.");
+  }
+
+  if (files.length > 1) {
+    throw new Error(
+      "Upload one file at a time through this form, or use the task file picker which uploads multiple files sequentially.",
+    );
+  }
+
+  await uploadOneProjectTaskFile(formData);
   redirect(`/projects/${projectId}?task=${taskId}`);
 }
 

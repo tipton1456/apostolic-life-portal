@@ -19,7 +19,8 @@ import {
   updateProjectTask,
 } from "@/lib/project-management";
 import type { ProjectTaskFile } from "@/lib/project-files";
-import { deleteProjectTaskFile, uploadProjectTaskFile } from "@/lib/project-files";
+import { deleteProjectTaskFile } from "@/lib/project-files";
+import TaskFilesUploadForm from "@/app/projects/task-files-upload-form";
 import {
   formatProjectFileDate,
   formatProjectFileSize,
@@ -372,28 +373,11 @@ export default function ProjectTaskModals({
                 </p>
               )}
               {!isProjectCompleted && canEdit ? (
-                <form
-                  action={uploadProjectTaskFile}
-                  encType="multipart/form-data"
-                  className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]"
-                >
-                  <input type="hidden" name="projectId" value={projectId} />
-                  <input type="hidden" name="taskId" value={activeTask.id} />
-                  <label className="block text-sm font-medium text-neutral-300">
-                    Attach files
-                    <input
-                      name="taskFile"
-                      type="file"
-                      multiple
-                      required
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,image/*"
-                      className="mt-2 block w-full text-sm text-neutral-300 file:mr-4 file:rounded-lg file:border-0 file:bg-lime-400 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-neutral-950 hover:file:bg-lime-300"
-                    />
-                  </label>
-                  <AdminFormButton pendingLabel="Uploading..." className="md:mt-7">
-                    Upload Files
-                  </AdminFormButton>
-                </form>
+                <TaskFilesUploadForm
+                  currentFileCount={taskFiles.length}
+                  projectId={projectId}
+                  taskId={activeTask.id}
+                />
               ) : null}
             </section>
           </div>

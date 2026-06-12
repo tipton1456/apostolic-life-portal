@@ -1,4 +1,5 @@
-const MAX_PROJECT_FILE_BYTES = 25 * 1024 * 1024;
+export const MAX_PROJECT_FILE_BYTES = 25 * 1024 * 1024;
+export const MAX_PROJECT_FILE_SIZE_LABEL = "25 MB";
 
 const ALLOWED_PROJECT_FILE_TYPES = new Set([
   "application/pdf",
