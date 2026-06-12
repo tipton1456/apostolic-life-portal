@@ -20,11 +20,14 @@ import {
   isTaskOverdue,
 } from "@/lib/project-management-utils";
 import {
+  canUserViewProject,
+  loadProjectManagerNamesForProject,
+} from "@/lib/project-access";
+import {
   listPortalParticipantRoleUsers,
-  listProjectManagersForAssignee,
+  listProjectManagers,
 } from "@/lib/project-management";
 import type { Project, ProjectStatus, ProjectTask } from "@/lib/project-management";
-import { isPortalProjectManager } from "@/lib/portal-project-roles";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import { listProjectTaskUpdates } from "@/lib/project-task-updates";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -86,7 +89,7 @@ async function loadProjectSummaryReportContext(projectId: string) {
   }
 
   const supabase = await createClient();
-  const canView = await userCanViewProject(projectId, currentUser);
+  const canView = await canUserViewProject(projectId, currentUser);
   if (!canView) {
     throw new ProjectSummaryReportError("You do not have access to this project.", 403);
   }
@@ -114,8 +117,8 @@ async function loadProjectSummaryReportContext(projectId: string) {
         .order("created_at", { ascending: true }),
       loadProjectMemberNames(projectId),
       listProjectTaskUpdates(projectId).catch(() => []),
-      loadProjectManagerNames(),
-      listProjectManagersForAssignee().catch(() => []),
+      loadProjectManagerNamesForProject(projectId),
+      listProjectManagers(projectId).catch(() => []),
       listPortalParticipantRoleUsers().catch(() => []),
     ]);
 
@@ -134,7 +137,7 @@ async function loadProjectSummaryReportContext(projectId: string) {
       fullName: member.fullName,
     })),
     managers: assigneeManagers.map((manager) => ({
-      id: manager.id,
+      id: manager.userId,
       fullName: manager.fullName,
     })),
     portalParticipants: portalParticipants.map((participant) => ({
@@ -177,29 +180,7 @@ async function loadProjectSummaryReportContext(projectId: string) {
   };
 }
 
-async function userCanViewProject(
-  projectId: string,
-  currentUser: NonNullable<Awaited<ReturnType<typeof getCurrentPortalUser>>>,
-) {
-  if (isPortalProjectManager(currentUser)) {
-    return true;
-  }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("project_members")
-    .select("id")
-    .eq("project_id", projectId)
-    .eq("user_id", currentUser.id)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Project report permission lookup failed:", error);
-    return false;
-  }
-
-  return Boolean(data);
-}
 
 async function loadProjectMemberNames(projectId: string) {
   const supabase = await createClient();
@@ -233,33 +214,6 @@ async function loadProjectMemberNames(projectId: string) {
       [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
       (profile.email as string),
   }));
-}
-
-async function loadProjectManagerNames() {
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("portal_users")
-    .select("email,first_name,last_name,is_admin,project_role,can_access_projects")
-    .or("is_admin.eq.true,project_role.eq.project_manager,can_access_projects.eq.true")
-    .order("email", { ascending: true });
-
-  if (error) {
-    console.error("Project report manager lookup failed:", error);
-    return [];
-  }
-
-  return (data ?? [])
-    .filter(
-      (profile) =>
-        profile.is_admin ||
-        profile.project_role === "project_manager" ||
-        profile.can_access_projects,
-    )
-    .map(
-      (profile) =>
-        [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
-        (profile.email as string),
-    );
 }
 
 function buildReportSections(

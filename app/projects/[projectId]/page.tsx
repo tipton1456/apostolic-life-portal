@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PortalIcon } from "@/app/icons";
 import HighlightTask from "@/app/projects/highlight-task";
+import ProjectMilestoneTimelineProgress from "@/app/projects/project-milestone-timeline-progress";
 import ProjectSettingsModal from "@/app/projects/project-settings-modal";
 import ProjectTaskModals from "@/app/projects/project-task-modals";
 import ProjectTeamPanel from "@/app/projects/project-team-panel";
@@ -31,9 +32,9 @@ import { listProjectRevenue } from "@/lib/project-revenue";
 import {
   canCurrentUserAccessProjects,
   getProjectDashboard,
+  listEligibleManagersToAdd,
   listPortalParticipantRoleUsers,
   listPortalUsersAvailableForProject,
-  listProjectManagersForAssignee,
 } from "@/lib/project-management";
 import {
   listProjectTaskUpdates,
@@ -102,29 +103,26 @@ export default async function ProjectDashboardPage({
     existing.push(update);
     updatesByTaskId.set(update.taskId, existing);
   }
-  const [availablePortalUsers, projectManagers, portalParticipants] =
+  const [availablePortalUsers, eligibleManagers, portalParticipants] =
     dashboard?.permissions.canManageMembers
       ? await Promise.all([
           listPortalUsersAvailableForProject(projectId),
-          listProjectManagersForAssignee(),
+          listEligibleManagersToAdd(projectId),
           listPortalParticipantRoleUsers(),
         ])
-      : [
-          [],
-          await listProjectManagersForAssignee().catch(() => []),
-          await listPortalParticipantRoleUsers().catch(() => []),
-        ];
+      : [[], [], await listPortalParticipantRoleUsers().catch(() => [])];
 
   if (!dashboard || !portalUser) {
     notFound();
   }
 
-  const { project, members, tasks, stats, permissions } = dashboard;
+  const { project, members, managers, milestones, tasks, stats, permissions } =
+    dashboard;
   const isProjectCompleted = project.status === "completed";
   const assigneeOptions = buildManagerTaskAssigneeOptions({
     members,
-    managers: projectManagers.map((manager) => ({
-      id: manager.id,
+    managers: managers.map((manager) => ({
+      id: manager.userId,
       fullName: manager.fullName,
     })),
     portalParticipants: portalParticipants.map((participant) => ({
@@ -141,8 +139,8 @@ export default async function ProjectDashboardPage({
   const participantAssigneeOptions = buildParticipantHandoffOptions({
     currentUserId: portalUser.id,
     members,
-    managers: projectManagers.map((manager) => ({
-      id: manager.id,
+    managers: managers.map((manager) => ({
+      id: manager.userId,
       fullName: manager.fullName,
     })),
     portalParticipants: portalParticipants.map((participant) => ({
@@ -227,7 +225,7 @@ export default async function ProjectDashboardPage({
                 email: candidate.email,
               }))}
               canManageMembers={permissions.canManageMembers}
-              managerNames={projectManagers.map((manager) => manager.fullName)}
+              managerNames={managers.map((manager) => manager.fullName)}
               participantNames={members.map((member) => member.fullName)}
               projectId={project.id}
             />
@@ -267,12 +265,19 @@ export default async function ProjectDashboardPage({
           </section>
         ) : null}
 
-        <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <CompletionPieCard
             completedTasks={stats.completedTasks}
             percent={stats.completionPercent}
             totalTasks={stats.totalTasks}
           />
+          <div className="md:col-span-2 xl:col-span-2">
+            <ProjectMilestoneTimelineProgress
+              milestones={milestones}
+              startDate={project.startDate}
+              targetEndDate={project.targetEndDate}
+            />
+          </div>
           <MetricCard
             label="Outstanding"
             value={String(stats.outstandingTasks)}
@@ -295,12 +300,15 @@ export default async function ProjectDashboardPage({
 
         <ProjectTaskGrid
           assigneeOptions={assigneeOptions}
+          milestones={milestones}
           portalUserOptions={portalUserOptions}
           canManageTasks={permissions.canManageTasks}
           currentUserId={portalUser.id}
           highlightedTaskId={highlightedTaskId}
           isProjectCompleted={isProjectCompleted}
+          projectEndDate={project.targetEndDate}
           projectId={project.id}
+          projectStartDate={project.startDate}
           taskUpdatesByTaskId={taskUpdatesByTaskId}
           tasks={tasks}
         />
@@ -342,17 +350,27 @@ export default async function ProjectDashboardPage({
       <Suspense fallback={null}>
         <ProjectSettingsModal
           canManageProject={permissions.canManageProject}
+          eligibleManagers={eligibleManagers.map((manager) => ({
+            id: manager.id,
+            fullName: manager.fullName,
+            email: manager.email,
+          }))}
+          managers={managers}
+          milestones={milestones}
           project={project}
         />
         <ProjectTaskModals
           assigneeOptions={assigneeOptions}
+          milestones={milestones}
           portalUserOptions={portalUserOptions}
           canManageTasks={permissions.canManageTasks}
           canReassignTasks={permissions.canReassignTasks}
           currentUserId={portalUser.id}
           isProjectCompleted={isProjectCompleted}
           participantAssigneeOptions={participantAssigneeOptions}
+          projectEndDate={project.targetEndDate}
           projectId={project.id}
+          projectStartDate={project.startDate}
           taskFilesByTaskId={taskFilesByTaskId}
           taskUpdatesByTaskId={taskUpdatesByTaskId}
           tasks={tasks}

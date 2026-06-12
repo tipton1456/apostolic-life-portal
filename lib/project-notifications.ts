@@ -27,7 +27,7 @@ export async function notifyProjectManagersTaskCompleted({
   senderEmail: string;
   taskTitle: string;
 }) {
-  const managers = await listProjectManagerContacts();
+  const managers = await listProjectManagerContacts(projectId);
   const loginUrl = buildPortalLoginUrl(`/projects/${projectId}`);
   const message = appendSmsOptOut(
     `Apostolic Life Projects: "${taskTitle}" was completed by ${completedByName} on ${projectName}. View: ${loginUrl}`,
@@ -162,17 +162,28 @@ export async function notifyProjectParticipantTaskAssigned({
   });
 }
 
-async function listProjectManagerContacts() {
+async function listProjectManagerContacts(projectId: string) {
   const admin = createAdminClient();
+  const { data: managerRows, error: managerError } = await admin
+    .from("project_managers")
+    .select("user_id")
+    .eq("project_id", projectId);
+
+  if (managerError) {
+    console.error("Project manager lookup failed:", managerError);
+    return [];
+  }
+
+  const userIds = (managerRows ?? []).map((row) => row.user_id as string);
+  if (userIds.length === 0) return [];
+
   const { data, error } = await admin
     .from("portal_users")
-    .select("id,email,first_name,last_name,is_admin,project_role,can_access_projects")
-    .or(
-      "is_admin.eq.true,project_role.eq.project_manager,can_access_projects.eq.true",
-    );
+    .select("id,email,first_name,last_name")
+    .in("id", userIds);
 
   if (error) {
-    console.error("Project manager lookup failed:", error);
+    console.error("Project manager profile lookup failed:", error);
     return [];
   }
 

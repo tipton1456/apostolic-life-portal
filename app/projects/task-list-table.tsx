@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { ProjectTask, TaskPriority, TaskStatus } from "@/lib/project-management";
 import type { ProjectTaskUpdate } from "@/lib/project-task-updates";
+import { formatTaskDueLabel } from "@/lib/project-milestone-utils";
 import {
-  formatDisplayDate,
   formatTaskPriority,
   formatTaskStatus,
   isTaskAtRisk,
@@ -150,7 +150,11 @@ export default function TaskListTable({
                       : "text-right text-neutral-300"
                   }
                 >
-                  {formatDisplayDate(task.dueDate)}
+                  {formatTaskDueLabel({
+                    dueDate: task.dueDate,
+                    dueDateMode: task.dueDateMode,
+                    milestoneName: task.milestoneName,
+                  })}
                 </p>
                 <p className="text-right tabular-nums text-neutral-400">
                   {updates.length}

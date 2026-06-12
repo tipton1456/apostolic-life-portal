@@ -5,11 +5,19 @@ import { useEffect } from "react";
 import AdminFormButton from "@/app/admin/admin-form-button";
 import { PortalIcon } from "@/app/icons";
 import {
+  addProjectManager,
   deleteProject,
+  removeProjectManager,
   updateProject,
   uploadProjectImage,
   type Project,
+  type ProjectManager,
 } from "@/lib/project-management";
+import {
+  createProjectMilestone,
+  deleteProjectMilestone,
+} from "@/lib/project-milestones";
+import type { ProjectMilestone } from "@/lib/project-milestone-utils";
 
 const PROJECT_STATUS_OPTIONS = [
   { value: "active", label: "Active" },
@@ -21,9 +29,15 @@ const PROJECT_STATUS_OPTIONS = [
 export default function ProjectSettingsModal({
   project,
   canManageProject,
+  managers,
+  eligibleManagers,
+  milestones,
 }: {
   project: Project;
   canManageProject: boolean;
+  managers: ProjectManager[];
+  eligibleManagers: Array<{ id: string; fullName: string; email: string }>;
+  milestones: ProjectMilestone[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -76,6 +90,118 @@ export default function ProjectSettingsModal({
         </div>
 
         <div className="space-y-6 px-5 py-5">
+          <section className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-500">
+              Project Managers
+            </h3>
+            <div className="mt-4 space-y-3">
+              {managers.map((manager) => (
+                <div
+                  key={manager.id}
+                  className="flex flex-col gap-3 rounded-lg border border-white/10 bg-neutral-950/40 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="font-medium text-neutral-100">{manager.fullName}</p>
+                    <p className="mt-1 text-xs text-neutral-500">{manager.email}</p>
+                  </div>
+                  {managers.length > 1 ? (
+                    <form action={removeProjectManager}>
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <input type="hidden" name="userId" value={manager.userId} />
+                      <AdminFormButton
+                        pendingLabel="Removing..."
+                        variant="danger"
+                        className="rounded-lg px-3 py-2 text-sm"
+                      >
+                        Remove
+                      </AdminFormButton>
+                    </form>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            {eligibleManagers.length > 0 ? (
+              <form action={addProjectManager} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                <input type="hidden" name="projectId" value={project.id} />
+                <label className="block flex-1 text-sm font-medium text-neutral-300">
+                  Add project manager
+                  <select
+                    name="userId"
+                    required
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
+                  >
+                    {eligibleManagers.map((manager) => (
+                      <option key={manager.id} value={manager.id}>
+                        {manager.fullName} ({manager.email})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <AdminFormButton pendingLabel="Adding..." className="rounded-lg px-4 py-3">
+                  Add Manager
+                </AdminFormButton>
+              </form>
+            ) : (
+              <p className="mt-4 text-xs text-neutral-500">
+                Every eligible project manager is already assigned to this project.
+              </p>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-500">
+              Milestones
+            </h3>
+            <p className="mt-2 text-xs leading-5 text-neutral-500">
+              Milestone dates must fall between the project start and target end dates.
+            </p>
+            {milestones.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                {milestones.map((milestone) => (
+                  <div
+                    key={milestone.id}
+                    className="flex flex-col gap-3 rounded-lg border border-white/10 bg-neutral-950/40 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="font-medium text-neutral-100">{milestone.name}</p>
+                      <p className="mt-1 text-xs text-neutral-500">
+                        {milestone.milestoneDate}
+                      </p>
+                    </div>
+                    <form action={deleteProjectMilestone}>
+                      <input type="hidden" name="projectId" value={project.id} />
+                      <input type="hidden" name="milestoneId" value={milestone.id} />
+                      <AdminFormButton
+                        pendingLabel="Deleting..."
+                        variant="danger"
+                        className="rounded-lg px-3 py-2 text-sm"
+                      >
+                        Delete
+                      </AdminFormButton>
+                    </form>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-neutral-500">No milestones yet.</p>
+            )}
+            <form action={createProjectMilestone} className="mt-4 grid gap-4 md:grid-cols-2">
+              <input type="hidden" name="projectId" value={project.id} />
+              <ModalField label="Milestone name" name="name" required />
+              <ModalField
+                label="Milestone date"
+                name="milestoneDate"
+                type="date"
+                min={project.startDate ?? undefined}
+                max={project.targetEndDate ?? undefined}
+                required
+              />
+              <div className="flex items-end justify-end md:col-span-2">
+                <AdminFormButton pendingLabel="Adding...">Add Milestone</AdminFormButton>
+              </div>
+            </form>
+          </section>
+
           <section className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-500">
               Project Details
@@ -219,12 +345,16 @@ function ModalField({
   type = "text",
   required,
   defaultValue,
+  min,
+  max,
 }: {
   label: string;
   name: string;
   type?: string;
   required?: boolean;
   defaultValue?: string;
+  min?: string;
+  max?: string;
 }) {
   return (
     <label className="block text-sm font-medium text-neutral-300">
@@ -234,6 +364,8 @@ function ModalField({
         type={type}
         required={required}
         defaultValue={defaultValue}
+        min={min}
+        max={max}
         className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
       />
     </label>

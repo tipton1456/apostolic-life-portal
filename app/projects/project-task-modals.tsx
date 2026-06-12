@@ -5,6 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import AdminFormButton from "@/app/admin/admin-form-button";
 import TaskAssigneeField from "@/app/projects/task-assignee-field";
+import TaskDueDateField from "@/app/projects/task-due-date-field";
+import type { ProjectMilestone } from "@/lib/project-milestone-utils";
+import { formatTaskDueLabel } from "@/lib/project-milestone-utils";
 import { PortalIcon } from "@/app/icons";
 import { addProjectTaskUpdate } from "@/lib/project-task-updates";
 import type { ProjectTaskUpdate } from "@/lib/project-task-updates";
@@ -42,6 +45,9 @@ export default function ProjectTaskModals({
   assigneeOptions,
   portalUserOptions = [],
   participantAssigneeOptions,
+  milestones,
+  projectStartDate,
+  projectEndDate,
   taskFilesByTaskId,
   taskUpdatesByTaskId,
   isProjectCompleted,
@@ -54,6 +60,9 @@ export default function ProjectTaskModals({
   assigneeOptions: AssigneeOption[];
   portalUserOptions?: AssigneeOption[];
   participantAssigneeOptions: AssigneeOption[];
+  milestones: ProjectMilestone[];
+  projectStartDate: string | null;
+  projectEndDate: string | null;
   taskFilesByTaskId: Record<string, ProjectTaskFile[]>;
   taskUpdatesByTaskId: Record<string, ProjectTaskUpdate[]>;
   isProjectCompleted: boolean;
@@ -119,7 +128,11 @@ export default function ProjectTaskModals({
               <p className="mt-2 text-sm text-neutral-400">
                 {formatTaskStatus(activeTask.status)} ·{" "}
                 {formatTaskPriority(activeTask.priority)} · Due{" "}
-                {formatDisplayDate(activeTask.dueDate)}
+                {formatTaskDueLabel({
+                  dueDate: activeTask.dueDate,
+                  dueDateMode: activeTask.dueDateMode,
+                  milestoneName: activeTask.milestoneName,
+                })}
               </p>
             </div>
             <button
@@ -158,16 +171,22 @@ export default function ProjectTaskModals({
                       />
                       <ModalField
                         label="Start date"
+                        max={projectEndDate ?? undefined}
+                        min={projectStartDate ?? undefined}
                         name="startDate"
                         type="date"
                         defaultValue={activeTask.startDate ?? ""}
                       />
-                      <ModalField
-                        label="Due date"
-                        name="dueDate"
-                        type="date"
-                        defaultValue={activeTask.dueDate ?? ""}
-                      />
+                      <div className="md:col-span-2 xl:col-span-1">
+                        <TaskDueDateField
+                          defaultDueDate={activeTask.dueDate ?? ""}
+                          defaultDueDateMode={activeTask.dueDateMode}
+                          defaultMilestoneId={activeTask.milestoneId ?? ""}
+                          milestones={milestones}
+                          projectEndDate={projectEndDate}
+                          projectStartDate={projectStartDate}
+                        />
+                      </div>
                       <ModalSelectField
                         label="Priority"
                         name="priority"
@@ -480,12 +499,16 @@ function ModalField({
   type = "text",
   required,
   defaultValue,
+  min,
+  max,
 }: {
   label: string;
   name: string;
   type?: string;
   required?: boolean;
   defaultValue?: string;
+  min?: string;
+  max?: string;
 }) {
   return (
     <label className="block text-sm font-medium text-neutral-300">
@@ -495,6 +518,8 @@ function ModalField({
         type={type}
         required={required}
         defaultValue={defaultValue}
+        min={min}
+        max={max}
         className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
       />
     </label>

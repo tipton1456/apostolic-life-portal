@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import AdminFormButton from "@/app/admin/admin-form-button";
 import TaskAssigneeField from "@/app/projects/task-assignee-field";
+import TaskDueDateField from "@/app/projects/task-due-date-field";
 import TaskListTable from "@/app/projects/task-list-table";
+import type { ProjectMilestone } from "@/lib/project-milestone-utils";
 import { createProjectTask, type ProjectTask } from "@/lib/project-management";
 import {
   TASK_PRIORITY_OPTIONS,
@@ -37,7 +39,10 @@ export default function ProjectTaskGrid({
   canManageTasks,
   isProjectCompleted,
   assigneeOptions,
+  milestones,
   portalUserOptions = [],
+  projectStartDate,
+  projectEndDate,
   taskUpdatesByTaskId,
   highlightedTaskId,
 }: {
@@ -47,7 +52,10 @@ export default function ProjectTaskGrid({
   canManageTasks: boolean;
   isProjectCompleted: boolean;
   assigneeOptions: Array<{ value: string; label: string }>;
+  milestones: ProjectMilestone[];
   portalUserOptions?: Array<{ value: string; label: string }>;
+  projectStartDate: string | null;
+  projectEndDate: string | null;
   taskUpdatesByTaskId: Record<string, ProjectTaskUpdate[]>;
   highlightedTaskId?: string;
 }) {
@@ -105,8 +113,20 @@ export default function ProjectTaskGrid({
           <input type="hidden" name="projectId" value={projectId} />
           <Field label="Task title" name="title" required />
           <Field label="Description" name="description" />
-          <Field label="Start date" name="startDate" type="date" />
-          <Field label="Due date" name="dueDate" type="date" />
+          <Field
+            label="Start date"
+            max={projectEndDate ?? undefined}
+            min={projectStartDate ?? undefined}
+            name="startDate"
+            type="date"
+          />
+          <div className="md:col-span-2 xl:col-span-1">
+            <TaskDueDateField
+              milestones={milestones}
+              projectEndDate={projectEndDate}
+              projectStartDate={projectStartDate}
+            />
+          </div>
           <SelectField
             label="Status"
             name="status"
@@ -170,11 +190,15 @@ function Field({
   name,
   type = "text",
   required,
+  min,
+  max,
 }: {
   label: string;
   name: string;
   type?: string;
   required?: boolean;
+  min?: string;
+  max?: string;
 }) {
   return (
     <label className="block text-sm font-medium text-neutral-300">
@@ -183,6 +207,8 @@ function Field({
         name={name}
         type={type}
         required={required}
+        min={min}
+        max={max}
         className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2"
       />
     </label>

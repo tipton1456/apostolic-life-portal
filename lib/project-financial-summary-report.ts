@@ -31,8 +31,11 @@ import {
   formatDisplayDate,
   formatProjectStatus,
 } from "@/lib/project-management-utils";
+import {
+  canUserViewProject,
+  loadProjectManagerNamesForProject,
+} from "@/lib/project-access";
 import type { Project, ProjectStatus } from "@/lib/project-management";
-import { isPortalProjectManager } from "@/lib/portal-project-roles";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -104,7 +107,7 @@ async function loadProjectFinancialSummaryReportContext(projectId: string) {
   }
 
   const supabase = await createClient();
-  const canView = await userCanViewProject(projectId, currentUser);
+  const canView = await canUserViewProject(projectId, currentUser);
   if (!canView) {
     throw new ProjectFinancialSummaryReportError("You do not have access to this project.", 403);
   }
@@ -138,7 +141,7 @@ async function loadProjectFinancialSummaryReportContext(projectId: string) {
       .order("revenue_date", { ascending: false })
       .order("created_at", { ascending: false }),
     loadProjectMemberNames(projectId),
-    loadProjectManagerNames(),
+    loadProjectManagerNamesForProject(projectId),
   ]);
 
   if (projectError || !projectRow) {
@@ -230,30 +233,6 @@ async function loadProjectFinancialSummaryReportContext(projectId: string) {
   };
 }
 
-async function userCanViewProject(
-  projectId: string,
-  currentUser: NonNullable<Awaited<ReturnType<typeof getCurrentPortalUser>>>,
-) {
-  if (isPortalProjectManager(currentUser)) {
-    return true;
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("project_members")
-    .select("id")
-    .eq("project_id", projectId)
-    .eq("user_id", currentUser.id)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Project cost report permission lookup failed:", error);
-    return false;
-  }
-
-  return Boolean(data);
-}
-
 async function loadProjectMemberNames(projectId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -286,33 +265,6 @@ async function loadProjectMemberNames(projectId: string) {
       [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
       (profile.email as string),
   }));
-}
-
-async function loadProjectManagerNames() {
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("portal_users")
-    .select("email,first_name,last_name,is_admin,project_role,can_access_projects")
-    .or("is_admin.eq.true,project_role.eq.project_manager,can_access_projects.eq.true")
-    .order("email", { ascending: true });
-
-  if (error) {
-    console.error("Project cost report manager lookup failed:", error);
-    return [];
-  }
-
-  return (data ?? [])
-    .filter(
-      (profile) =>
-        profile.is_admin ||
-        profile.project_role === "project_manager" ||
-        profile.can_access_projects,
-    )
-    .map(
-      (profile) =>
-        [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
-        (profile.email as string),
-    );
 }
 
 function buildReportSections(

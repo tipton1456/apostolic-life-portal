@@ -24,8 +24,23 @@ import {
   isTaskOpenOutstanding,
   isTaskOverdue,
 } from "@/lib/project-management-utils";
+import {
+  canUserManageProject,
+  canUserViewProject,
+  isAssignedProjectManager,
+  loadAccessibleProjectIds,
+  requireEligibleProjectManager,
+  requireProjectAreaAccess as requireProjectAreaAccessFromAccess,
+  requireProjectManageAccess,
+} from "@/lib/project-access";
+import {
+  assertDateWithinProjectRange,
+  type ProjectMilestone,
+  type TaskDueDateMode,
+} from "@/lib/project-milestone-utils";
+import { listProjectMilestones } from "@/lib/project-milestones";
 import { isPortalProjectManager } from "@/lib/portal-project-roles";
-import { getCurrentPortalUser, setPortalUserProjectRole } from "@/lib/portal-users";
+import { getCurrentPortalUser } from "@/lib/portal-users";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -59,6 +74,18 @@ export type ProjectMember = {
   createdAt: string;
 };
 
+export type ProjectManager = {
+  id: string;
+  projectId: string;
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  addedBy: string;
+  createdAt: string;
+};
+
 export type ProjectTask = {
   id: string;
   projectId: string;
@@ -68,6 +95,9 @@ export type ProjectTask = {
   priority: TaskPriority;
   startDate: string | null;
   dueDate: string | null;
+  dueDateMode: TaskDueDateMode;
+  milestoneId: string | null;
+  milestoneName: string | null;
   completedAt: string | null;
   sortOrder: number;
   assignedTo: string | null;
@@ -101,6 +131,8 @@ export type AccessibleProjectTask = {
 export type ProjectDashboard = {
   project: Project;
   members: ProjectMember[];
+  managers: ProjectManager[];
+  milestones: ProjectMilestone[];
   tasks: ProjectTask[];
   stats: {
     totalTasks: number;
@@ -143,6 +175,14 @@ type ProjectMemberRow = {
   created_at: string;
 };
 
+type ProjectManagerRow = {
+  id: string;
+  project_id: string;
+  user_id: string;
+  added_by: string;
+  created_at: string;
+};
+
 type PortalUserRow = {
   id: string;
   email: string;
@@ -159,6 +199,8 @@ type ProjectTaskRow = {
   priority: TaskPriority;
   start_date: string | null;
   due_date: string | null;
+  due_date_mode?: TaskDueDateMode;
+  milestone_id?: string | null;
   completed_at: string | null;
   sort_order: number;
   assigned_to: string | null;
@@ -212,26 +254,12 @@ export async function canCurrentUserAccessProjects() {
 }
 
 export async function listProjects(): Promise<ProjectSummary[]> {
-  const currentUser = await requireProjectAreaAccess();
-  const isManager = isPortalProjectManager(currentUser);
+  const currentUser = await requireProjectAreaAccessFromAccess();
   const supabase = await createClient();
+  const projectIds = await loadAccessibleProjectIds(currentUser);
 
-  let projectIds: string[] | null = null;
-
-  if (!isManager) {
-    const { data: memberships, error: membershipError } = await supabase
-      .from("project_members")
-      .select("project_id")
-      .eq("user_id", currentUser.id);
-
-    if (membershipError) {
-      console.error("Project membership lookup failed:", membershipError);
-      throw new Error("Unable to load project memberships.");
-    }
-
-    projectIds = (memberships ?? []).map((membership) => membership.project_id);
-
-    if (projectIds.length === 0) return [];
+  if (projectIds && projectIds.length === 0) {
+    return [];
   }
 
   const [{ data: projects, error: projectError }, { data: tasks, error: taskError }] =
@@ -288,26 +316,11 @@ export async function listAccessibleProjectTasks(
     return [];
   }
 
-  const isManager = isPortalProjectManager(currentUser);
   const supabase = await createClient();
-  let projectIds: string[] | null = null;
+  const projectIds = await loadAccessibleProjectIds(currentUser);
 
-  if (!isManager) {
-    const { data: memberships, error } = await supabase
-      .from("project_members")
-      .select("project_id")
-      .eq("user_id", currentUser.id);
-
-    if (error) {
-      console.error("Project task membership lookup failed:", error);
-      throw new Error("Unable to load project tasks.");
-    }
-
-    projectIds = (memberships ?? []).map((membership) => membership.project_id);
-
-    if (projectIds.length === 0) {
-      return [];
-    }
+  if (projectIds && projectIds.length === 0) {
+    return [];
   }
 
   let query = supabase
@@ -368,6 +381,9 @@ export async function listAccessibleProjectTasks(
         priority: task.priority,
         startDate: null,
         dueDate: task.due_date,
+        dueDateMode: "custom",
+        milestoneId: null,
+        milestoneName: null,
         completedAt: null,
         sortOrder: 0,
         assignedTo: currentUser.id,
@@ -510,7 +526,7 @@ export async function listPortalParticipantRoleUsers(): Promise<PortalUserOption
 }
 
 export async function listAssignablePortalUsers(): Promise<PortalUserOption[]> {
-  await requireProjectManager();
+  await requireEligibleProjectManager();
 
   const admin = createAdminClient();
   const { data, error } = await admin
@@ -534,10 +550,127 @@ export async function listAssignablePortalUsers(): Promise<PortalUserOption[]> {
     .map(mapPortalUserOption);
 }
 
+export async function listProjectManagers(projectId: string): Promise<ProjectManager[]> {
+  return loadProjectManagers(projectId);
+}
+
+export async function listEligibleManagersToAdd(
+  projectId: string,
+): Promise<PortalUserOption[]> {
+  await requireProjectManageAccess(projectId);
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("portal_users")
+    .select("id,email,first_name,last_name,is_admin,project_role,can_access_projects")
+    .or(
+      "is_admin.eq.true,project_role.eq.project_manager,can_access_projects.eq.true",
+    )
+    .order("email", { ascending: true });
+
+  if (error) {
+    console.error("Eligible project manager lookup failed:", error);
+    throw new Error("Unable to load eligible project managers.");
+  }
+
+  const assignedManagerIds = new Set(
+    (await loadProjectManagers(projectId)).map((manager) => manager.userId),
+  );
+
+  return ((data ?? []) as Array<
+    PortalUserRow & {
+      is_admin: boolean | null;
+      project_role: string | null;
+      can_access_projects: boolean | null;
+    }
+  >)
+    .filter(
+      (user) =>
+        user.is_admin ||
+        user.project_role === "project_manager" ||
+        user.can_access_projects,
+    )
+    .filter((user) => !assignedManagerIds.has(user.id))
+    .map(mapPortalUserOption);
+}
+
+export async function addProjectManager(formData: FormData) {
+  const currentUser = await requireProjectManageAccess(
+    String(formData.get("projectId") || ""),
+  );
+  const projectId = String(formData.get("projectId") || "");
+  const userId = String(formData.get("userId") || "");
+
+  if (!projectId || !userId) {
+    throw new Error("Project ID and user ID are required.");
+  }
+
+  const profile = await getPortalUserAssigneeProfile(userId);
+
+  if (!isManagerPortalUser(profile)) {
+    throw new Error("Only eligible portal project managers can be added.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("project_managers").insert({
+    project_id: projectId,
+    user_id: userId,
+    added_by: currentUser.id,
+  });
+
+  if (error) {
+    console.error("Project manager add failed:", error);
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/projects");
+}
+
+export async function removeProjectManager(formData: FormData) {
+  const projectId = String(formData.get("projectId") || "");
+  const userId = String(formData.get("userId") || "");
+
+  await requireProjectManageAccess(projectId);
+
+  if (!projectId || !userId) {
+    throw new Error("Project ID and user ID are required.");
+  }
+
+  const supabase = await createClient();
+  const { count, error: countError } = await supabase
+    .from("project_managers")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", projectId);
+
+  if (countError) {
+    console.error("Project manager count failed:", countError);
+    throw new Error("Unable to remove project manager.");
+  }
+
+  if ((count ?? 0) <= 1) {
+    throw new Error("Each project must keep at least one project manager.");
+  }
+
+  const { error } = await supabase
+    .from("project_managers")
+    .delete()
+    .eq("project_id", projectId)
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error("Project manager remove failed:", error);
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/projects");
+}
+
 export async function listPortalUsersAvailableForProject(
   projectId: string,
 ): Promise<PortalUserOption[]> {
-  await requireProjectManager();
+  await requireProjectManageAccess(projectId);
 
   const [portalUsers, memberIds] = await Promise.all([
     listAssignablePortalUsers(),
@@ -550,7 +683,7 @@ export async function listPortalUsersAvailableForProject(
 export async function getProjectDashboard(
   projectId: string,
 ): Promise<ProjectDashboard | null> {
-  const currentUser = await requireProjectAreaAccess();
+  const currentUser = await requireProjectAreaAccessFromAccess();
   const access = await getProjectPermissions(projectId, currentUser);
   const supabase = await createClient();
   const [
@@ -558,20 +691,25 @@ export async function getProjectDashboard(
     { data: tasks, error: taskError },
     members,
     managers,
+    milestones,
     portalParticipants,
   ] = await Promise.all([
     fetchProjectById(supabase, projectId),
     supabase
       .from("project_tasks")
       .select(
-        "id,project_id,title,description,status,priority,start_date,due_date,completed_at,sort_order,assigned_to,created_by,created_at,updated_at",
+        "id,project_id,title,description,status,priority,start_date,due_date,due_date_mode,milestone_id,completed_at,sort_order,assigned_to,created_by,created_at,updated_at",
       )
       .eq("project_id", projectId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
     loadProjectMembers(projectId),
-    listProjectManagersForAssignee().catch((error) => {
+    loadProjectManagers(projectId).catch((error) => {
       console.error("Project dashboard manager lookup failed:", error);
+      return [];
+    }),
+    listProjectMilestones(projectId).catch((error) => {
+      console.error("Project dashboard milestone lookup failed:", error);
       return [];
     }),
     listPortalParticipantRoleUsers().catch((error) => {
@@ -592,13 +730,16 @@ export async function getProjectDashboard(
 
   if (!project || !access.canView) return null;
 
+  const milestoneNameById = new Map(
+    milestones.map((milestone) => [milestone.id, milestone.name]),
+  );
   const assigneeNameById = buildAssigneeNameById({
     members: members.map((member) => ({
       id: member.userId,
       fullName: member.fullName,
     })),
     managers: managers.map((manager) => ({
-      id: manager.id,
+      id: manager.userId,
       fullName: manager.fullName,
     })),
     portalParticipants: portalParticipants.map((participant) => ({
@@ -607,7 +748,11 @@ export async function getProjectDashboard(
     })),
   });
   const mappedTasks = ((tasks ?? []) as ProjectTaskRow[]).map((task) =>
-    mapTask(task, assigneeNameById.get(task.assigned_to ?? "") ?? null),
+    mapTask(
+      task,
+      assigneeNameById.get(task.assigned_to ?? "") ?? null,
+      milestoneNameById.get(task.milestone_id ?? "") ?? null,
+    ),
   );
   const stats = calculateTaskStats(
     mappedTasks.map((task) => ({
@@ -621,6 +766,8 @@ export async function getProjectDashboard(
   return {
     project: mapProject(normalizeProjectRow(project)),
     members,
+    managers,
+    milestones,
     tasks: mappedTasks,
     stats,
     permissions: {
@@ -635,7 +782,7 @@ export async function getProjectDashboard(
 }
 
 export async function createProject(formData: FormData) {
-  const currentUser = await requireProjectManager();
+  const currentUser = await requireEligibleProjectManager();
   const name = normalizeText(formData.get("name"));
   const description = normalizeText(formData.get("description"));
   const status = parseProjectStatus(formData.get("status"));
@@ -665,14 +812,25 @@ export async function createProject(formData: FormData) {
     throw new Error(error?.message ?? "Unable to create project.");
   }
 
+  const { error: managerError } = await supabase.from("project_managers").insert({
+    project_id: data.id,
+    user_id: currentUser.id,
+    added_by: currentUser.id,
+  });
+
+  if (managerError) {
+    console.error("Project manager assignment failed:", managerError);
+    await supabase.from("projects").delete().eq("id", data.id);
+    throw new Error(managerError.message);
+  }
+
   revalidatePath("/projects");
   redirect(`/projects/${data.id}`);
 }
 
 export async function updateProject(formData: FormData) {
-  await requireProjectManager();
-
   const id = String(formData.get("id") || "");
+  await requireProjectManageAccess(id);
   const name = normalizeText(formData.get("name"));
   const description = normalizeText(formData.get("description"));
   const status = parseProjectStatus(formData.get("status"));
@@ -715,9 +873,8 @@ export async function updateProject(formData: FormData) {
 }
 
 export async function uploadProjectImage(formData: FormData) {
-  await requireProjectManager();
-
   const projectId = String(formData.get("projectId") || "");
+  await requireProjectManageAccess(projectId);
   const imageFile = getProjectImageFile(formData.get("projectImage"));
   const removeImage = formData.get("removeImage") === "on";
 
@@ -795,9 +952,8 @@ export async function uploadProjectImage(formData: FormData) {
 }
 
 export async function deleteProject(formData: FormData) {
-  await requireProjectManager();
-
   const id = String(formData.get("id") || "");
+  await requireProjectManageAccess(id);
 
   if (!id) {
     throw new Error("Project ID is required.");
@@ -831,9 +987,8 @@ export async function deleteProject(formData: FormData) {
 }
 
 export async function addProjectMember(formData: FormData) {
-  const currentUser = await requireProjectManager();
-
   const projectId = String(formData.get("projectId") || "");
+  const currentUser = await requireProjectManageAccess(projectId);
   const userId = String(formData.get("userId") || "");
 
   if (!projectId || !userId) {
@@ -847,8 +1002,8 @@ export async function addProjectMember(formData: FormData) {
 }
 
 export async function addNewProjectParticipant(formData: FormData) {
-  const currentUser = await requireProjectManager();
   const projectId = String(formData.get("projectId") || "");
+  const currentUser = await requireProjectManageAccess(projectId);
 
   if (!projectId) {
     throw new Error("Project ID is required.");
@@ -878,9 +1033,8 @@ export async function addNewProjectParticipant(formData: FormData) {
 }
 
 export async function removeProjectMember(formData: FormData) {
-  await requireProjectManager();
-
   const projectId = String(formData.get("projectId") || "");
+  await requireProjectManageAccess(projectId);
   const userId = String(formData.get("userId") || "");
 
   if (!projectId || !userId) {
@@ -915,15 +1069,13 @@ export async function removeProjectMember(formData: FormData) {
 }
 
 export async function createProjectTask(formData: FormData) {
-  const currentUser = await requireProjectManager();
-
   const projectId = String(formData.get("projectId") || "");
+  const currentUser = await requireProjectManageAccess(projectId);
   const title = normalizeText(formData.get("title"));
   const description = normalizeText(formData.get("description"));
   const status = parseTaskStatus(formData.get("status"));
   const priority = parseTaskPriority(formData.get("priority"));
   const startDate = parseOptionalDate(formData.get("startDate"));
-  const dueDate = parseOptionalDate(formData.get("dueDate"));
   const assignee = await resolveTaskAssigneeFromForm(formData, projectId, currentUser);
   const assignedTo = assignee.userId;
 
@@ -931,9 +1083,28 @@ export async function createProjectTask(formData: FormData) {
     throw new Error("Project ID and task title are required.");
   }
 
-  await ensureAssigneeCanReceiveTask(projectId, assignedTo, currentUser.id);
-
   const supabase = await createClient();
+  const { data: projectRow, error: projectError } = await supabase
+    .from("projects")
+    .select("start_date,target_end_date")
+    .eq("id", projectId)
+    .maybeSingle<{ start_date: string | null; target_end_date: string | null }>();
+
+  if (projectError || !projectRow) {
+    throw new Error("Project not found.");
+  }
+
+  const projectDates = {
+    startDate: projectRow.start_date,
+    targetEndDate: projectRow.target_end_date,
+  };
+  const milestones = await listProjectMilestones(projectId);
+  const resolvedDue = resolveTaskDueDateFromForm(formData, milestones);
+
+  assertDateWithinProjectRange(projectDates, startDate, "Task start date");
+  assertDateWithinProjectRange(projectDates, resolvedDue.dueDate, "Task due date");
+
+  await ensureAssigneeCanReceiveTask(projectId, assignedTo, currentUser.id);
   const { data: existingTasks, error: sortError } = await supabase
     .from("project_tasks")
     .select("sort_order")
@@ -954,7 +1125,9 @@ export async function createProjectTask(formData: FormData) {
     status,
     priority,
     start_date: startDate,
-    due_date: dueDate,
+    due_date: resolvedDue.dueDate,
+    due_date_mode: resolvedDue.dueDateMode,
+    milestone_id: resolvedDue.milestoneId,
     sort_order: nextSortOrder,
     assigned_to: assignedTo,
     created_by: currentUser.id,
@@ -1004,7 +1177,7 @@ export async function createProjectTask(formData: FormData) {
 }
 
 export async function updateProjectTask(formData: FormData) {
-  const currentUser = await requireProjectAreaAccess();
+  const currentUser = await requireProjectAreaAccessFromAccess();
   const id = String(formData.get("id") || "");
   const projectId = String(formData.get("projectId") || "");
   const access = await getProjectPermissions(projectId, currentUser);
@@ -1046,7 +1219,18 @@ export async function updateProjectTask(formData: FormData) {
   const startDate = isManager
     ? parseOptionalDate(formData.get("startDate"))
     : undefined;
-  const dueDate = isManager ? parseOptionalDate(formData.get("dueDate")) : undefined;
+  let resolvedDue:
+    | {
+        dueDate: string | null;
+        dueDateMode: TaskDueDateMode;
+        milestoneId: string | null;
+      }
+    | undefined;
+
+  if (isManager) {
+    const milestones = await listProjectMilestones(projectId);
+    resolvedDue = resolveTaskDueDateFromForm(formData, milestones);
+  }
 
   let assignee: Awaited<ReturnType<typeof resolveTaskAssigneeFromForm>> = {
     userId: existingTask.assigned_to,
@@ -1079,6 +1263,28 @@ export async function updateProjectTask(formData: FormData) {
 
   if (isManager) {
     await ensureAssigneeCanReceiveTask(projectId, assignedTo, currentUser.id);
+
+    const { data: projectRow, error: projectError } = await supabase
+      .from("projects")
+      .select("start_date,target_end_date")
+      .eq("id", projectId)
+      .maybeSingle<{ start_date: string | null; target_end_date: string | null }>();
+
+    if (projectError || !projectRow) {
+      throw new Error("Project not found.");
+    }
+
+    const projectDates = {
+      startDate: projectRow.start_date,
+      targetEndDate: projectRow.target_end_date,
+    };
+
+    assertDateWithinProjectRange(projectDates, startDate ?? null, "Task start date");
+    assertDateWithinProjectRange(
+      projectDates,
+      resolvedDue?.dueDate ?? null,
+      "Task due date",
+    );
   }
 
   const updatePayload: Record<string, string | null> = {
@@ -1091,7 +1297,9 @@ export async function updateProjectTask(formData: FormData) {
     updatePayload.description = description ?? "";
     updatePayload.priority = priority ?? "medium";
     updatePayload.start_date = startDate ?? null;
-    updatePayload.due_date = dueDate ?? null;
+    updatePayload.due_date = resolvedDue?.dueDate ?? null;
+    updatePayload.due_date_mode = resolvedDue?.dueDateMode ?? "custom";
+    updatePayload.milestone_id = resolvedDue?.milestoneId ?? null;
     updatePayload.assigned_to = assignedTo ?? null;
   } else if (canReassignAsParticipant && assignedTo !== existingTask.assigned_to) {
     updatePayload.assigned_to = assignedTo ?? null;
@@ -1143,10 +1351,9 @@ export async function updateProjectTask(formData: FormData) {
 }
 
 export async function deleteProjectTask(formData: FormData) {
-  await requireProjectManager();
-
   const id = String(formData.get("id") || "");
   const projectId = String(formData.get("projectId") || "");
+  await requireProjectManageAccess(projectId);
 
   if (!id || !projectId) {
     throw new Error("Task ID and project ID are required.");
@@ -1163,6 +1370,57 @@ export async function deleteProjectTask(formData: FormData) {
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
   redirect(`/projects/${projectId}`);
+}
+
+async function loadProjectManagers(projectId: string): Promise<ProjectManager[]> {
+  const supabase = await createClient();
+  const { data: managerRows, error } = await supabase
+    .from("project_managers")
+    .select("id,project_id,user_id,added_by,created_at")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Project managers lookup failed:", error);
+    throw new Error("Unable to load project managers.");
+  }
+
+  const userIds = (managerRows ?? []).map((manager) => manager.user_id);
+  if (userIds.length === 0) return [];
+
+  const admin = createAdminClient();
+  const { data: profiles, error: profileError } = await admin
+    .from("portal_users")
+    .select("id,email,first_name,last_name")
+    .in("id", userIds);
+
+  if (profileError) {
+    console.error("Project manager profile lookup failed:", profileError);
+    throw new Error("Unable to load project manager profiles.");
+  }
+
+  const profilesById = new Map(
+    ((profiles ?? []) as PortalUserRow[]).map((profile) => [profile.id, profile]),
+  );
+
+  return ((managerRows ?? []) as ProjectManagerRow[]).map((manager) => {
+    const profile = profilesById.get(manager.user_id);
+
+    return {
+      id: manager.id,
+      projectId: manager.project_id,
+      userId: manager.user_id,
+      email: profile?.email ?? "",
+      firstName: profile?.first_name ?? "",
+      lastName: profile?.last_name ?? "",
+      fullName:
+        [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+        profile?.email ||
+        "Unknown manager",
+      addedBy: manager.added_by,
+      createdAt: manager.created_at,
+    };
+  });
 }
 
 async function loadProjectMembers(projectId: string): Promise<ProjectMember[]> {
@@ -1306,11 +1564,11 @@ async function ensureAssigneeCanReceiveTask(
 ) {
   if (!userId) return;
 
-  const profile = await getPortalUserAssigneeProfile(userId);
-
-  if (isManagerPortalUser(profile)) {
+  if (await isAssignedProjectManager(projectId, userId)) {
     return;
   }
+
+  const profile = await getPortalUserAssigneeProfile(userId);
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -1333,7 +1591,7 @@ async function ensureAssigneeCanReceiveTask(
   }
 
   throw new Error(
-    "Tasks can only be assigned to project managers, portal participants, or people already on this project.",
+    "Tasks can only be assigned to this project's managers, portal participants, or people already on this project.",
   );
 }
 
@@ -1346,11 +1604,11 @@ async function ensureAssigneeIsValidParticipantHandoff(
     throw new Error("Choose a project manager or participant to hand off this task.");
   }
 
-  const profile = await getPortalUserAssigneeProfile(userId);
-
-  if (isManagerPortalUser(profile)) {
+  if (await isAssignedProjectManager(projectId, userId)) {
     return;
   }
+
+  const profile = await getPortalUserAssigneeProfile(userId);
 
   if (profile.project_role === "project_participant") {
     await ensureProjectMemberRecord(projectId, userId, addedBy);
@@ -1381,7 +1639,17 @@ async function getProjectPermissions(
   projectId: string,
   currentUser: NonNullable<Awaited<ReturnType<typeof getCurrentPortalUser>>>,
 ) {
-  const isManager = isPortalProjectManager(currentUser);
+  const canView = await canUserViewProject(projectId, currentUser);
+
+  if (!canView) {
+    return {
+      canView: false,
+      isManager: false,
+      isParticipant: false,
+    };
+  }
+
+  const isManager = await canUserManageProject(projectId, currentUser);
 
   if (isManager) {
     return {
@@ -1391,72 +1659,11 @@ async function getProjectPermissions(
     };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("project_members")
-    .select("id")
-    .eq("project_id", projectId)
-    .eq("user_id", currentUser.id)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Project permission lookup failed:", error);
-    return {
-      canView: false,
-      isManager: false,
-      isParticipant: false,
-    };
-  }
-
   return {
-    canView: Boolean(data),
+    canView: true,
     isManager: false,
-    isParticipant: Boolean(data),
+    isParticipant: true,
   };
-}
-
-async function requireProjectManager() {
-  const currentUser = await getCurrentPortalUser();
-
-  if (!currentUser) {
-    redirect("/login?next=/projects");
-  }
-
-  if (!isPortalProjectManager(currentUser)) {
-    redirect("/dashboard");
-  }
-
-  return currentUser;
-}
-
-async function requireProjectAreaAccess() {
-  const currentUser = await getCurrentPortalUser();
-
-  if (!currentUser) {
-    redirect("/login?next=/projects");
-  }
-
-  if (isPortalProjectManager(currentUser)) {
-    return currentUser;
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("project_members")
-    .select("id")
-    .eq("user_id", currentUser.id)
-    .limit(1);
-
-  if (error) {
-    console.error("Project area access lookup failed:", error);
-    redirect("/dashboard");
-  }
-
-  if (!data?.length) {
-    redirect("/dashboard");
-  }
-
-  return currentUser;
 }
 
 async function fetchProjects(
@@ -1554,7 +1761,11 @@ function parseOptionalUrl(value: FormDataEntryValue | null) {
   }
 }
 
-function mapTask(row: ProjectTaskRow, assignedName: string | null): ProjectTask {
+function mapTask(
+  row: ProjectTaskRow,
+  assignedName: string | null,
+  milestoneName: string | null = null,
+): ProjectTask {
   return {
     id: row.id,
     projectId: row.project_id,
@@ -1564,6 +1775,9 @@ function mapTask(row: ProjectTaskRow, assignedName: string | null): ProjectTask 
     priority: row.priority,
     startDate: row.start_date,
     dueDate: row.due_date,
+    dueDateMode: row.due_date_mode ?? "custom",
+    milestoneId: row.milestone_id ?? null,
+    milestoneName,
     completedAt: row.completed_at,
     sortOrder: row.sort_order,
     assignedTo: row.assigned_to,
@@ -1572,6 +1786,44 @@ function mapTask(row: ProjectTaskRow, assignedName: string | null): ProjectTask 
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function resolveTaskDueDateFromForm(
+  formData: FormData,
+  milestones: ProjectMilestone[],
+) {
+  const dueDateMode = parseTaskDueDateMode(formData.get("dueDateMode"));
+  const milestoneId = normalizeText(formData.get("milestoneId")) || null;
+  const customDueDate = parseOptionalDate(formData.get("dueDate"));
+
+  if (dueDateMode === "milestone") {
+    if (!milestoneId) {
+      throw new Error("Choose a milestone for the task due date.");
+    }
+
+    const milestone = milestones.find((entry) => entry.id === milestoneId);
+
+    if (!milestone) {
+      throw new Error("Selected milestone was not found on this project.");
+    }
+
+    return {
+      dueDate: milestone.milestoneDate,
+      dueDateMode: "milestone" as const,
+      milestoneId,
+    };
+  }
+
+  return {
+    dueDate: customDueDate,
+    dueDateMode: "custom" as const,
+    milestoneId: null,
+  };
+}
+
+function parseTaskDueDateMode(value: FormDataEntryValue | null): TaskDueDateMode {
+  const mode = normalizeText(value);
+  return mode === "milestone" ? "milestone" : "custom";
 }
 
 function groupTasksByProject(
