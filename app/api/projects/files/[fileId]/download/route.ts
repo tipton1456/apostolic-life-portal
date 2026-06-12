@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ProjectFileDownloadError } from "@/lib/project-file-download-error";
+import { ProjectFileStorageError } from "@/lib/project-file-storage-error";
 import { getProjectFileForDownload } from "@/lib/project-files";
 
 function buildContentDisposition(fileName: string) {
@@ -33,9 +34,21 @@ export async function GET(
       });
     }
 
+    if (error instanceof ProjectFileStorageError) {
+      return new NextResponse(error.message, {
+        status: 404,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+        },
+      });
+    }
+
     console.error("Project file download failed:", error);
 
-    return new NextResponse("Unable to download file.", {
+    const message =
+      error instanceof Error ? error.message : "Unable to download file.";
+
+    return new NextResponse(message, {
       status: 500,
       headers: {
         "Content-Type": "text/plain; charset=utf-8",

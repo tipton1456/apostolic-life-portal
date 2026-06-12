@@ -25,6 +25,7 @@ import { canCurrentUserAccessProjects } from "@/lib/project-management";
 import { isPortalProjectManager } from "@/lib/portal-project-roles";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import { ProjectFileDownloadError } from "@/lib/project-file-download-error";
+import { ProjectFileStorageError } from "@/lib/project-file-storage-error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -179,6 +180,7 @@ export async function storeProjectTaskFile({
     relativePath: storagePath,
     contents: fileBuffer,
     contentType: file.type || "application/octet-stream",
+    supabase,
   });
 
   const insertPayload = {
@@ -341,7 +343,7 @@ export async function deleteProjectTaskFile(formData: FormData) {
     throw new Error("You do not have permission to delete this file.");
   }
 
-  await deleteStoredProjectTaskFile(file.storage_path);
+  await deleteStoredProjectTaskFile(file.storage_path, { supabase });
 
   const { error: deleteError } = await supabase
     .from("project_task_files")
@@ -379,13 +381,21 @@ export async function getProjectFileForDownload(fileId: string) {
     throw new ProjectFileDownloadError("You do not have access to this file.", 403);
   }
 
-  const contents = await readProjectTaskFile(file.storage_path);
+  try {
+    const contents = await readProjectTaskFile(file.storage_path, { supabase });
 
-  return {
-    contents,
-    fileName: file.file_name,
-    mimeType: file.mime_type || "application/octet-stream",
-  };
+    return {
+      contents,
+      fileName: file.file_name,
+      mimeType: file.mime_type || "application/octet-stream",
+    };
+  } catch (error) {
+    if (error instanceof ProjectFileStorageError) {
+      throw new ProjectFileDownloadError(error.message, 404);
+    }
+
+    throw error;
+  }
 }
 
 export async function buildProjectFilesZip(projectId: string) {
@@ -417,7 +427,7 @@ export async function buildProjectFilesZip(projectId: string) {
       continue;
     }
 
-    const contents = await readProjectTaskFile(row.storage_path);
+    const contents = await readProjectTaskFile(row.storage_path, { supabase });
     const folderName = sanitizeZipPathSegment(file.taskTitle || "task");
     const fileName = sanitizeZipPathSegment(file.fileName);
 
