@@ -7,6 +7,8 @@ import ProjectSettingsModal from "@/app/projects/project-settings-modal";
 import ProjectTaskModals from "@/app/projects/project-task-modals";
 import ProjectTeamPanel from "@/app/projects/project-team-panel";
 import CompletionPieCard from "@/app/projects/completion-pie-card";
+import ProjectExpenseGrid from "@/app/projects/project-expense-grid";
+import ProjectExpenseModals from "@/app/projects/project-expense-modals";
 import ProjectTaskGrid from "@/app/projects/project-task-grid";
 import TaskBreakdownPieCard from "@/app/projects/task-breakdown-pie-card";
 import { getCurrentSessionUser } from "@/lib/demo";
@@ -18,6 +20,11 @@ import {
   buildParticipantHandoffOptions,
   buildPortalUserPickerOptions,
 } from "@/lib/project-assignee-options";
+import {
+  calculateProjectExpenseStats,
+  formatCurrency,
+} from "@/lib/project-expense-utils";
+import { listProjectExpenses } from "@/lib/project-expenses";
 import {
   canCurrentUserAccessProjects,
   getProjectDashboard,
@@ -40,7 +47,7 @@ export default async function ProjectDashboardPage({
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ task?: string }>;
+  searchParams: Promise<{ task?: string; expense?: string }>;
 }) {
   const user = await getCurrentSessionUser();
 
@@ -60,15 +67,20 @@ export default async function ProjectDashboardPage({
 
   const { projectId } = await params;
   const { task: highlightedTaskId } = await searchParams;
-  const [dashboard, portalUser, projectFiles, taskUpdates] = await Promise.all([
-    getProjectDashboard(projectId),
-    getCurrentPortalUser(),
-    listProjectFiles(projectId).catch(() => [] as ProjectTaskFile[]),
-    listProjectTaskUpdates(projectId).catch((error) => {
-      console.error("Project task updates lookup failed:", error);
-      return [];
-    }),
-  ]);
+  const [dashboard, portalUser, projectFiles, taskUpdates, expenses] =
+    await Promise.all([
+      getProjectDashboard(projectId),
+      getCurrentPortalUser(),
+      listProjectFiles(projectId).catch(() => [] as ProjectTaskFile[]),
+      listProjectTaskUpdates(projectId).catch((error) => {
+        console.error("Project task updates lookup failed:", error);
+        return [];
+      }),
+      listProjectExpenses(projectId).catch((error) => {
+        console.error("Project expenses lookup failed:", error);
+        return [];
+      }),
+    ]);
   const filesByTaskId = new Map<string, ProjectTaskFile[]>();
   const updatesByTaskId = new Map<string, ProjectTaskUpdate[]>();
 
@@ -133,6 +145,7 @@ export default async function ProjectDashboardPage({
   });
   const taskFilesByTaskId = Object.fromEntries(filesByTaskId.entries());
   const taskUpdatesByTaskId = Object.fromEntries(updatesByTaskId.entries());
+  const expenseStats = calculateProjectExpenseStats(expenses);
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
@@ -292,6 +305,37 @@ export default async function ProjectDashboardPage({
           taskUpdatesByTaskId={taskUpdatesByTaskId}
           tasks={tasks}
         />
+
+        <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label="Total Costs"
+            value={formatCurrency(expenseStats.totalAmount)}
+            detail={`${expenseStats.activeExpenses} active expense${expenseStats.activeExpenses === 1 ? "" : "s"}`}
+          />
+          <MetricCard
+            label="Paid"
+            value={formatCurrency(expenseStats.paidAmount)}
+            detail="Expenses marked as paid"
+          />
+          <MetricCard
+            label="Outstanding"
+            value={formatCurrency(expenseStats.outstandingAmount)}
+            detail="Planned and committed costs"
+            highlight={expenseStats.outstandingAmount > 0}
+          />
+          <MetricCard
+            label="Committed"
+            value={formatCurrency(expenseStats.committedAmount)}
+            detail="Approved but not yet paid"
+          />
+        </section>
+
+        <ProjectExpenseGrid
+          canManageExpenses={permissions.canManageTasks}
+          expenses={expenses}
+          isProjectCompleted={isProjectCompleted}
+          projectId={project.id}
+        />
       </div>
 
       <Suspense fallback={null}>
@@ -311,6 +355,12 @@ export default async function ProjectDashboardPage({
           taskFilesByTaskId={taskFilesByTaskId}
           taskUpdatesByTaskId={taskUpdatesByTaskId}
           tasks={tasks}
+        />
+        <ProjectExpenseModals
+          canManageExpenses={permissions.canManageTasks}
+          expenses={expenses}
+          isProjectCompleted={isProjectCompleted}
+          projectId={project.id}
         />
       </Suspense>
     </main>

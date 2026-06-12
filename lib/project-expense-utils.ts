@@ -1,0 +1,92 @@
+export type ExpenseCategory =
+  | "labor"
+  | "materials"
+  | "equipment"
+  | "travel"
+  | "fees"
+  | "other";
+
+export type ExpenseStatus = "planned" | "committed" | "paid" | "cancelled";
+
+export type ProjectExpense = {
+  id: string;
+  projectId: string;
+  description: string;
+  category: ExpenseCategory;
+  amount: number;
+  expenseDate: string;
+  vendor: string;
+  notes: string;
+  status: ExpenseStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectExpenseStats = {
+  totalExpenses: number;
+  activeExpenses: number;
+  totalAmount: number;
+  paidAmount: number;
+  committedAmount: number;
+  plannedAmount: number;
+  outstandingAmount: number;
+};
+
+const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  labor: "Labor",
+  materials: "Materials",
+  equipment: "Equipment",
+  travel: "Travel",
+  fees: "Fees",
+  other: "Other",
+};
+
+const STATUS_LABELS: Record<ExpenseStatus, string> = {
+  planned: "Planned",
+  committed: "Committed",
+  paid: "Paid",
+  cancelled: "Cancelled",
+};
+
+export function formatExpenseCategory(category: ExpenseCategory) {
+  return CATEGORY_LABELS[category];
+}
+
+export function formatExpenseStatus(status: ExpenseStatus) {
+  return STATUS_LABELS[status];
+}
+
+export function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+export function calculateProjectExpenseStats(
+  expenses: ProjectExpense[],
+): ProjectExpenseStats {
+  const activeExpenses = expenses.filter((expense) => expense.status !== "cancelled");
+  const sumByStatus = (status: ExpenseStatus) =>
+    activeExpenses
+      .filter((expense) => expense.status === status)
+      .reduce((total, expense) => total + expense.amount, 0);
+
+  const paidAmount = sumByStatus("paid");
+  const committedAmount = sumByStatus("committed");
+  const plannedAmount = sumByStatus("planned");
+  const totalAmount = activeExpenses.reduce((total, expense) => total + expense.amount, 0);
+
+  return {
+    totalExpenses: expenses.length,
+    activeExpenses: activeExpenses.length,
+    totalAmount,
+    paidAmount,
+    committedAmount,
+    plannedAmount,
+    outstandingAmount: plannedAmount + committedAmount,
+  };
+}
