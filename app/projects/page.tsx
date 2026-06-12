@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import AdminFormButton from "@/app/admin/admin-form-button";
-import ProjectFilesPreview from "@/app/projects/project-files-preview";
+import ProjectRecentFilesHeaderCard from "@/app/projects/project-recent-files-header-card";
 import { getCurrentSessionUser } from "@/lib/demo";
 import { listAccessibleProjectFiles } from "@/lib/project-files";
 import {
@@ -48,36 +48,34 @@ export default async function ProjectsPage() {
   const isManager = await isCurrentUserProjectManager();
   const [projects, recentFiles] = await Promise.all([
     listProjects(),
-    listAccessibleProjectFiles(8).catch((error) => {
+    listAccessibleProjectFiles(3).catch((error) => {
       console.error("Recent project files preview failed:", error);
       return [];
     }),
   ]);
 
   return (
-    <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
+    <main className="min-h-screen bg-neutral-950 px-4 py-6 text-white sm:px-6 sm:py-8">
       <div className="mx-auto max-w-7xl">
         <header className="border-b border-white/10 pb-6">
-          <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
-            Project Management
-          </p>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight">
-            {isManager ? "Projects" : "My Projects"}
-          </h1>
-          <p className="mt-3 max-w-3xl text-neutral-400">
-            {isManager
-              ? "Manage church projects, track tasks, deadlines, and completion progress from one dashboard."
-              : "View the projects you are on, your assigned tasks, and project progress."}
-          </p>
-        </header>
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.3em] text-lime-400">
+                Project Management
+              </p>
+              <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+                {isManager ? "Projects" : "My Projects"}
+              </h1>
+              <p className="mt-3 max-w-3xl text-neutral-400">
+                {isManager
+                  ? "Manage church projects, track tasks, deadlines, and completion progress from one dashboard."
+                  : "View the projects you are on, your assigned tasks, and project progress."}
+              </p>
+            </div>
 
-        <div className="mt-8">
-          <ProjectFilesPreview
-            files={recentFiles}
-            title="Recent Files"
-            viewAllHref="/projects/files"
-          />
-        </div>
+            <ProjectRecentFilesHeaderCard files={recentFiles} />
+          </div>
+        </header>
 
         {isManager ? (
         <details className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6">

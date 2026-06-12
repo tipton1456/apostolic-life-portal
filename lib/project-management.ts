@@ -258,15 +258,20 @@ export async function listProjects(): Promise<ProjectSummary[]> {
     due_date: string | null;
   }>);
 
-  return ((projects ?? []) as ProjectRow[]).map((project) => {
-    const projectTasks = tasksByProject.get(project.id) ?? [];
-    const stats = calculateTaskStats(projectTasks);
+  return ((projects ?? []) as ProjectRow[])
+    .map((project) => {
+      const projectTasks = tasksByProject.get(project.id) ?? [];
+      const stats = calculateTaskStats(projectTasks);
 
-    return {
-      ...mapProject(normalizeProjectRow(project)),
-      ...stats,
-    };
-  });
+      return {
+        ...mapProject(normalizeProjectRow(project)),
+        ...stats,
+      };
+    })
+    .sort(
+      (left, right) =>
+        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+    );
 }
 
 export async function listAccessibleProjectTasks(
