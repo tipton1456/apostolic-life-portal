@@ -8,7 +8,6 @@ export const EXPENSE_CATEGORY_OPTIONS = [
 ] as const;
 
 export const EXPENSE_STATUS_OPTIONS = [
-  { value: "planned", label: "Planned" },
   { value: "committed", label: "Committed" },
   { value: "paid", label: "Paid" },
   { value: "cancelled", label: "Cancelled" },

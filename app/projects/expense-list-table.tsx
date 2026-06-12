@@ -17,10 +17,9 @@ type SortKey = "description" | "category" | "amount" | "date" | "status";
 type SortDirection = "asc" | "desc";
 
 const STATUS_RANK: Record<ExpenseStatus, number> = {
-  planned: 0,
-  committed: 1,
-  paid: 2,
-  cancelled: 3,
+  committed: 0,
+  paid: 1,
+  cancelled: 2,
 };
 
 export default function ExpenseListTable({
@@ -205,7 +204,6 @@ function compareExpenses(
 
 function ExpenseStatusBadge({ status }: { status: ExpenseStatus }) {
   const styles: Record<ExpenseStatus, string> = {
-    planned: "border-white/10 bg-white/[0.04] text-neutral-300",
     committed: "border-amber-400/30 bg-amber-400/10 text-amber-200",
     paid: "border-lime-400/30 bg-lime-400/10 text-lime-200",
     cancelled: "border-red-400/30 bg-red-400/10 text-red-200",

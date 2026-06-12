@@ -11,11 +11,10 @@ import {
 import type { ProjectExpense } from "@/lib/project-expense-utils";
 import { formatCurrency } from "@/lib/project-expense-utils";
 
-type ExpenseView = "active" | "planned" | "committed" | "paid" | "cancelled" | "all";
+type ExpenseView = "active" | "committed" | "paid" | "cancelled" | "all";
 
 const EXPENSE_VIEWS: Array<{ id: ExpenseView; label: string }> = [
   { id: "active", label: "Active" },
-  { id: "planned", label: "Planned" },
   { id: "committed", label: "Committed" },
   { id: "paid", label: "Paid" },
   { id: "cancelled", label: "Cancelled" },
@@ -24,7 +23,6 @@ const EXPENSE_VIEWS: Array<{ id: ExpenseView; label: string }> = [
 
 const EMPTY_MESSAGES: Record<ExpenseView, string> = {
   active: "No active expenses. Add a cost to start tracking project spending.",
-  planned: "No planned expenses.",
   committed: "No committed expenses.",
   paid: "No paid expenses yet.",
   cancelled: "No cancelled expenses.",
@@ -134,7 +132,7 @@ export default function ProjectExpenseGrid({
           <SelectField
             label="Status"
             name="status"
-            defaultValue="planned"
+            defaultValue="committed"
             options={EXPENSE_STATUS_OPTIONS}
           />
           <div className="md:col-span-2 xl:col-span-6">
@@ -170,8 +168,6 @@ function filterExpenses(expenses: ProjectExpense[], view: ExpenseView) {
   switch (view) {
     case "active":
       return expenses.filter((expense) => expense.status !== "cancelled");
-    case "planned":
-      return expenses.filter((expense) => expense.status === "planned");
     case "committed":
       return expenses.filter((expense) => expense.status === "committed");
     case "paid":

@@ -6,7 +6,7 @@ export type ExpenseCategory =
   | "fees"
   | "other";
 
-export type ExpenseStatus = "planned" | "committed" | "paid" | "cancelled";
+export type ExpenseStatus = "committed" | "paid" | "cancelled";
 
 export type ProjectExpense = {
   id: string;
@@ -29,7 +29,6 @@ export type ProjectExpenseStats = {
   totalAmount: number;
   paidAmount: number;
   committedAmount: number;
-  plannedAmount: number;
   outstandingAmount: number;
 };
 
@@ -43,7 +42,6 @@ const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 };
 
 const STATUS_LABELS: Record<ExpenseStatus, string> = {
-  planned: "Planned",
   committed: "Committed",
   paid: "Paid",
   cancelled: "Cancelled",
@@ -77,7 +75,6 @@ export function calculateProjectExpenseStats(
 
   const paidAmount = sumByStatus("paid");
   const committedAmount = sumByStatus("committed");
-  const plannedAmount = sumByStatus("planned");
   const totalAmount = activeExpenses.reduce((total, expense) => total + expense.amount, 0);
 
   return {
@@ -86,7 +83,6 @@ export function calculateProjectExpenseStats(
     totalAmount,
     paidAmount,
     committedAmount,
-    plannedAmount,
-    outstandingAmount: plannedAmount + committedAmount,
+    outstandingAmount: committedAmount,
   };
 }

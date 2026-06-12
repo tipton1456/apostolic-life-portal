@@ -43,7 +43,6 @@ const EXPENSE_CATEGORIES = new Set<ExpenseCategory>([
 ]);
 
 const EXPENSE_STATUSES = new Set<ExpenseStatus>([
-  "planned",
   "committed",
   "paid",
   "cancelled",
@@ -224,8 +223,10 @@ function parseExpenseCategory(value: FormDataEntryValue | null): ExpenseCategory
 }
 
 function parseExpenseStatus(value: FormDataEntryValue | null): ExpenseStatus {
-  const status = String(value ?? "planned").trim() as ExpenseStatus;
-  return EXPENSE_STATUSES.has(status) ? status : "planned";
+  const normalized = String(value ?? "committed")
+    .trim()
+    .replace(/^planned$/i, "committed") as ExpenseStatus;
+  return EXPENSE_STATUSES.has(normalized) ? normalized : "committed";
 }
 
 async function requireProjectExpenseAccess(projectId: string) {

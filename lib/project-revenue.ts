@@ -43,7 +43,6 @@ const REVENUE_CATEGORIES = new Set<RevenueCategory>([
 ]);
 
 const REVENUE_STATUSES = new Set<RevenueStatus>([
-  "planned",
   "committed",
   "received",
   "cancelled",
@@ -222,8 +221,10 @@ function parseRevenueCategory(value: FormDataEntryValue | null): RevenueCategory
 }
 
 function parseRevenueStatus(value: FormDataEntryValue | null): RevenueStatus {
-  const status = String(value ?? "planned").trim() as RevenueStatus;
-  return REVENUE_STATUSES.has(status) ? status : "planned";
+  const normalized = String(value ?? "committed")
+    .trim()
+    .replace(/^planned$/i, "committed") as RevenueStatus;
+  return REVENUE_STATUSES.has(normalized) ? normalized : "committed";
 }
 
 async function requireProjectRevenueAccess(projectId: string) {

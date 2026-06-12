@@ -11,11 +11,10 @@ import {
 import { createProjectRevenue } from "@/lib/project-revenue";
 import type { ProjectRevenue } from "@/lib/project-revenue-utils";
 
-type RevenueView = "active" | "planned" | "committed" | "received" | "cancelled" | "all";
+type RevenueView = "active" | "committed" | "received" | "cancelled" | "all";
 
 const REVENUE_VIEWS: Array<{ id: RevenueView; label: string }> = [
   { id: "active", label: "Active" },
-  { id: "planned", label: "Planned" },
   { id: "committed", label: "Committed" },
   { id: "received", label: "Received" },
   { id: "cancelled", label: "Cancelled" },
@@ -24,7 +23,6 @@ const REVENUE_VIEWS: Array<{ id: RevenueView; label: string }> = [
 
 const EMPTY_MESSAGES: Record<RevenueView, string> = {
   active: "No active income entries. Add revenue to start tracking project income.",
-  planned: "No planned income.",
   committed: "No committed income.",
   received: "No received income yet.",
   cancelled: "No cancelled income.",
@@ -133,7 +131,7 @@ export default function ProjectRevenueGrid({
           <SelectField
             label="Status"
             name="status"
-            defaultValue="planned"
+            defaultValue="committed"
             options={REVENUE_STATUS_OPTIONS}
           />
           <div className="md:col-span-2 xl:col-span-6">
@@ -169,8 +167,6 @@ function filterRevenue(revenue: ProjectRevenue[], view: RevenueView) {
   switch (view) {
     case "active":
       return revenue.filter((entry) => entry.status !== "cancelled");
-    case "planned":
-      return revenue.filter((entry) => entry.status === "planned");
     case "committed":
       return revenue.filter((entry) => entry.status === "committed");
     case "received":

@@ -328,7 +328,7 @@ export default async function ProjectDashboardPage({
           <MetricCard
             label="Outstanding Expenses"
             value={formatCurrency(financialStats.outstandingExpenses)}
-            detail="Planned and committed costs"
+            detail="Committed costs"
             highlight={financialStats.outstandingExpenses > 0}
           />
           <MetricCard

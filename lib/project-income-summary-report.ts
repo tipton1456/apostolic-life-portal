@@ -208,7 +208,7 @@ async function loadProjectMemberNames(projectId: string) {
 
 function buildReportSections(revenue: ProjectRevenue[]): ReportSection[] {
   const outstanding = revenue.filter(
-    (entry) => entry.status === "planned" || entry.status === "committed",
+    (entry) => entry.status === "committed",
   );
   const received = revenue.filter((entry) => entry.status === "received");
 

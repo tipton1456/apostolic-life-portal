@@ -164,7 +164,7 @@ function formatExpenseExportStatus(status: ProjectExpense["status"]) {
 
 function formatRevenueExportStatus(status: ProjectRevenue["status"]) {
   if (status === "received") return "Received";
-  return "Planned";
+  return "Committed";
 }
 
 async function renderProjectFinancialExportWorkbook(context: {
@@ -235,7 +235,7 @@ async function renderProjectFinancialExportWorkbook(context: {
     formula: `SUMIFS(${detailsRange},${typeRange},"Income",${statusRange},"Received")`,
   };
   summarySheet.getCell("B5").value = {
-    formula: `SUMIF(${typeRange},"Income",${detailsRange})-B2+B3-SUMIFS(${detailsRange},${typeRange},"Income",${statusRange},"Planned")`,
+    formula: `SUMIF(${typeRange},"Income",${detailsRange})-B2+B3-SUMIFS(${detailsRange},${typeRange},"Income",${statusRange},"Committed")`,
   };
 
   summarySheet.getCell("B5").font = { name: "Arial", bold: true };

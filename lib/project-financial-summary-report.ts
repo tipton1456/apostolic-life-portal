@@ -272,11 +272,11 @@ function buildReportSections(
   revenue: ProjectRevenue[],
 ): ReportSection[] {
   const outstandingExpenses = expenses.filter(
-    (expense) => expense.status === "planned" || expense.status === "committed",
+    (expense) => expense.status === "committed",
   );
   const paidExpenses = expenses.filter((expense) => expense.status === "paid");
   const outstandingIncome = revenue.filter(
-    (entry) => entry.status === "planned" || entry.status === "committed",
+    (entry) => entry.status === "committed",
   );
   const receivedIncome = revenue.filter((entry) => entry.status === "received");
 

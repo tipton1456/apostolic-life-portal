@@ -8,7 +8,6 @@ export const REVENUE_CATEGORY_OPTIONS = [
 ] as const;
 
 export const REVENUE_STATUS_OPTIONS = [
-  { value: "planned", label: "Planned" },
   { value: "committed", label: "Committed" },
   { value: "received", label: "Received" },
   { value: "cancelled", label: "Cancelled" },

@@ -208,7 +208,7 @@ async function loadProjectMemberNames(projectId: string) {
 
 function buildReportSections(expenses: ProjectExpense[]): ReportSection[] {
   const outstanding = expenses.filter(
-    (expense) => expense.status === "planned" || expense.status === "committed",
+    (expense) => expense.status === "committed",
   );
   const paid = expenses.filter((expense) => expense.status === "paid");
 

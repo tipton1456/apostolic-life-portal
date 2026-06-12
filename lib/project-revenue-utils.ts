@@ -6,7 +6,7 @@ export type RevenueCategory =
   | "services"
   | "other";
 
-export type RevenueStatus = "planned" | "committed" | "received" | "cancelled";
+export type RevenueStatus = "committed" | "received" | "cancelled";
 
 export type ProjectRevenue = {
   id: string;
@@ -29,7 +29,6 @@ export type ProjectRevenueStats = {
   totalAmount: number;
   receivedAmount: number;
   committedAmount: number;
-  plannedAmount: number;
   outstandingAmount: number;
 };
 
@@ -43,7 +42,6 @@ const CATEGORY_LABELS: Record<RevenueCategory, string> = {
 };
 
 const STATUS_LABELS: Record<RevenueStatus, string> = {
-  planned: "Planned",
   committed: "Committed",
   received: "Received",
   cancelled: "Cancelled",
@@ -68,7 +66,6 @@ export function calculateProjectRevenueStats(
 
   const receivedAmount = sumByStatus("received");
   const committedAmount = sumByStatus("committed");
-  const plannedAmount = sumByStatus("planned");
   const totalAmount = activeEntries.reduce((total, entry) => total + entry.amount, 0);
 
   return {
@@ -77,7 +74,6 @@ export function calculateProjectRevenueStats(
     totalAmount,
     receivedAmount,
     committedAmount,
-    plannedAmount,
-    outstandingAmount: plannedAmount + committedAmount,
+    outstandingAmount: committedAmount,
   };
 }
