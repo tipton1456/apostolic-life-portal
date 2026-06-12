@@ -40,6 +40,7 @@ export default function ProjectTaskModals({
   canManageTasks,
   canReassignTasks,
   assigneeOptions,
+  portalUserOptions = [],
   participantAssigneeOptions,
   taskFilesByTaskId,
   taskUpdatesByTaskId,
@@ -51,6 +52,7 @@ export default function ProjectTaskModals({
   canManageTasks: boolean;
   canReassignTasks: boolean;
   assigneeOptions: AssigneeOption[];
+  portalUserOptions?: AssigneeOption[];
   participantAssigneeOptions: AssigneeOption[];
   taskFilesByTaskId: Record<string, ProjectTaskFile[]>;
   taskUpdatesByTaskId: Record<string, ProjectTaskUpdate[]>;
@@ -177,6 +179,7 @@ export default function ProjectTaskModals({
                         name="assignedTo"
                         defaultValue={activeTask.assignedTo ?? ""}
                         options={assigneeOptions}
+                        portalUserOptions={portalUserOptions}
                       />
                     </>
                   ) : (

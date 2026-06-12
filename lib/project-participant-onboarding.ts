@@ -7,7 +7,10 @@ import {
   notifyNewProjectParticipantAccountCreated,
   notifyProjectParticipantTaskAssigned,
 } from "@/lib/project-notifications";
-import { CREATE_NEW_ASSIGNEE_VALUE } from "@/lib/project-participant-constants";
+import {
+  ADD_PORTAL_USER_ASSIGNEE_VALUE,
+  CREATE_NEW_ASSIGNEE_VALUE,
+} from "@/lib/project-participant-constants";
 import { setPortalUserProjectRole } from "@/lib/portal-users";
 import { normalizePhoneNumber } from "@/lib/twilio-sms";
 
@@ -26,11 +29,26 @@ export async function resolveTaskAssigneeFromForm(
 ): Promise<ResolvedTaskAssignee> {
   const assignedToValue = String(formData.get("assignedTo") || "").trim();
 
-  if (!assignedToValue || assignedToValue === CREATE_NEW_ASSIGNEE_VALUE) {
-    if (assignedToValue !== CREATE_NEW_ASSIGNEE_VALUE) {
-      return { userId: null, isNewAccount: false };
+  if (!assignedToValue) {
+    return { userId: null, isNewAccount: false };
+  }
+
+  if (assignedToValue === ADD_PORTAL_USER_ASSIGNEE_VALUE) {
+    const userId = String(formData.get("existingPortalUserId") || "").trim();
+
+    if (!userId) {
+      throw new Error("Choose a portal user to add.");
     }
 
+    await attachExistingPortalUserToProject(projectId, userId, actor.id);
+
+    return {
+      userId,
+      isNewAccount: false,
+    };
+  }
+
+  if (assignedToValue === CREATE_NEW_ASSIGNEE_VALUE) {
     return createOrAttachProjectParticipantFromForm(formData, projectId, actor);
   }
 
@@ -87,7 +105,16 @@ export async function sendTaskAssignmentNotifications({
   });
 }
 
-async function createOrAttachProjectParticipantFromForm(
+export async function attachExistingPortalUserToProject(
+  projectId: string,
+  userId: string,
+  addedBy: string,
+) {
+  await ensureProjectMember(projectId, userId, addedBy);
+  await ensurePortalUserIsProjectParticipant(userId);
+}
+
+export async function createOrAttachProjectParticipantFromForm(
   formData: FormData,
   projectId: string,
   actor: { id: string; email: string },

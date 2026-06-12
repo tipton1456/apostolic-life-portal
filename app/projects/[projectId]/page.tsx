@@ -14,9 +14,15 @@ import { listProjectFiles } from "@/lib/project-files";
 import type { ProjectTaskFile } from "@/lib/project-files";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import {
+  buildManagerTaskAssigneeOptions,
+  buildParticipantHandoffOptions,
+  buildPortalUserPickerOptions,
+} from "@/lib/project-assignee-options";
+import {
   canCurrentUserAccessProjects,
   getProjectDashboard,
-  listAssignablePortalUsers,
+  listPortalParticipantRoleUsers,
+  listPortalUsersAvailableForProject,
   listProjectManagersForAssignee,
 } from "@/lib/project-management";
 import {
@@ -77,12 +83,18 @@ export default async function ProjectDashboardPage({
     existing.push(update);
     updatesByTaskId.set(update.taskId, existing);
   }
-  const [assignableUsers, projectManagers] = dashboard?.permissions.canManageMembers
-    ? await Promise.all([
-        listAssignablePortalUsers(),
-        listProjectManagersForAssignee(),
-      ])
-    : [[], await listProjectManagersForAssignee().catch(() => [])];
+  const [availablePortalUsers, projectManagers, portalParticipants] =
+    dashboard?.permissions.canManageMembers
+      ? await Promise.all([
+          listPortalUsersAvailableForProject(projectId),
+          listProjectManagersForAssignee(),
+          listPortalParticipantRoleUsers(),
+        ])
+      : [
+          [],
+          await listProjectManagersForAssignee().catch(() => []),
+          await listPortalParticipantRoleUsers().catch(() => []),
+        ];
 
   if (!dashboard || !portalUser) {
     notFound();
@@ -90,20 +102,35 @@ export default async function ProjectDashboardPage({
 
   const { project, members, tasks, stats, permissions } = dashboard;
   const isProjectCompleted = project.status === "completed";
-  const memberIds = new Set(members.map((member) => member.userId));
-  const availableUsers = assignableUsers.filter((candidate) => !memberIds.has(candidate.id));
-  const assigneeOptions = [
-    { value: "", label: "Unassigned" },
-    ...members.map((member) => ({
-      value: member.userId,
-      label: member.fullName,
-    })),
-  ];
-  const participantAssigneeOptions = buildParticipantAssigneeOptions(
-    projectManagers,
+  const assigneeOptions = buildManagerTaskAssigneeOptions({
     members,
-    portalUser.id,
+    managers: projectManagers.map((manager) => ({
+      id: manager.id,
+      fullName: manager.fullName,
+    })),
+    portalParticipants: portalParticipants.map((participant) => ({
+      id: participant.id,
+      fullName: participant.fullName,
+    })),
+  });
+  const portalUserOptions = buildPortalUserPickerOptions(
+    availablePortalUsers.map((user) => ({
+      id: user.id,
+      fullName: `${user.fullName} (${user.email})`,
+    })),
   );
+  const participantAssigneeOptions = buildParticipantHandoffOptions({
+    currentUserId: portalUser.id,
+    members,
+    managers: projectManagers.map((manager) => ({
+      id: manager.id,
+      fullName: manager.fullName,
+    })),
+    portalParticipants: portalParticipants.map((participant) => ({
+      id: participant.id,
+      fullName: participant.fullName,
+    })),
+  });
   const taskFilesByTaskId = Object.fromEntries(filesByTaskId.entries());
   const taskUpdatesByTaskId = Object.fromEntries(updatesByTaskId.entries());
 
@@ -182,7 +209,7 @@ export default async function ProjectDashboardPage({
               </div>
             </div>
             <ProjectTeamPanel
-              availableUsers={availableUsers.map((candidate) => ({
+              availableUsers={availablePortalUsers.map((candidate) => ({
                 id: candidate.id,
                 fullName: candidate.fullName,
                 email: candidate.email,
@@ -256,6 +283,7 @@ export default async function ProjectDashboardPage({
 
         <ProjectTaskGrid
           assigneeOptions={assigneeOptions}
+          portalUserOptions={portalUserOptions}
           canManageTasks={permissions.canManageTasks}
           currentUserId={portalUser.id}
           highlightedTaskId={highlightedTaskId}
@@ -273,6 +301,7 @@ export default async function ProjectDashboardPage({
         />
         <ProjectTaskModals
           assigneeOptions={assigneeOptions}
+          portalUserOptions={portalUserOptions}
           canManageTasks={permissions.canManageTasks}
           canReassignTasks={permissions.canReassignTasks}
           currentUserId={portalUser.id}
@@ -286,30 +315,6 @@ export default async function ProjectDashboardPage({
       </Suspense>
     </main>
   );
-}
-
-function buildParticipantAssigneeOptions(
-  managers: Array<{ id: string; fullName: string }>,
-  members: Array<{ userId: string; fullName: string }>,
-  currentUserId: string,
-) {
-  const options = new Map<string, string>([
-    [currentUserId, "Keep assigned to me"],
-  ]);
-
-  for (const manager of managers) {
-    if (manager.id !== currentUserId) {
-      options.set(manager.id, `${manager.fullName} (Project Manager)`);
-    }
-  }
-
-  for (const member of members) {
-    if (member.userId !== currentUserId) {
-      options.set(member.userId, member.fullName);
-    }
-  }
-
-  return Array.from(options.entries()).map(([value, label]) => ({ value, label }));
 }
 
 function MetricCard({

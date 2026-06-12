@@ -12,9 +12,12 @@ import {
   PROJECT_SELECT_WITH_ARCHIVE,
 } from "@/lib/project-db-compat";
 import {
+  attachExistingPortalUserToProject,
+  createOrAttachProjectParticipantFromForm,
   resolveTaskAssigneeFromForm,
   sendTaskAssignmentNotifications,
 } from "@/lib/project-participant-onboarding";
+import { CREATE_NEW_ASSIGNEE_VALUE } from "@/lib/project-participant-constants";
 import {
   isTaskAtRisk,
   isTaskOpenOutstanding,
@@ -439,21 +442,74 @@ export async function listProjectManagersForAssignee(): Promise<
     }));
 }
 
-export async function listAssignablePortalUsers(): Promise<
-  Array<{
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    fullName: string;
-  }>
-> {
+type PortalUserOption = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+};
+
+function mapPortalUserOption(
+  user: Pick<PortalUserRow, "id" | "email" | "first_name" | "last_name">,
+): PortalUserOption {
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.first_name ?? "",
+    lastName: user.last_name ?? "",
+    fullName:
+      [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email,
+  };
+}
+
+function isManagerPortalUser(profile: {
+  is_admin: boolean | null;
+  project_role: string | null;
+  can_access_projects: boolean | null;
+}) {
+  return isPortalProjectManager({
+    isAdmin: Boolean(profile.is_admin),
+    projectRole:
+      profile.project_role === "project_manager" ||
+      profile.project_role === "project_participant"
+        ? profile.project_role
+        : null,
+    canAccessProjects: Boolean(profile.can_access_projects),
+  });
+}
+
+export async function listPortalParticipantRoleUsers(): Promise<PortalUserOption[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("portal_users")
+    .select("id,email,first_name,last_name,is_admin,project_role,can_access_projects")
+    .eq("project_role", "project_participant")
+    .order("email", { ascending: true });
+
+  if (error) {
+    console.error("Portal participant role lookup failed:", error);
+    throw new Error("Unable to load portal participants.");
+  }
+
+  return ((data ?? []) as Array<
+    PortalUserRow & {
+      is_admin: boolean | null;
+      project_role: string | null;
+      can_access_projects: boolean | null;
+    }
+  >)
+    .filter((user) => !isManagerPortalUser(user))
+    .map(mapPortalUserOption);
+}
+
+export async function listAssignablePortalUsers(): Promise<PortalUserOption[]> {
   await requireProjectManager();
 
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("portal_users")
-    .select("id,email,first_name,last_name")
+    .select("id,email,first_name,last_name,is_admin,project_role,can_access_projects")
     .order("email", { ascending: true });
 
   if (error) {
@@ -461,14 +517,28 @@ export async function listAssignablePortalUsers(): Promise<
     throw new Error("Unable to load portal users.");
   }
 
-  return ((data ?? []) as PortalUserRow[]).map((user) => ({
-    id: user.id,
-    email: user.email,
-    firstName: user.first_name ?? "",
-    lastName: user.last_name ?? "",
-    fullName:
-      [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email,
-  }));
+  return ((data ?? []) as Array<
+    PortalUserRow & {
+      is_admin: boolean | null;
+      project_role: string | null;
+      can_access_projects: boolean | null;
+    }
+  >)
+    .filter((user) => !isManagerPortalUser(user))
+    .map(mapPortalUserOption);
+}
+
+export async function listPortalUsersAvailableForProject(
+  projectId: string,
+): Promise<PortalUserOption[]> {
+  await requireProjectManager();
+
+  const [portalUsers, memberIds] = await Promise.all([
+    listAssignablePortalUsers(),
+    loadProjectMemberIds(projectId),
+  ]);
+
+  return portalUsers.filter((user) => !memberIds.has(user.id));
 }
 
 export async function getProjectDashboard(
@@ -740,42 +810,38 @@ export async function addProjectMember(formData: FormData) {
     throw new Error("Project ID and user ID are required.");
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("project_members").insert({
-    project_id: projectId,
-    user_id: userId,
-    added_by: currentUser.id,
-  });
+  await attachExistingPortalUserToProject(projectId, userId, currentUser.id);
 
-  if (error) {
-    console.error("Project member insert failed:", error);
-    throw new Error(error.message);
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/projects");
+}
+
+export async function addNewProjectParticipant(formData: FormData) {
+  const currentUser = await requireProjectManager();
+  const projectId = String(formData.get("projectId") || "");
+
+  if (!projectId) {
+    throw new Error("Project ID is required.");
   }
 
-  const admin = createAdminClient();
-  const { data: profile, error: profileError } = await admin
-    .from("portal_users")
-    .select("is_admin,project_role,can_access_projects")
-    .eq("id", userId)
-    .maybeSingle<{
-      is_admin: boolean | null;
-      project_role: string | null;
-      can_access_projects: boolean | null;
-    }>();
+  const onboardingForm = new FormData();
+  onboardingForm.set("assignedTo", CREATE_NEW_ASSIGNEE_VALUE);
+  onboardingForm.set("newParticipantEmail", String(formData.get("newParticipantEmail") || ""));
+  onboardingForm.set("newParticipantPhone", String(formData.get("newParticipantPhone") || ""));
+  onboardingForm.set(
+    "newParticipantFirstName",
+    String(formData.get("newParticipantFirstName") || ""),
+  );
+  onboardingForm.set(
+    "newParticipantLastName",
+    String(formData.get("newParticipantLastName") || ""),
+  );
 
-  if (profileError) {
-    console.error("Project member role lookup failed:", profileError);
-    throw new Error("Unable to update participant role.");
-  }
-
-  const isManagerProfile =
-    profile?.is_admin ||
-    profile?.project_role === "project_manager" ||
-    profile?.can_access_projects;
-
-  if (!isManagerProfile) {
-    await setPortalUserProjectRole(userId, "project_participant");
-  }
+  await createOrAttachProjectParticipantFromForm(
+    onboardingForm,
+    projectId,
+    currentUser,
+  );
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
@@ -835,7 +901,7 @@ export async function createProjectTask(formData: FormData) {
     throw new Error("Project ID and task title are required.");
   }
 
-  await ensureAssigneeIsProjectMember(projectId, assignedTo);
+  await ensureAssigneeCanReceiveTask(projectId, assignedTo, currentUser.id);
 
   const supabase = await createClient();
   const { data: existingTasks, error: sortError } = await supabase
@@ -970,7 +1036,11 @@ export async function updateProjectTask(formData: FormData) {
 
     assignedTo = nextAssignee;
     assignee = { userId: assignedTo, isNewAccount: false };
-    await ensureAssigneeIsValidParticipantHandoff(projectId, assignedTo);
+    await ensureAssigneeIsValidParticipantHandoff(
+      projectId,
+      assignedTo,
+      currentUser.id,
+    );
   }
 
   if (!id || !projectId || !title) {
@@ -978,7 +1048,7 @@ export async function updateProjectTask(formData: FormData) {
   }
 
   if (isManager) {
-    await ensureAssigneeIsProjectMember(projectId, assignedTo);
+    await ensureAssigneeCanReceiveTask(projectId, assignedTo, currentUser.id);
   }
 
   const updatePayload: Record<string, string | null> = {
@@ -1132,11 +1202,85 @@ async function getProjectRecord(projectId: string) {
   return data;
 }
 
-async function ensureAssigneeIsProjectMember(
+async function loadProjectMemberIds(projectId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("project_members")
+    .select("user_id")
+    .eq("project_id", projectId);
+
+  if (error) {
+    console.error("Project member id lookup failed:", error);
+    throw new Error("Unable to load project members.");
+  }
+
+  return new Set((data ?? []).map((row) => row.user_id as string));
+}
+
+async function getPortalUserAssigneeProfile(userId: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("portal_users")
+    .select("is_admin,project_role,can_access_projects")
+    .eq("id", userId)
+    .maybeSingle<{
+      is_admin: boolean | null;
+      project_role: string | null;
+      can_access_projects: boolean | null;
+    }>();
+
+  if (error || !data) {
+    console.error("Assignee profile lookup failed:", error);
+    throw new Error("Unable to validate assignee.");
+  }
+
+  return data;
+}
+
+async function ensureProjectMemberRecord(
+  projectId: string,
+  userId: string,
+  addedBy: string,
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("project_members")
+    .select("id")
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Project member validation failed:", error);
+    throw new Error("Unable to validate project member.");
+  }
+
+  if (data) return;
+
+  const { error: insertError } = await supabase.from("project_members").insert({
+    project_id: projectId,
+    user_id: userId,
+    added_by: addedBy,
+  });
+
+  if (insertError) {
+    console.error("Project member auto-add failed:", insertError);
+    throw new Error(insertError.message);
+  }
+}
+
+async function ensureAssigneeCanReceiveTask(
   projectId: string,
   userId: string | null,
+  addedBy: string,
 ) {
   if (!userId) return;
+
+  const profile = await getPortalUserAssigneeProfile(userId);
+
+  if (isManagerPortalUser(profile)) {
+    return;
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -1151,41 +1295,35 @@ async function ensureAssigneeIsProjectMember(
     throw new Error("Unable to validate project member.");
   }
 
-  if (!data) {
-    throw new Error("Tasks can only be assigned to people on this project.");
+  if (data) return;
+
+  if (profile.project_role === "project_participant") {
+    await ensureProjectMemberRecord(projectId, userId, addedBy);
+    return;
   }
+
+  throw new Error(
+    "Tasks can only be assigned to project managers, portal participants, or people already on this project.",
+  );
 }
 
 async function ensureAssigneeIsValidParticipantHandoff(
   projectId: string,
   userId: string | null,
+  addedBy: string,
 ) {
   if (!userId) {
     throw new Error("Choose a project manager or participant to hand off this task.");
   }
 
-  const admin = createAdminClient();
-  const { data: profile, error: profileError } = await admin
-    .from("portal_users")
-    .select("is_admin,project_role,can_access_projects")
-    .eq("id", userId)
-    .maybeSingle<{
-      is_admin: boolean | null;
-      project_role: string | null;
-      can_access_projects: boolean | null;
-    }>();
+  const profile = await getPortalUserAssigneeProfile(userId);
 
-  if (profileError) {
-    console.error("Participant handoff profile lookup failed:", profileError);
-    throw new Error("Unable to validate assignee.");
+  if (isManagerPortalUser(profile)) {
+    return;
   }
 
-  const isManager =
-    profile?.is_admin ||
-    profile?.project_role === "project_manager" ||
-    profile?.can_access_projects;
-
-  if (isManager) {
+  if (profile.project_role === "project_participant") {
+    await ensureProjectMemberRecord(projectId, userId, addedBy);
     return;
   }
 
@@ -1204,7 +1342,7 @@ async function ensureAssigneeIsValidParticipantHandoff(
 
   if (!data) {
     throw new Error(
-      "Participants can only hand tasks to a project manager or someone already on this project.",
+      "Participants can only hand tasks to a project manager, a portal participant, or someone already on this project.",
     );
   }
 }

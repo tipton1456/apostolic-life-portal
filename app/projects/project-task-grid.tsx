@@ -37,6 +37,7 @@ export default function ProjectTaskGrid({
   canManageTasks,
   isProjectCompleted,
   assigneeOptions,
+  portalUserOptions = [],
   taskUpdatesByTaskId,
   highlightedTaskId,
 }: {
@@ -46,6 +47,7 @@ export default function ProjectTaskGrid({
   canManageTasks: boolean;
   isProjectCompleted: boolean;
   assigneeOptions: Array<{ value: string; label: string }>;
+  portalUserOptions?: Array<{ value: string; label: string }>;
   taskUpdatesByTaskId: Record<string, ProjectTaskUpdate[]>;
   highlightedTaskId?: string;
 }) {
@@ -122,6 +124,7 @@ export default function ProjectTaskGrid({
             name="assignedTo"
             defaultValue=""
             options={assigneeOptions}
+            portalUserOptions={portalUserOptions}
           />
           <AdminFormButton pendingLabel="Adding..." className="md:col-start-2 xl:col-start-8">
             Add Task
