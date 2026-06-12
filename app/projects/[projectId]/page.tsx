@@ -282,22 +282,11 @@ export default async function ProjectDashboardPage({
           />
         </section>
 
-        <section className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="mt-6 grid gap-6 lg:grid-cols-2">
           <CompletionPieCard
             completedTasks={stats.completedTasks}
             percent={stats.completionPercent}
             totalTasks={stats.totalTasks}
-          />
-          <MetricCard
-            label="Outstanding"
-            value={String(stats.outstandingTasks)}
-            detail="Tasks not yet completed"
-          />
-          <MetricCard
-            label="Overdue"
-            value={String(stats.overdueTasks)}
-            detail="Past due and still open"
-            highlight={stats.overdueTasks > 0}
           />
           <TaskBreakdownPieCard
             atRiskTasks={stats.atRiskTasks}
