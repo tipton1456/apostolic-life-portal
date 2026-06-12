@@ -13,11 +13,13 @@ export default function ProjectFilesTable({
   currentUserId,
   isManager,
   showProjectColumn = true,
+  deleteReturnTo = "project-files",
 }: {
   files: ProjectTaskFile[];
   currentUserId: string;
   isManager: boolean;
   showProjectColumn?: boolean;
+  deleteReturnTo?: "project-files" | "all-files";
 }) {
   if (files.length === 0) {
     return (
@@ -88,12 +90,14 @@ export default function ProjectFilesTable({
                       <form action={deleteProjectTaskFile}>
                         <input type="hidden" name="fileId" value={file.id} />
                         <input type="hidden" name="projectId" value={file.projectId} />
+                        <input type="hidden" name="returnTo" value={deleteReturnTo} />
                         <AdminFormButton
                           pendingLabel="Deleting..."
                           variant="danger"
                           className="rounded-lg px-3 py-2"
                         >
                           <PortalIcon className="h-4 w-4" name="trash" />
+                          <span className="sr-only sm:not-sr-only">Delete</span>
                         </AdminFormButton>
                       </form>
                     ) : null}

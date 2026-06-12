@@ -71,6 +71,7 @@ export default async function ProjectFilesPage() {
             </Link>
           </div>
           <ProjectFilesTable
+            deleteReturnTo="all-files"
             files={files}
             currentUserId={portalUser.id}
             isManager={isManager}

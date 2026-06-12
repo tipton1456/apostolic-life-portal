@@ -343,7 +343,11 @@ export async function deleteProjectTaskFile(formData: FormData) {
     throw new Error("You do not have permission to delete this file.");
   }
 
-  await deleteStoredProjectTaskFile(file.storage_path, { supabase });
+  try {
+    await deleteStoredProjectTaskFile(file.storage_path, { supabase });
+  } catch (error) {
+    console.error("Project file storage delete failed:", error);
+  }
 
   const { error: deleteError } = await supabase
     .from("project_task_files")
@@ -356,6 +360,19 @@ export async function deleteProjectTaskFile(formData: FormData) {
   }
 
   revalidateProjectFilePaths(projectId);
+
+  const taskId = String(formData.get("taskId") || "").trim();
+  const returnTo = String(formData.get("returnTo") || "").trim();
+
+  if (taskId) {
+    redirect(`/projects/${projectId}?task=${taskId}`);
+  }
+
+  if (returnTo === "all-files") {
+    redirect("/projects/files");
+  }
+
+  redirect(`/projects/${projectId}/files`);
 }
 
 export async function getProjectFileForDownload(fileId: string) {

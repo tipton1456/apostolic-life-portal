@@ -19,7 +19,7 @@ import {
   updateProjectTask,
 } from "@/lib/project-management";
 import type { ProjectTaskFile } from "@/lib/project-files";
-import { uploadProjectTaskFile } from "@/lib/project-files";
+import { deleteProjectTaskFile, uploadProjectTaskFile } from "@/lib/project-files";
 import {
   formatProjectFileDate,
   formatProjectFileSize,
@@ -321,26 +321,50 @@ export default function ProjectTaskModals({
               </div>
               {taskFiles.length > 0 ? (
                 <div className="mt-3 space-y-2">
-                  {taskFiles.map((file) => (
-                    <div
-                      key={file.id}
-                      className="flex flex-col gap-2 rounded-lg border border-white/10 bg-neutral-950/40 px-3 py-3 md:flex-row md:items-center md:justify-between"
-                    >
-                      <div>
-                        <p className="font-medium text-neutral-100">{file.fileName}</p>
-                        <p className="mt-1 text-xs text-neutral-500">
-                          {formatProjectFileSize(file.fileSize)} · {file.uploadedByName} ·{" "}
-                          {formatProjectFileDate(file.createdAt)}
-                        </p>
-                      </div>
-                      <a
-                        href={`/api/projects/files/${file.id}/download`}
-                        className="inline-flex w-fit rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-lime-300 transition hover:border-lime-300/60 hover:bg-lime-400/10"
+                  {taskFiles.map((file) => {
+                    const canDeleteFile =
+                      !isProjectCompleted &&
+                      canEdit &&
+                      (canManageTasks || file.uploadedBy === currentUserId);
+
+                    return (
+                      <div
+                        key={file.id}
+                        className="flex flex-col gap-3 rounded-lg border border-white/10 bg-neutral-950/40 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
                       >
-                        Download
-                      </a>
-                    </div>
-                  ))}
+                        <div className="min-w-0">
+                          <p className="font-medium text-neutral-100">{file.fileName}</p>
+                          <p className="mt-1 text-xs text-neutral-500">
+                            {formatProjectFileSize(file.fileSize)} · {file.uploadedByName} ·{" "}
+                            {formatProjectFileDate(file.createdAt)}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <a
+                            href={`/api/projects/files/${file.id}/download`}
+                            className="inline-flex rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-lime-300 transition hover:border-lime-300/60 hover:bg-lime-400/10"
+                          >
+                            Download
+                          </a>
+                          {canDeleteFile ? (
+                            <form action={deleteProjectTaskFile}>
+                              <input type="hidden" name="fileId" value={file.id} />
+                              <input type="hidden" name="projectId" value={projectId} />
+                              <input type="hidden" name="taskId" value={activeTask.id} />
+                              <AdminFormButton
+                                pendingLabel="Deleting..."
+                                variant="danger"
+                                className="rounded-lg px-3 py-2"
+                              >
+                                <PortalIcon className="h-4 w-4" name="trash" />
+                                Delete
+                              </AdminFormButton>
+                            </form>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="mt-3 text-sm text-neutral-500">
