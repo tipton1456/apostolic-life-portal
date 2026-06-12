@@ -12,7 +12,6 @@ export default function ExpandablePieCard({
   segments,
   total,
   centerValue,
-  centerLabel,
   emptyMessage,
   glowClassName,
   shellClassName,
@@ -24,7 +23,6 @@ export default function ExpandablePieCard({
   segments: PieSegment[];
   total: number;
   centerValue: string;
-  centerLabel: string;
   emptyMessage?: string;
   glowClassName: string;
   shellClassName: string;
@@ -37,11 +35,15 @@ export default function ExpandablePieCard({
 
   return (
     <div
-      className={`rounded-3xl border border-white/10 bg-gradient-to-br p-4 transition-all duration-300 sm:p-5 ${
-        isExpanded ? "sm:p-8" : ""
+      className={`rounded-3xl border border-white/10 bg-gradient-to-br transition-all duration-300 ${
+        isExpanded ? "p-6 sm:p-8" : "p-0"
       } ${shellClassName}`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div
+        className={`flex items-center justify-between gap-2 ${
+          isExpanded ? "" : "border-b border-white/10 px-3 py-1.5"
+        }`}
+      >
         <p className="text-xs uppercase tracking-[0.22em] text-neutral-500">
           {title}
         </p>
@@ -52,15 +54,19 @@ export default function ExpandablePieCard({
           aria-label={
             isExpanded ? `Collapse ${title} details` : `Expand ${title} details`
           }
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-neutral-950/70 text-lg font-semibold text-lime-300 transition hover:border-lime-300/40 hover:bg-lime-400/10"
+          className={`inline-flex shrink-0 items-center justify-center rounded-full border border-white/10 bg-neutral-950/70 font-semibold text-lime-300 transition hover:border-lime-300/40 hover:bg-lime-400/10 ${
+            isExpanded ? "h-8 w-8 text-lg" : "h-7 w-7 text-base"
+          }`}
         >
           {isExpanded ? "−" : "+"}
         </button>
       </div>
 
       <div
-        className={`relative mx-auto mt-4 aspect-square w-full transition-all duration-300 ${
-          isExpanded ? "max-w-[22rem]" : "max-w-[9.5rem]"
+        className={`relative mx-auto w-full transition-all duration-300 ${
+          isExpanded
+            ? "mt-4 aspect-square max-w-[22rem]"
+            : "h-[4.75rem] w-[4.75rem]"
         }`}
       >
         <div
@@ -70,16 +76,13 @@ export default function ExpandablePieCard({
           style={{ background: gradient }}
           aria-hidden="true"
         />
-        <div className="absolute inset-[30%] flex flex-col items-center justify-center rounded-full border border-white/10 bg-neutral-950/95 text-center shadow-inner">
+        <div className="absolute inset-[30%] flex items-center justify-center rounded-full border border-white/10 bg-neutral-950/95 text-center shadow-inner">
           <span
             className={`font-bold tracking-tight transition-all duration-300 ${centerValueClassName} ${
-              isExpanded ? "text-4xl sm:text-5xl" : "text-2xl sm:text-3xl"
+              isExpanded ? "text-4xl sm:text-5xl" : "text-lg"
             }`}
           >
             {centerValue}
-          </span>
-          <span className="mt-1 text-[10px] uppercase tracking-[0.18em] text-neutral-500 sm:text-xs">
-            {centerLabel}
           </span>
         </div>
 
@@ -140,11 +143,6 @@ export default function ExpandablePieCard({
           })}
         </div>
 
-        {!isExpanded && total === 0 && emptyMessage ? (
-          <p className="absolute inset-x-0 -bottom-1 text-center text-xs text-neutral-500">
-            {emptyMessage}
-          </p>
-        ) : null}
       </div>
 
       {isExpanded && total === 0 && emptyMessage ? (

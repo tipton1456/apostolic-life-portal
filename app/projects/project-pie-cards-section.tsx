@@ -43,7 +43,7 @@ export default function ProjectPieCardsSection({
   }, [expanded.breakdown, expanded.completion]);
 
   return (
-    <section className={`mt-6 grid gap-6 ${layoutClassName}`}>
+    <section className={`mt-6 grid gap-4 ${layoutClassName}`}>
       <CompletionPieCard
         completedTasks={completedTasks}
         isExpanded={expanded.completion}

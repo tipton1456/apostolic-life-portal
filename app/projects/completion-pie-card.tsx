@@ -35,7 +35,6 @@ export default function CompletionPieCard({
 
   return (
     <ExpandablePieCard
-      centerLabel="Complete"
       centerValue={`${clampedPercent}%`}
       centerValueClassName="text-lime-300"
       emptyMessage="Add tasks to start tracking completion."

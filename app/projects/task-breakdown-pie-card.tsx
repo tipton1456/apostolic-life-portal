@@ -57,7 +57,6 @@ export default function TaskBreakdownPieCard({
 
   return (
     <ExpandablePieCard
-      centerLabel="Tasks"
       centerValue={String(totalTasks)}
       centerValueClassName="text-white"
       emptyMessage="No tasks on this project yet."
