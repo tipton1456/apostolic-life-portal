@@ -12,13 +12,21 @@ import {
   PROJECT_SELECT_WITH_ARCHIVE,
 } from "@/lib/project-db-compat";
 import {
-  calculateProjectExpenseStats,
+  calculateProjectFinancialStats,
   formatCurrency,
+} from "@/lib/project-financial-utils";
+import {
   formatExpenseCategory,
   formatExpenseStatus,
   type ExpenseStatus,
   type ProjectExpense,
 } from "@/lib/project-expense-utils";
+import {
+  formatRevenueCategory,
+  formatRevenueStatus,
+  type ProjectRevenue,
+  type RevenueStatus,
+} from "@/lib/project-revenue-utils";
 import {
   formatDisplayDate,
   formatProjectStatus,
@@ -40,30 +48,36 @@ const COLORS = {
   line: rgb(0.82, 0.82, 0.82),
   outstanding: rgb(0.79, 0.45, 0.12),
   paid: rgb(0.2, 0.55, 0.25),
+  received: rgb(0.16, 0.62, 0.35),
   total: rgb(0.12, 0.45, 0.7),
+  net: rgb(0.35, 0.2, 0.62),
   headerFill: rgb(0.95, 0.95, 0.95),
 };
 
-type ReportExpenseGroup = "outstanding" | "paid";
+type ReportFinancialGroup =
+  | "outstandingExpenses"
+  | "paidExpenses"
+  | "outstandingIncome"
+  | "receivedIncome";
 
-type ReportExpenseRow = {
+type ReportFinancialRow = {
   description: string;
   category: string;
   amount: string;
-  expenseDate: string;
-  vendor: string;
+  itemDate: string;
+  counterparty: string;
   status: string;
 };
 
 type ReportSection = {
-  key: ReportExpenseGroup;
+  key: ReportFinancialGroup;
   title: string;
   color: ReturnType<typeof rgb>;
   totalAmount: number;
-  expenses: ReportExpenseRow[];
+  entries: ReportFinancialRow[];
 };
 
-export class ProjectCostSummaryReportError extends Error {
+export class ProjectFinancialSummaryReportError extends Error {
   status: number;
 
   constructor(message: string, status: number) {
@@ -72,18 +86,18 @@ export class ProjectCostSummaryReportError extends Error {
   }
 }
 
-export async function buildProjectCostSummaryReportPdf(projectId: string) {
-  const context = await loadProjectCostSummaryReportContext(projectId);
-  const buffer = await renderProjectCostSummaryReportPdf(context);
-  const fileName = `${slugify(context.project.name)}-cost-summary-report.pdf`;
+export async function buildProjectFinancialSummaryReportPdf(projectId: string) {
+  const context = await loadProjectFinancialSummaryReportContext(projectId);
+  const buffer = await renderProjectFinancialSummaryReportPdf(context);
+  const fileName = `${slugify(context.project.name)}-financial-summary-report.pdf`;
 
   return { buffer, fileName };
 }
 
-async function loadProjectCostSummaryReportContext(projectId: string) {
+async function loadProjectFinancialSummaryReportContext(projectId: string) {
   const currentUser = await getCurrentPortalUser();
   if (!currentUser) {
-    throw new ProjectCostSummaryReportError(
+    throw new ProjectFinancialSummaryReportError(
       "You must be signed in to download this report.",
       401,
     );
@@ -92,34 +106,51 @@ async function loadProjectCostSummaryReportContext(projectId: string) {
   const supabase = await createClient();
   const canView = await userCanViewProject(projectId, currentUser);
   if (!canView) {
-    throw new ProjectCostSummaryReportError("You do not have access to this project.", 403);
+    throw new ProjectFinancialSummaryReportError("You do not have access to this project.", 403);
   }
 
-  const [{ data: projectRow, error: projectError }, { data: expenseRows, error: expenseError }, members, managers] =
-    await Promise.all([
-      supabase
-        .from("projects")
-        .select(PROJECT_SELECT_WITH_ARCHIVE)
-        .eq("id", projectId)
-        .maybeSingle(),
-      supabase
-        .from("project_expenses")
-        .select(
-          "id,project_id,description,category,amount,expense_date,vendor,notes,status,created_by,created_at,updated_at",
-        )
-        .eq("project_id", projectId)
-        .order("expense_date", { ascending: false })
-        .order("created_at", { ascending: false }),
-      loadProjectMemberNames(projectId),
-      loadProjectManagerNames(),
-    ]);
+  const [
+    { data: projectRow, error: projectError },
+    { data: expenseRows, error: expenseError },
+    { data: revenueRows, error: revenueError },
+    members,
+    managers,
+  ] = await Promise.all([
+    supabase
+      .from("projects")
+      .select(PROJECT_SELECT_WITH_ARCHIVE)
+      .eq("id", projectId)
+      .maybeSingle(),
+    supabase
+      .from("project_expenses")
+      .select(
+        "id,project_id,description,category,amount,expense_date,vendor,notes,status,created_by,created_at,updated_at",
+      )
+      .eq("project_id", projectId)
+      .order("expense_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("project_revenue")
+      .select(
+        "id,project_id,description,category,amount,revenue_date,source,notes,status,created_by,created_at,updated_at",
+      )
+      .eq("project_id", projectId)
+      .order("revenue_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+    loadProjectMemberNames(projectId),
+    loadProjectManagerNames(),
+  ]);
 
   if (projectError || !projectRow) {
-    throw new ProjectCostSummaryReportError("Project not found.", 404);
+    throw new ProjectFinancialSummaryReportError("Project not found.", 404);
   }
 
   if (expenseError) {
-    throw new ProjectCostSummaryReportError("Unable to load project expenses.", 500);
+    throw new ProjectFinancialSummaryReportError("Unable to load project expenses.", 500);
+  }
+
+  if (revenueError) {
+    throw new ProjectFinancialSummaryReportError("Unable to load project revenue.", 500);
   }
 
   const project = mapProject(normalizeProjectRow(projectRow));
@@ -153,8 +184,38 @@ async function loadProjectCostSummaryReportContext(projectId: string) {
     }),
   );
 
-  const stats = calculateProjectExpenseStats(expenses);
-  const sections = buildReportSections(expenses);
+  const revenue = ((revenueRows ?? []) as Array<{
+    id: string;
+    project_id: string;
+    description: string;
+    category: ProjectRevenue["category"];
+    amount: number | string;
+    revenue_date: string;
+    source: string;
+    notes: string;
+    status: RevenueStatus;
+    created_by: string;
+    created_at: string;
+    updated_at: string;
+  }>).map(
+    (row): ProjectRevenue => ({
+      id: row.id,
+      projectId: row.project_id,
+      description: row.description,
+      category: row.category,
+      amount: Number(row.amount),
+      revenueDate: row.revenue_date,
+      source: row.source,
+      notes: row.notes,
+      status: row.status,
+      createdBy: row.created_by,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }),
+  );
+
+  const stats = calculateProjectFinancialStats(expenses, revenue);
+  const sections = buildReportSections(expenses, revenue);
 
   return {
     project,
@@ -254,48 +315,80 @@ async function loadProjectManagerNames() {
     );
 }
 
-function buildReportSections(expenses: ProjectExpense[]): ReportSection[] {
-  const outstanding = expenses.filter(
+function buildReportSections(
+  expenses: ProjectExpense[],
+  revenue: ProjectRevenue[],
+): ReportSection[] {
+  const outstandingExpenses = expenses.filter(
     (expense) => expense.status === "planned" || expense.status === "committed",
   );
-  const paid = expenses.filter((expense) => expense.status === "paid");
+  const paidExpenses = expenses.filter((expense) => expense.status === "paid");
+  const outstandingIncome = revenue.filter(
+    (entry) => entry.status === "planned" || entry.status === "committed",
+  );
+  const receivedIncome = revenue.filter((entry) => entry.status === "received");
 
   return [
     {
-      key: "outstanding",
+      key: "outstandingExpenses",
       title: "Outstanding Expenses",
       color: COLORS.outstanding,
-      totalAmount: outstanding.reduce((total, expense) => total + expense.amount, 0),
-      expenses: outstanding.map(mapExpenseRow),
+      totalAmount: outstandingExpenses.reduce((total, expense) => total + expense.amount, 0),
+      entries: outstandingExpenses.map(mapExpenseRow),
     },
     {
-      key: "paid",
+      key: "paidExpenses",
       title: "Paid Expenses",
       color: COLORS.paid,
-      totalAmount: paid.reduce((total, expense) => total + expense.amount, 0),
-      expenses: paid.map(mapExpenseRow),
+      totalAmount: paidExpenses.reduce((total, expense) => total + expense.amount, 0),
+      entries: paidExpenses.map(mapExpenseRow),
+    },
+    {
+      key: "outstandingIncome",
+      title: "Outstanding Income",
+      color: COLORS.outstanding,
+      totalAmount: outstandingIncome.reduce((total, entry) => total + entry.amount, 0),
+      entries: outstandingIncome.map(mapRevenueRow),
+    },
+    {
+      key: "receivedIncome",
+      title: "Received Income",
+      color: COLORS.received,
+      totalAmount: receivedIncome.reduce((total, entry) => total + entry.amount, 0),
+      entries: receivedIncome.map(mapRevenueRow),
     },
   ];
 }
 
-function mapExpenseRow(expense: ProjectExpense): ReportExpenseRow {
+function mapExpenseRow(expense: ProjectExpense): ReportFinancialRow {
   return {
     description: expense.description,
     category: formatExpenseCategory(expense.category),
     amount: formatCurrency(expense.amount),
-    expenseDate: formatDisplayDate(expense.expenseDate),
-    vendor: expense.vendor || "—",
+    itemDate: formatDisplayDate(expense.expenseDate),
+    counterparty: expense.vendor || "—",
     status: formatExpenseStatus(expense.status),
   };
 }
 
-async function renderProjectCostSummaryReportPdf(context: {
+function mapRevenueRow(entry: ProjectRevenue): ReportFinancialRow {
+  return {
+    description: entry.description,
+    category: formatRevenueCategory(entry.category),
+    amount: formatCurrency(entry.amount),
+    itemDate: formatDisplayDate(entry.revenueDate),
+    counterparty: entry.source || "—",
+    status: formatRevenueStatus(entry.status),
+  };
+}
+
+async function renderProjectFinancialSummaryReportPdf(context: {
   project: Project;
   generatedAt: Date;
   generatedBy: string;
   managerNames: string[];
   participantNames: string[];
-  stats: ReturnType<typeof calculateProjectExpenseStats>;
+  stats: ReturnType<typeof calculateProjectFinancialStats>;
   sections: ReportSection[];
 }) {
   const pdf = await PDFDocument.create();
@@ -306,14 +399,14 @@ async function renderProjectCostSummaryReportPdf(context: {
   );
   const logo = await pdf.embedPng(logoBytes);
 
-  const renderer = new CostReportPdfRenderer(pdf, regular, bold, logo);
+  const renderer = new FinancialReportPdfRenderer(pdf, regular, bold, logo);
   renderer.drawCover(context);
   renderer.drawSections(context.sections, context.generatedAt, context.generatedBy);
 
   return pdf.save();
 }
 
-class CostReportPdfRenderer {
+class FinancialReportPdfRenderer {
   private page: PDFPage;
   private pageNumber = 0;
   private y = PAGE_HEIGHT - MARGIN;
@@ -332,10 +425,10 @@ class CostReportPdfRenderer {
     generatedAt: Date;
     managerNames: string[];
     participantNames: string[];
-    stats: ReturnType<typeof calculateProjectExpenseStats>;
+    stats: ReturnType<typeof calculateProjectFinancialStats>;
   }) {
     const logoDims = this.logo.scaleToFit(180, 48);
-    const titleText = `${context.project.name.toUpperCase()} PROJECT EXPENSE SUMMARY REPORT`;
+    const titleText = `${context.project.name.toUpperCase()} PROJECT FINANCIAL SUMMARY REPORT`;
     const titleSize = 14;
     const titleLineHeight = titleSize + 4;
     const titleLines = wrapText(
@@ -406,16 +499,16 @@ class CostReportPdfRenderer {
       this.ensureSpace(72);
       this.drawSectionHeader(section);
 
-      if (section.expenses.length === 0) {
-        this.drawWrappedLine("No expenses in this category.", 10, this.regular, COLORS.muted, 14);
+      if (section.entries.length === 0) {
+        this.drawWrappedLine("No entries in this category.", 10, this.regular, COLORS.muted, 14);
         this.y -= 8;
         continue;
       }
 
       this.drawTableHeader();
 
-      for (const expense of section.expenses) {
-        this.drawExpenseRow(expense);
+      for (const entry of section.entries) {
+        this.drawFinancialRow(entry);
       }
 
       this.y -= 4;
@@ -432,22 +525,25 @@ class CostReportPdfRenderer {
     this.drawFooters(generatedAt, generatedBy);
   }
 
-  private drawTotalSummary(stats: ReturnType<typeof calculateProjectExpenseStats>) {
+  private drawTotalSummary(stats: ReturnType<typeof calculateProjectFinancialStats>) {
     this.page.drawRectangle({
       x: MARGIN,
-      y: this.y - 54,
+      y: this.y - 72,
       width: CONTENT_WIDTH,
-      height: 58,
+      height: 76,
       color: COLORS.headerFill,
       borderColor: COLORS.total,
       borderWidth: 1,
     });
 
     const summaryLines: DetailLineSegment[][] = [
-      [{ label: "Total Expenses:", value: formatCurrency(stats.totalAmount) }],
       [
-        { label: "Outstanding:", value: formatCurrency(stats.outstandingAmount) },
-        { label: "Paid:", value: formatCurrency(stats.paidAmount) },
+        { label: "Total Revenue:", value: formatCurrency(stats.totalRevenue) },
+        { label: "Total Expenses:", value: formatCurrency(stats.totalExpense) },
+      ],
+      [
+        { label: "Outstanding Expenses:", value: formatCurrency(stats.outstandingExpenses) },
+        { label: "Net Revenue:", value: formatCurrency(stats.netRevenue) },
       ],
     ];
 
@@ -477,7 +573,7 @@ class CostReportPdfRenderer {
       summaryY -= 18;
     }
 
-    this.y -= 66;
+    this.y -= 84;
   }
 
   private drawSectionHeader(section: ReportSection) {
@@ -491,7 +587,7 @@ class CostReportPdfRenderer {
       borderWidth: 1,
     });
     this.page.drawText(
-      `${section.title} (${section.expenses.length}) · ${formatCurrency(section.totalAmount)}`,
+      `${section.title} (${section.entries.length}) · ${formatCurrency(section.totalAmount)}`,
       {
         x: MARGIN + 8,
         y: this.y - 14,
@@ -505,7 +601,7 @@ class CostReportPdfRenderer {
 
   private drawTableHeader() {
     const columns = getColumnLayout();
-    this.page.drawText("Expense", { x: columns.description.x, y: this.y, size: 9, font: this.bold, color: COLORS.muted });
+    this.page.drawText("Item", { x: columns.description.x, y: this.y, size: 9, font: this.bold, color: COLORS.muted });
     this.page.drawText("Category", {
       x: columns.category.x,
       y: this.y,
@@ -527,8 +623,8 @@ class CostReportPdfRenderer {
       font: this.bold,
       color: COLORS.muted,
     });
-    this.page.drawText("Vendor", {
-      x: columns.vendor.x,
+    this.page.drawText("Vendor/Source", {
+      x: columns.counterparty.x,
       y: this.y,
       size: 9,
       font: this.bold,
@@ -551,11 +647,11 @@ class CostReportPdfRenderer {
     this.y -= 14;
   }
 
-  private drawExpenseRow(expense: ReportExpenseRow) {
+  private drawFinancialRow(entry: ReportFinancialRow) {
     const columns = getColumnLayout();
-    const descriptionLines = wrapText(expense.description, columns.description.width, this.bold, 9);
-    const vendorLines = wrapText(expense.vendor, columns.vendor.width, this.regular, 9);
-    const rowLines = Math.max(descriptionLines.length, vendorLines.length, 1);
+    const descriptionLines = wrapText(entry.description, columns.description.width, this.bold, 9);
+    const counterpartyLines = wrapText(entry.counterparty, columns.counterparty.width, this.regular, 9);
+    const rowLines = Math.max(descriptionLines.length, counterpartyLines.length, 1);
     const rowHeight = rowLines * 12 + 8;
 
     this.ensureSpace(rowHeight + 4);
@@ -573,21 +669,21 @@ class CostReportPdfRenderer {
         });
       }
       if (index === 0) {
-        this.page.drawText(expense.category, {
+        this.page.drawText(entry.category, {
           x: columns.category.x,
           y: lineY,
           size: 9,
           font: this.regular,
           color: COLORS.text,
         });
-        this.page.drawText(expense.amount, {
+        this.page.drawText(entry.amount, {
           x: columns.amount.x,
           y: lineY,
           size: 9,
           font: this.regular,
           color: COLORS.text,
         });
-        this.page.drawText(expense.expenseDate, {
+        this.page.drawText(entry.itemDate, {
           x: columns.date.x,
           y: lineY,
           size: 9,
@@ -595,9 +691,9 @@ class CostReportPdfRenderer {
           color: COLORS.text,
         });
       }
-      if (vendorLines[index]) {
-        this.page.drawText(vendorLines[index], {
-          x: columns.vendor.x,
+      if (counterpartyLines[index]) {
+        this.page.drawText(counterpartyLines[index], {
+          x: columns.counterparty.x,
           y: lineY,
           size: 9,
           font: this.regular,
@@ -605,7 +701,7 @@ class CostReportPdfRenderer {
         });
       }
       if (index === 0) {
-        this.page.drawText(expense.status, {
+        this.page.drawText(entry.status, {
           x: columns.status.x,
           y: lineY,
           size: 9,
@@ -776,21 +872,22 @@ function getColumnLayout() {
   const categoryWidth = 88;
   const amountWidth = 72;
   const dateWidth = 72;
-  const vendorWidth = 120;
-  const statusWidth = CONTENT_WIDTH - descriptionWidth - categoryWidth - amountWidth - dateWidth - vendorWidth - 24;
+  const counterpartyWidth = 120;
+  const statusWidth =
+    CONTENT_WIDTH - descriptionWidth - categoryWidth - amountWidth - dateWidth - counterpartyWidth - 24;
   const descriptionX = MARGIN;
   const categoryX = descriptionX + descriptionWidth + 4;
   const amountX = categoryX + categoryWidth + 4;
   const dateX = amountX + amountWidth + 4;
-  const vendorX = dateX + dateWidth + 4;
-  const statusX = vendorX + vendorWidth + 4;
+  const counterpartyX = dateX + dateWidth + 4;
+  const statusX = counterpartyX + counterpartyWidth + 4;
 
   return {
     description: { x: descriptionX, width: descriptionWidth },
     category: { x: categoryX, width: categoryWidth },
     amount: { x: amountX, width: amountWidth },
     date: { x: dateX, width: dateWidth },
-    vendor: { x: vendorX, width: vendorWidth },
+    counterparty: { x: counterpartyX, width: counterpartyWidth },
     status: { x: statusX, width: statusWidth },
   };
 }

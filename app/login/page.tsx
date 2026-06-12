@@ -17,11 +17,9 @@ export default async function LoginPage({
           <PortalLogo className="h-auto w-64 max-w-full" />
         </div>
 
-        <h1 className="mt-4 text-center text-2xl font-bold sm:text-3xl">
-          Portal Login
-        </h1>
-
-        <LoginForm nextPath={nextPath} />
+        <div className="mt-6">
+          <LoginForm nextPath={nextPath} />
+        </div>
       </div>
     </main>
   );

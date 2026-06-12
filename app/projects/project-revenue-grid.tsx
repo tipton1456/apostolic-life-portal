@@ -2,77 +2,76 @@
 
 import { useMemo, useState } from "react";
 import AdminFormButton from "@/app/admin/admin-form-button";
-import ExpenseListTable from "@/app/projects/expense-list-table";
-import { createProjectExpense } from "@/lib/project-expenses";
-import {
-  EXPENSE_CATEGORY_OPTIONS,
-  EXPENSE_STATUS_OPTIONS,
-} from "@/lib/project-expense-options";
-import type { ProjectExpense } from "@/lib/project-expense-utils";
+import RevenueListTable from "@/app/projects/revenue-list-table";
 import { formatCurrency } from "@/lib/project-expense-utils";
+import {
+  REVENUE_CATEGORY_OPTIONS,
+  REVENUE_STATUS_OPTIONS,
+} from "@/lib/project-revenue-options";
+import { createProjectRevenue } from "@/lib/project-revenue";
+import type { ProjectRevenue } from "@/lib/project-revenue-utils";
 
-type ExpenseView = "active" | "planned" | "committed" | "paid" | "cancelled" | "all";
+type RevenueView = "active" | "planned" | "committed" | "received" | "cancelled" | "all";
 
-const EXPENSE_VIEWS: Array<{ id: ExpenseView; label: string }> = [
+const REVENUE_VIEWS: Array<{ id: RevenueView; label: string }> = [
   { id: "active", label: "Active" },
   { id: "planned", label: "Planned" },
   { id: "committed", label: "Committed" },
-  { id: "paid", label: "Paid" },
+  { id: "received", label: "Received" },
   { id: "cancelled", label: "Cancelled" },
-  { id: "all", label: "All Expenses" },
+  { id: "all", label: "All Income" },
 ];
 
-const EMPTY_MESSAGES: Record<ExpenseView, string> = {
-  active: "No active expenses. Add a cost to start tracking project spending.",
-  planned: "No planned expenses.",
-  committed: "No committed expenses.",
-  paid: "No paid expenses yet.",
-  cancelled: "No cancelled expenses.",
-  all: "No expenses have been added to this project yet.",
+const EMPTY_MESSAGES: Record<RevenueView, string> = {
+  active: "No active income entries. Add revenue to start tracking project income.",
+  planned: "No planned income.",
+  committed: "No committed income.",
+  received: "No received income yet.",
+  cancelled: "No cancelled income.",
+  all: "No revenue has been added to this project yet.",
 };
 
-export default function ProjectExpenseGrid({
-  expenses,
+export default function ProjectRevenueGrid({
+  revenue,
   projectId,
-  canManageExpenses,
+  canManageRevenue,
   isProjectCompleted,
 }: {
-  expenses: ProjectExpense[];
+  revenue: ProjectRevenue[];
   projectId: string;
-  canManageExpenses: boolean;
+  canManageRevenue: boolean;
   isProjectCompleted: boolean;
 }) {
-  const [view, setView] = useState<ExpenseView>("active");
-  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [view, setView] = useState<RevenueView>("active");
+  const [showAddRevenue, setShowAddRevenue] = useState(false);
 
-  const filteredExpenses = useMemo(
-    () => filterExpenses(expenses, view),
-    [expenses, view],
+  const filteredRevenue = useMemo(
+    () => filterRevenue(revenue, view),
+    [revenue, view],
   );
-  const canAddExpenses = canManageExpenses && !isProjectCompleted;
-  const viewTotal = filteredExpenses
-    .filter((expense) => expense.status !== "cancelled" || view === "cancelled" || view === "all")
-    .reduce((total, expense) => {
-      if (expense.status === "cancelled" && view !== "cancelled" && view !== "all") {
+  const canAddRevenue = canManageRevenue && !isProjectCompleted;
+  const viewTotal = filteredRevenue
+    .filter((entry) => entry.status !== "cancelled" || view === "cancelled" || view === "all")
+    .reduce((total, entry) => {
+      if (entry.status === "cancelled" && view !== "cancelled" && view !== "all") {
         return total;
       }
 
-      return total + expense.amount;
+      return total + entry.amount;
     }, 0);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
       <div className="flex flex-col gap-4 border-b border-white/10 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold text-lime-200">Expenses</h2>
+          <h2 className="text-2xl font-semibold text-lime-200">Revenue</h2>
           <p className="mt-1 text-sm text-neutral-400">
-            {filteredExpenses.length} expense
-            {filteredExpenses.length === 1 ? "" : "s"} shown
+            {filteredRevenue.length} entr{filteredRevenue.length === 1 ? "y" : "ies"} shown
             {view !== "cancelled" ? ` · ${formatCurrency(viewTotal)} total` : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {EXPENSE_VIEWS.map((option) => {
+          {REVENUE_VIEWS.map((option) => {
             const isActive = view === option.id;
 
             return (
@@ -90,21 +89,21 @@ export default function ProjectExpenseGrid({
               </button>
             );
           })}
-          {canAddExpenses ? (
+          {canAddRevenue ? (
             <button
               type="button"
-              onClick={() => setShowAddExpense((current) => !current)}
+              onClick={() => setShowAddRevenue((current) => !current)}
               className="rounded-lg bg-lime-400 px-3 py-2 text-xs font-semibold text-neutral-950 transition hover:bg-lime-300"
             >
-              {showAddExpense ? "Close" : "New Expense"}
+              {showAddRevenue ? "Close" : "New Income"}
             </button>
           ) : null}
         </div>
       </div>
 
-      {showAddExpense && canAddExpenses ? (
+      {showAddRevenue && canAddRevenue ? (
         <form
-          action={createProjectExpense}
+          action={createProjectRevenue}
           className="grid gap-4 border-b border-white/10 px-5 py-5 md:grid-cols-2 xl:grid-cols-[1.2fr_0.8fr_0.7fr_0.7fr_0.8fr_0.8fr_auto]"
         >
           <input type="hidden" name="projectId" value={projectId} />
@@ -113,7 +112,7 @@ export default function ProjectExpenseGrid({
             label="Category"
             name="category"
             defaultValue="other"
-            options={EXPENSE_CATEGORY_OPTIONS}
+            options={REVENUE_CATEGORY_OPTIONS}
           />
           <Field
             label="Amount"
@@ -124,18 +123,18 @@ export default function ProjectExpenseGrid({
             min="0"
           />
           <Field
-            label="Expense date"
-            name="expenseDate"
+            label="Revenue date"
+            name="revenueDate"
             type="date"
             required
             defaultValue={new Date().toISOString().slice(0, 10)}
           />
-          <Field label="Vendor" name="vendor" />
+          <Field label="Source" name="source" />
           <SelectField
             label="Status"
             name="status"
             defaultValue="planned"
-            options={EXPENSE_STATUS_OPTIONS}
+            options={REVENUE_STATUS_OPTIONS}
           />
           <div className="md:col-span-2 xl:col-span-6">
             <label className="block text-sm font-medium text-neutral-300">
@@ -148,16 +147,16 @@ export default function ProjectExpenseGrid({
             </label>
           </div>
           <AdminFormButton pendingLabel="Adding..." className="md:col-start-2 xl:col-start-7">
-            Add Expense
+            Add Income
           </AdminFormButton>
         </form>
       ) : null}
 
-      {filteredExpenses.length > 0 ? (
-        <ExpenseListTable
-          canManageExpenses={canManageExpenses}
-          expenses={filteredExpenses}
+      {filteredRevenue.length > 0 ? (
+        <RevenueListTable
+          canManageRevenue={canManageRevenue}
           projectId={projectId}
+          revenue={filteredRevenue}
         />
       ) : (
         <p className="px-5 py-4 text-sm text-neutral-400">{EMPTY_MESSAGES[view]}</p>
@@ -166,22 +165,22 @@ export default function ProjectExpenseGrid({
   );
 }
 
-function filterExpenses(expenses: ProjectExpense[], view: ExpenseView) {
+function filterRevenue(revenue: ProjectRevenue[], view: RevenueView) {
   switch (view) {
     case "active":
-      return expenses.filter((expense) => expense.status !== "cancelled");
+      return revenue.filter((entry) => entry.status !== "cancelled");
     case "planned":
-      return expenses.filter((expense) => expense.status === "planned");
+      return revenue.filter((entry) => entry.status === "planned");
     case "committed":
-      return expenses.filter((expense) => expense.status === "committed");
-    case "paid":
-      return expenses.filter((expense) => expense.status === "paid");
+      return revenue.filter((entry) => entry.status === "committed");
+    case "received":
+      return revenue.filter((entry) => entry.status === "received");
     case "cancelled":
-      return expenses.filter((expense) => expense.status === "cancelled");
+      return revenue.filter((entry) => entry.status === "cancelled");
     case "all":
-      return expenses;
+      return revenue;
     default:
-      return expenses;
+      return revenue;
   }
 }
 

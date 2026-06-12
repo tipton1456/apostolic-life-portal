@@ -7,8 +7,10 @@ import ProjectSettingsModal from "@/app/projects/project-settings-modal";
 import ProjectTaskModals from "@/app/projects/project-task-modals";
 import ProjectTeamPanel from "@/app/projects/project-team-panel";
 import CompletionPieCard from "@/app/projects/completion-pie-card";
-import ProjectExpenseGrid from "@/app/projects/project-expense-grid";
 import ProjectExpenseModals from "@/app/projects/project-expense-modals";
+import ProjectFinancialsSection from "@/app/projects/project-financials-section";
+import ProjectReportsDropdown from "@/app/projects/project-reports-dropdown";
+import ProjectRevenueModals from "@/app/projects/project-revenue-modals";
 import ProjectTaskGrid from "@/app/projects/project-task-grid";
 import TaskBreakdownPieCard from "@/app/projects/task-breakdown-pie-card";
 import { getCurrentSessionUser } from "@/lib/demo";
@@ -21,10 +23,11 @@ import {
   buildPortalUserPickerOptions,
 } from "@/lib/project-assignee-options";
 import {
-  calculateProjectExpenseStats,
+  calculateProjectFinancialStats,
   formatCurrency,
-} from "@/lib/project-expense-utils";
+} from "@/lib/project-financial-utils";
 import { listProjectExpenses } from "@/lib/project-expenses";
+import { listProjectRevenue } from "@/lib/project-revenue";
 import {
   canCurrentUserAccessProjects,
   getProjectDashboard,
@@ -47,7 +50,7 @@ export default async function ProjectDashboardPage({
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ task?: string; expense?: string }>;
+  searchParams: Promise<{ task?: string; expense?: string; revenue?: string }>;
 }) {
   const user = await getCurrentSessionUser();
 
@@ -67,7 +70,7 @@ export default async function ProjectDashboardPage({
 
   const { projectId } = await params;
   const { task: highlightedTaskId } = await searchParams;
-  const [dashboard, portalUser, projectFiles, taskUpdates, expenses] =
+  const [dashboard, portalUser, projectFiles, taskUpdates, expenses, revenue] =
     await Promise.all([
       getProjectDashboard(projectId),
       getCurrentPortalUser(),
@@ -78,6 +81,10 @@ export default async function ProjectDashboardPage({
       }),
       listProjectExpenses(projectId).catch((error) => {
         console.error("Project expenses lookup failed:", error);
+        return [];
+      }),
+      listProjectRevenue(projectId).catch((error) => {
+        console.error("Project revenue lookup failed:", error);
         return [];
       }),
     ]);
@@ -145,7 +152,7 @@ export default async function ProjectDashboardPage({
   });
   const taskFilesByTaskId = Object.fromEntries(filesByTaskId.entries());
   const taskUpdatesByTaskId = Object.fromEntries(updatesByTaskId.entries());
-  const expenseStats = calculateProjectExpenseStats(expenses);
+  const financialStats = calculateProjectFinancialStats(expenses, revenue);
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-8 text-white">
@@ -203,24 +210,7 @@ export default async function ProjectDashboardPage({
                     Project Settings
                   </Link>
                 ) : null}
-                <a
-                  href={`/api/projects/${project.id}/summary-report`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-lime-400 transition hover:text-lime-300"
-                >
-                  <PortalIcon className="h-4 w-4" name="report" />
-                  Project Summary Report
-                </a>
-                <a
-                  href={`/api/projects/${project.id}/cost-summary-report`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-lime-400 transition hover:text-lime-300"
-                >
-                  <PortalIcon className="h-4 w-4" name="report" />
-                  Project Cost Summary Report
-                </a>
+                <ProjectReportsDropdown projectId={project.id} />
                 <Link
                   href={`/projects/${project.id}/files`}
                   className="inline-flex items-center gap-2 text-lime-400 transition hover:text-lime-300"
@@ -317,33 +307,35 @@ export default async function ProjectDashboardPage({
 
         <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
-            label="Total Costs"
-            value={formatCurrency(expenseStats.totalAmount)}
-            detail={`${expenseStats.activeExpenses} active expense${expenseStats.activeExpenses === 1 ? "" : "s"}`}
+            label="Total Revenue"
+            value={formatCurrency(financialStats.totalRevenue)}
+            detail={`${financialStats.revenueStats.activeEntries} active income entr${financialStats.revenueStats.activeEntries === 1 ? "y" : "ies"}`}
           />
           <MetricCard
-            label="Paid"
-            value={formatCurrency(expenseStats.paidAmount)}
-            detail="Expenses marked as paid"
+            label="Total Expense"
+            value={formatCurrency(financialStats.totalExpense)}
+            detail={`${financialStats.expenseStats.activeExpenses} active expense${financialStats.expenseStats.activeExpenses === 1 ? "" : "s"}`}
           />
           <MetricCard
-            label="Outstanding"
-            value={formatCurrency(expenseStats.outstandingAmount)}
+            label="Outstanding Expenses"
+            value={formatCurrency(financialStats.outstandingExpenses)}
             detail="Planned and committed costs"
-            highlight={expenseStats.outstandingAmount > 0}
+            highlight={financialStats.outstandingExpenses > 0}
           />
           <MetricCard
-            label="Committed"
-            value={formatCurrency(expenseStats.committedAmount)}
-            detail="Approved but not yet paid"
+            label="Net Revenue"
+            value={formatCurrency(financialStats.netRevenue)}
+            detail="Total revenue - total expenses + outstanding expenses"
+            highlight={financialStats.netRevenue < 0}
           />
         </section>
 
-        <ProjectExpenseGrid
-          canManageExpenses={permissions.canManageTasks}
+        <ProjectFinancialsSection
+          canManageFinancials={permissions.canManageTasks}
           expenses={expenses}
           isProjectCompleted={isProjectCompleted}
           projectId={project.id}
+          revenue={revenue}
         />
       </div>
 
@@ -370,6 +362,12 @@ export default async function ProjectDashboardPage({
           expenses={expenses}
           isProjectCompleted={isProjectCompleted}
           projectId={project.id}
+        />
+        <ProjectRevenueModals
+          canManageRevenue={permissions.canManageTasks}
+          isProjectCompleted={isProjectCompleted}
+          projectId={project.id}
+          revenue={revenue}
         />
       </Suspense>
     </main>

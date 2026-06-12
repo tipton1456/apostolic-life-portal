@@ -117,7 +117,7 @@ async function testHttpRoutes(baseUrl) {
   await checkRoute("/login?next=%2Fprojects%2Fdemo-project%3Ftask%3Ddemo-task", [
     ({ response, body }) => {
       assert(response.status === 200, "login page with next param should render");
-      assert(body.includes("Portal Login"), "login page should render login form");
+      assert(body.includes("Sign In"), "login page should render login form");
     },
   ]);
 
