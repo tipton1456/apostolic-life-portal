@@ -481,16 +481,6 @@ class FinancialReportPdfRenderer {
   }
 
   private drawTotalSummary(stats: ReturnType<typeof calculateProjectFinancialStats>) {
-    this.page.drawRectangle({
-      x: MARGIN,
-      y: this.y - 88,
-      width: CONTENT_WIDTH,
-      height: 94,
-      color: COLORS.headerFill,
-      borderColor: COLORS.total,
-      borderWidth: 1,
-    });
-
     const summaryLines: DetailLineSegment[][] = [
       [
         { label: "Gross Revenue:", value: formatCurrency(stats.grossRevenue) },
@@ -503,33 +493,51 @@ class FinancialReportPdfRenderer {
       [{ label: "Net Revenue:", value: formatCurrency(stats.netRevenue) }],
     ];
 
-    let summaryY = this.y - 16;
+    const boxPadding = 12;
+    const rowGap = 8;
+    const summarySize = 12;
+    const summaryLineHeight = 16;
+    const { leftX, rightX, columnWidth } = getDetailColumnLayout();
+    const blockHeight = measureDetailRowsHeight(
+      summaryLines,
+      columnWidth,
+      this.bold,
+      this.regular,
+      summarySize,
+      summaryLineHeight,
+      rowGap,
+    );
+    const boxHeight = blockHeight + boxPadding * 2;
+
+    this.page.drawRectangle({
+      x: MARGIN,
+      y: this.y - boxHeight,
+      width: CONTENT_WIDTH,
+      height: boxHeight,
+      color: COLORS.headerFill,
+      borderColor: COLORS.total,
+      borderWidth: 1,
+    });
+
+    let summaryY = this.y - boxPadding;
     for (const line of summaryLines) {
-      let x = MARGIN + 10;
-      for (const [index, segment] of line.entries()) {
-        if (index > 0) {
-          x += 24;
-        }
-        this.page.drawText(`${segment.label} `, {
-          x,
-          y: summaryY,
-          size: 12,
-          font: this.bold,
-          color: COLORS.total,
-        });
-        x += this.bold.widthOfTextAtSize(`${segment.label} `, 12);
-        this.page.drawText(segment.value, {
-          x,
-          y: summaryY,
-          size: 12,
-          font: index === 0 && line.length === 1 ? this.bold : this.regular,
-          color: COLORS.text,
-        });
-      }
-      summaryY -= 18;
+      const rowHeight = drawDetailRow(this.page, line, {
+        topY: summaryY,
+        leftX,
+        rightX,
+        columnWidth,
+        size: summarySize,
+        lineHeight: summaryLineHeight,
+        labelFont: this.bold,
+        valueFont: this.regular,
+        labelColor: COLORS.total,
+        valueColor: COLORS.text,
+        emphasizeValue: line.length === 1,
+      });
+      summaryY -= rowHeight + rowGap;
     }
 
-    this.y -= 100;
+    this.y -= boxHeight + 6;
   }
 
   private drawSectionHeader(section: ReportSection) {
@@ -704,33 +712,30 @@ class FinancialReportPdfRenderer {
     size = 11,
     lineHeight = 14,
   ) {
-    const parts: StyledTextPart[] = [];
+    const { leftX, rightX, columnWidth } = getDetailColumnLayout();
+    const rowHeight = measureDetailRowHeight(
+      segments,
+      columnWidth,
+      this.bold,
+      this.regular,
+      size,
+      lineHeight,
+    );
 
-    for (const [index, segment] of segments.entries()) {
-      if (index > 0) {
-        parts.push({ text: "    ", font: this.regular });
-      }
-      parts.push({ text: `${segment.label} `, font: this.bold });
-      parts.push({ text: segment.value, font: this.regular });
-    }
-
-    for (const line of wrapStyledParts(parts, CONTENT_WIDTH, size)) {
-      this.ensureSpace(lineHeight);
-      let x = MARGIN;
-
-      for (const part of line) {
-        this.page.drawText(part.text, {
-          x,
-          y: this.y,
-          size,
-          font: part.font,
-          color: COLORS.muted,
-        });
-        x += part.font.widthOfTextAtSize(part.text, size);
-      }
-
-      this.y -= lineHeight;
-    }
+    this.ensureSpace(rowHeight);
+    drawDetailRow(this.page, segments, {
+      topY: this.y,
+      leftX,
+      rightX,
+      columnWidth,
+      size,
+      lineHeight,
+      labelFont: this.bold,
+      valueFont: this.regular,
+      labelColor: COLORS.muted,
+      valueColor: COLORS.muted,
+    });
+    this.y -= rowHeight;
   }
 
   private drawWrappedLine(
@@ -776,6 +781,226 @@ type StyledTextPart = {
   text: string;
   font: PDFFont;
 };
+
+function getDetailColumnLayout() {
+  const columnGap = 24;
+  const columnWidth = (CONTENT_WIDTH - columnGap) / 2;
+
+  return {
+    leftX: MARGIN,
+    rightX: MARGIN + columnWidth + columnGap,
+    columnWidth,
+  };
+}
+
+function measureSegmentHeight(
+  segment: DetailLineSegment,
+  maxWidth: number,
+  labelFont: PDFFont,
+  valueFont: PDFFont,
+  size: number,
+  lineHeight: number,
+) {
+  const parts: StyledTextPart[] = [
+    { text: `${segment.label} `, font: labelFont },
+    { text: segment.value, font: valueFont },
+  ];
+
+  return wrapStyledParts(parts, maxWidth, size).length * lineHeight;
+}
+
+function measureDetailRowsHeight(
+  rows: DetailLineSegment[][],
+  columnWidth: number,
+  labelFont: PDFFont,
+  valueFont: PDFFont,
+  size: number,
+  lineHeight: number,
+  rowGap: number,
+) {
+  return rows.reduce((total, row, index) => {
+    const rowHeight = measureDetailRowHeight(
+      row,
+      columnWidth,
+      labelFont,
+      valueFont,
+      size,
+      lineHeight,
+    );
+
+    return total + rowHeight + (index < rows.length - 1 ? rowGap : 0);
+  }, 0);
+}
+
+function measureDetailRowHeight(
+  segments: DetailLineSegment[],
+  columnWidth: number,
+  labelFont: PDFFont,
+  valueFont: PDFFont,
+  size: number,
+  lineHeight: number,
+) {
+  if (segments.length <= 1) {
+    const segment = segments[0];
+    return segment
+      ? measureSegmentHeight(segment, CONTENT_WIDTH, labelFont, valueFont, size, lineHeight)
+      : 0;
+  }
+
+  return Math.max(
+    measureSegmentHeight(segments[0], columnWidth, labelFont, valueFont, size, lineHeight),
+    measureSegmentHeight(segments[1], columnWidth, labelFont, valueFont, size, lineHeight),
+  );
+}
+
+function drawDetailRow(
+  page: PDFPage,
+  segments: DetailLineSegment[],
+  options: {
+    topY: number;
+    leftX: number;
+    rightX: number;
+    columnWidth: number;
+    size: number;
+    lineHeight: number;
+    labelFont: PDFFont;
+    valueFont: PDFFont;
+    labelColor: ReturnType<typeof rgb>;
+    valueColor: ReturnType<typeof rgb>;
+    emphasizeValue?: boolean;
+  },
+) {
+  const {
+    topY,
+    leftX,
+    rightX,
+    columnWidth,
+    size,
+    lineHeight,
+    labelFont,
+    valueFont,
+    labelColor,
+    valueColor,
+    emphasizeValue = false,
+  } = options;
+
+  if (segments.length <= 1) {
+    const segment = segments[0];
+    if (!segment) return 0;
+
+    const parts: StyledTextPart[] = [
+      { text: `${segment.label} `, font: labelFont },
+      {
+        text: segment.value,
+        font: emphasizeValue ? labelFont : valueFont,
+      },
+    ];
+    let currentY = topY;
+
+    for (const line of wrapStyledParts(parts, CONTENT_WIDTH, size)) {
+      let x = leftX;
+
+      for (const part of line) {
+        page.drawText(part.text, {
+          x,
+          y: currentY,
+          size,
+          font: part.font,
+          color: part.font === labelFont ? labelColor : valueColor,
+        });
+        x += part.font.widthOfTextAtSize(part.text, size);
+      }
+
+      currentY -= lineHeight;
+    }
+
+    return measureSegmentHeight(
+      segment,
+      CONTENT_WIDTH,
+      labelFont,
+      emphasizeValue ? labelFont : valueFont,
+      size,
+      lineHeight,
+    );
+  }
+
+  const leftHeight = drawSegmentColumn(page, segments[0], {
+    x: leftX,
+    topY,
+    maxWidth: columnWidth,
+    size,
+    lineHeight,
+    labelFont,
+    valueFont,
+    labelColor,
+    valueColor,
+  });
+  const rightHeight = drawSegmentColumn(page, segments[1], {
+    x: rightX,
+    topY,
+    maxWidth: columnWidth,
+    size,
+    lineHeight,
+    labelFont,
+    valueFont,
+    labelColor,
+    valueColor,
+  });
+
+  return Math.max(leftHeight, rightHeight);
+}
+
+function drawSegmentColumn(
+  page: PDFPage,
+  segment: DetailLineSegment,
+  options: {
+    x: number;
+    topY: number;
+    maxWidth: number;
+    size: number;
+    lineHeight: number;
+    labelFont: PDFFont;
+    valueFont: PDFFont;
+    labelColor: ReturnType<typeof rgb>;
+    valueColor: ReturnType<typeof rgb>;
+  },
+) {
+  const {
+    x,
+    topY,
+    maxWidth,
+    size,
+    lineHeight,
+    labelFont,
+    valueFont,
+    labelColor,
+    valueColor,
+  } = options;
+  const parts: StyledTextPart[] = [
+    { text: `${segment.label} `, font: labelFont },
+    { text: segment.value, font: valueFont },
+  ];
+  let currentY = topY;
+
+  for (const line of wrapStyledParts(parts, maxWidth, size)) {
+    let currentX = x;
+
+    for (const part of line) {
+      page.drawText(part.text, {
+        x: currentX,
+        y: currentY,
+        size,
+        font: part.font,
+        color: part.font === labelFont ? labelColor : valueColor,
+      });
+      currentX += part.font.widthOfTextAtSize(part.text, size);
+    }
+
+    currentY -= lineHeight;
+  }
+
+  return measureSegmentHeight(segment, maxWidth, labelFont, valueFont, size, lineHeight);
+}
 
 function wrapStyledParts(parts: StyledTextPart[], maxWidth: number, size: number) {
   const lines: StyledTextPart[][] = [];
