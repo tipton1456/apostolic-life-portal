@@ -10,6 +10,7 @@ import type {
 import { canUserManageProject } from "@/lib/project-access";
 import { isPortalProjectManager } from "@/lib/portal-project-roles";
 import { getCurrentPortalUser } from "@/lib/portal-users";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export type {
@@ -32,6 +33,8 @@ type ProjectExpenseRow = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  cognito_entry_id?: string | null;
+  source?: string | null;
 };
 
 const EXPENSE_CATEGORIES = new Set<ExpenseCategory>([
@@ -58,7 +61,7 @@ export async function listProjectExpenses(
   const { data, error } = await supabase
     .from("project_expenses")
     .select(
-      "id,project_id,description,category,amount,expense_date,vendor,notes,status,created_by,created_at,updated_at",
+      "id,project_id,description,category,amount,expense_date,vendor,notes,status,created_by,created_at,updated_at,cognito_entry_id,source",
     )
     .eq("project_id", projectId)
     .order("expense_date", { ascending: false })
@@ -98,6 +101,8 @@ export async function createProjectExpense(formData: FormData) {
     notes,
     status,
     created_by: currentUser.id,
+    cognito_entry_id: (formData.get("cognitoEntryId") as string) || null,
+    source: (formData.get("source") as string) || "manual",
   });
 
   if (error) {
@@ -192,6 +197,8 @@ function mapExpense(row: ProjectExpenseRow): ProjectExpense {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    cognitoEntryId: row.cognito_entry_id ?? null,
+    source: row.source ?? 'manual',
   };
 }
 
@@ -288,4 +295,82 @@ async function requireProjectExpenseManager() {
   }
 
   return currentUser;
+}
+
+/**
+ * Create a project expense record from a reimbursement that was submitted
+ * either via the portal custom form or directly in the published Cognito form.
+ *
+ * This uses the admin client so it can be called from sync jobs / server actions
+ * even when the submitter is not a project manager (reimbursements can be filed
+ * by participants).
+ *
+ * Status mapping for the user's requirement:
+ *   - Initially "committed" (appears as outstanding in project stats and lists).
+ *   - When the corresponding Cognito entry is later marked Approved/Paid,
+ *     a reconciliation job can call updateProjectExpense (or a dedicated updater)
+ *     to set status = "paid".
+ */
+export async function createProjectExpenseFromReimbursement(params: {
+  projectId: string;
+  description: string;
+  amount: number;
+  expenseDate: string;
+  vendor?: string;
+  notes?: string;
+  category?: ExpenseCategory;
+  cognitoEntryId?: string;
+  createdByUserId?: string; // the person who filed the reimbursement, if known
+  source?: "cognito-reimbursement" | "portal-reimbursement";
+}): Promise<string> {
+  const {
+    projectId,
+    description,
+    amount,
+    expenseDate,
+    vendor = "",
+    notes = "",
+    category = "other",
+    cognitoEntryId,
+    createdByUserId,
+    source = "cognito-reimbursement",
+  } = params;
+
+  if (!projectId || !description || amount == null || !expenseDate) {
+    throw new Error("projectId, description, amount and expenseDate are required.");
+  }
+
+  const supabase = createAdminClient();
+
+  // Try to use the provided user as created_by; fall back to a system-like insert
+  // (the RLS for insert requires manager, so admin bypasses it).
+  const createdBy = createdByUserId || "00000000-0000-0000-0000-000000000000"; // placeholder if unknown
+
+  const { data, error } = await supabase
+    .from("project_expenses")
+    .insert({
+      project_id: projectId,
+      description: description.trim(),
+      category,
+      amount,
+      expense_date: expenseDate,
+      vendor: vendor.trim(),
+      notes: notes.trim(),
+      status: "committed", // outstanding until the Cognito report is approved
+      created_by: createdBy,
+      cognito_entry_id: cognitoEntryId || null,
+      source,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    console.error("Import project expense from reimbursement failed:", error);
+    throw new Error("Failed to import expense into project.");
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/projects");
+
+  return data.id;
 }

@@ -2,10 +2,14 @@
 
 import {
   getCognitoFormEntry,
+  listAllCognitoExpenseEntries,
   listCognitoExpenseEntriesByEmail,
   type CognitoEntryMetadata,
   type CognitoExpenseEntry,
 } from "@/lib/cognito-forms";
+import { createProjectExpenseFromReimbursement } from "@/lib/project-expenses";
+import { getHousehold } from "@/lib/elvanto";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export type ExpenseReimbursementTracker = {
@@ -219,4 +223,185 @@ function toNumber(value: number | string | null) {
   }
 
   return 0;
+}
+
+/**
+ * Reconciles recent Cognito expense entries (the published form) into the
+ * project's expense tracking.
+ *
+ * - If the entry has a project linked (via Event field matching a project name),
+ *   we create a project_expense record (status "committed" = outstanding).
+ * - If the Cognito entry later shows an approved/paid status, we update the
+ *   linked project expense to "paid".
+ * - If the Cognito entry shows a denied/rejected status, we **delete** any
+ *   linked project expense entirely (so it drops off the project and is not
+ *   listed at all).
+ *
+ * This is the "Cognito direct submission → portal project expense" direction.
+ *
+ * Call this from an admin action, a scheduled task, or opportunistically when
+ * managers view the projects area.
+ */
+export async function reconcileCognitoReimbursementsIntoProjectExpenses(): Promise<{
+  imported: number;
+  updatedToPaid: number;
+  deleted: number;
+  errors: string[];
+}> {
+  const results = {
+    imported: 0,
+    updatedToPaid: 0,
+    deleted: 0,
+    errors: [] as string[],
+  };
+
+  let entries: CognitoExpenseEntry[] = [];
+  try {
+    entries = await listAllCognitoExpenseEntries();
+  } catch (e: any) {
+    results.errors.push(`Failed to fetch Cognito expenses: ${e?.message || e}`);
+    return results;
+  }
+
+  const supabase = createAdminClient();
+
+  // Simple name resolver for linking Cognito "Event" values to projects.
+  // Case-insensitive ("same letters" — different casing is fine, no case matching required).
+  // Prefers exact ID, then exact name match (ignoring case), then substring.
+  async function findProjectIdByNameOrId(nameOrId: string): Promise<string | null> {
+    const trimmed = nameOrId.trim();
+    if (!trimmed) return null;
+
+    // Try exact ID first (UUIDs are usually not case-sensitive, but match as provided)
+    const { data: byId } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("id", trimmed)
+      .maybeSingle();
+    if (byId?.id) return byId.id;
+
+    // Case-insensitive exact name match ("same letters" regardless of casing)
+    const { data: byName } = await supabase
+      .from("projects")
+      .select("id, name")
+      .ilike("name", trimmed)
+      .limit(1)
+      .maybeSingle();
+    if (byName?.id) return byName.id;
+
+    // Fallback: case-insensitive partial / contains match on name
+    const { data: partial } = await supabase
+      .from("projects")
+      .select("id, name")
+      .ilike("name", `%${trimmed}%`)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return partial?.id ?? null;
+  }
+
+  const isApprovedLike = (status: string) =>
+    /approved|paid|complete|accepted/i.test(status || "");
+
+  const isDeniedLike = (status: string) =>
+    /denied|reject|denial|declin/i.test(status || "");
+
+  for (const entry of entries) {
+    // Primary matching for projects: the "Event" field value on the Cognito side.
+    // If it exactly matches a project name, we link the expense to that project.
+    // We also support a separate "project" field if the user added one.
+    const candidateProjectName = (entry.event || entry.project || entry.projectId || "").toString().trim();
+
+    if (!candidateProjectName) continue;
+
+    try {
+      const projectId = await findProjectIdByNameOrId(String(candidateProjectName));
+
+      if (!projectId) {
+        results.errors.push(`Could not resolve project "${entry.project}" for Cognito entry ${entry.entryId}`);
+        continue;
+      }
+
+      // Check if we already imported this exact Cognito entry for this project
+      const { data: existing } = await supabase
+        .from("project_expenses")
+        .select("id, status")
+        .eq("project_id", projectId)
+        .eq("cognito_entry_id", entry.entryId)
+        .limit(1)
+        .maybeSingle();
+
+      // If the reimbursement was denied in Cognito, remove it from the project entirely.
+      // We do not want denied requests listed at all in project expenses.
+      if (isDeniedLike(entry.status)) {
+        if (existing?.id) {
+          await supabase.from("project_expenses").delete().eq("id", existing.id);
+          results.deleted++;
+        }
+        continue;
+      }
+
+      const amount = entry.amountTotal || 0;
+      const expenseDate = entry.requestDate || entry.dateSubmitted?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+
+      // Enrich submitter info via Elvanto even for people who don't have a portal account.
+      // This lets us populate a nice name in the project expense description/notes.
+      let personName = entry.email;
+      try {
+        const household = await getHousehold(entry.email);
+        if (household?.primary) {
+          personName = `${household.primary.firstName} ${household.primary.lastName}`.trim() || entry.email;
+        }
+      } catch {
+        // Non-fatal; fall back to email
+      }
+
+      const eventOrReport = entry.event || entry.reportType || "Cognito submission";
+      const desc = `${eventOrReport} — ${personName}`;
+
+      if (existing?.id) {
+        // Update status if Cognito now shows approved and we are still committed
+        if (isApprovedLike(entry.status) && existing.status === "committed") {
+          await supabase
+            .from("project_expenses")
+            .update({ status: "paid" })
+            .eq("id", existing.id);
+          results.updatedToPaid++;
+        }
+        continue;
+      }
+
+      // Import as new (outstanding/committed)
+      await createProjectExpenseFromReimbursement({
+        projectId,
+        description: desc,
+        amount,
+        expenseDate,
+        notes: `Auto-imported from Cognito reimbursement ${entry.entryId} (submitted by ${personName} <${entry.email}>)`,
+        cognitoEntryId: entry.entryId,
+        source: "cognito-reimbursement",
+      });
+      results.imported++;
+
+      // If this particular entry is already approved at import time, mark paid immediately
+      if (isApprovedLike(entry.status)) {
+        // Re-fetch the just-created one by cognito id (simple way)
+        const { data: justCreated } = await supabase
+          .from("project_expenses")
+          .select("id")
+          .eq("cognito_entry_id", entry.entryId)
+          .eq("project_id", projectId)
+          .limit(1)
+          .maybeSingle();
+        if (justCreated?.id) {
+          await supabase.from("project_expenses").update({ status: "paid" }).eq("id", justCreated.id);
+          results.updatedToPaid++;
+        }
+      }
+    } catch (err: any) {
+      results.errors.push(`Error processing ${entry.entryId}: ${err?.message || err}`);
+    }
+  }
+
+  return results;
 }

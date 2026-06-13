@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import {
+  buildCognitoProjectFields,
   createCognitoFormEntry,
   uploadCognitoFile,
   type CognitoUploadedFile,
@@ -7,7 +8,10 @@ import {
 import { getCurrentSessionUser } from "@/lib/demo";
 import { getHousehold } from "@/lib/elvanto";
 import { recordExpenseReimbursementSubmission } from "@/lib/expense-reimbursements";
+import { createProjectExpenseFromReimbursement } from "@/lib/project-expenses";
+import { listProjectOptions, type ProjectOption } from "@/lib/project-management";
 import ExpenseLines from "./expense-lines";
+import EventSelector from "./event-selector";
 import {
   EXPENSE_LINES,
   RECEIPT_UPLOAD_FIELD,
@@ -42,6 +46,13 @@ export default async function ExpenseReimbursementPage({
     : "";
   const today = new Date().toISOString().slice(0, 10);
 
+  // Load projects the current user can access.
+  const projectOptions = await listProjectOptions();
+
+  // For the Event field: only offer currently active/open projects as quick choices.
+  // "Custom event name" allows free text (for non-project events or special cases).
+  const activeProjectOptions = projectOptions.filter((p) => p.status === "active");
+
   async function submitReimbursement(formData: FormData) {
     "use server";
 
@@ -50,6 +61,15 @@ export default async function ExpenseReimbursementPage({
     if (!currentUser) {
       redirect("/login");
     }
+
+    // Re-resolve projects inside the action (cheap + guarantees fresh access-controlled list)
+    const currentProjectOptions = await listProjectOptions();
+    const selectedProjectId = getText(formData, "projectId");
+    const selectedProject = currentProjectOptions.find((p) => p.id === selectedProjectId) || null;
+
+    // The Event field (hybrid dropdown + custom) provides the text that goes to Cognito "Event".
+    // We also use it for exact project name matching for auto-linking to project expenses.
+    const eventValue = getText(formData, "event") || getText(formData, "eventCustom");
 
     const receiptFiles = getReceiptFiles(formData);
 
@@ -73,6 +93,7 @@ export default async function ExpenseReimbursementPage({
         formData,
         currentUser.email,
         uploadedReceipts,
+        selectedProject,
       );
 
       const result = await createCognitoFormEntry(
@@ -96,6 +117,38 @@ export default async function ExpenseReimbursementPage({
             "Expense reimbursement was submitted but tracking failed:",
             trackingError,
           );
+        }
+
+        // Link to project expenses if an explicit Related Project was chosen,
+        // or if the Event value matches one of our project names (case-insensitive,
+        // as long as the letters are the same — no case matching required).
+        let projectForLinking = selectedProject;
+        if (!projectForLinking && eventValue) {
+          const normalizedEvent = eventValue.trim().toLowerCase();
+          projectForLinking = currentProjectOptions.find(
+            (p) => p.name.trim().toLowerCase() === normalizedEvent
+          ) || null;
+        }
+
+        if (projectForLinking) {
+          try {
+            const eventTextForDesc = eventValue || getText(formData, "event") || "Reimbursement";
+            await createProjectExpenseFromReimbursement({
+              projectId: projectForLinking.id,
+              description: `${getReportType(formData)} — ${eventTextForDesc}`,
+              amount: getExpenseTotal(formData),
+              expenseDate: getText(formData, "date") || new Date().toISOString().slice(0, 10),
+              vendor: "",
+              notes: getText(formData, "requesterComments") || `From portal submission (Cognito entry ${result.entryId})`,
+              cognitoEntryId: result.entryId,
+              source: "portal-reimbursement",
+            });
+          } catch (projectExpenseError) {
+            console.error(
+              "Expense submitted to Cognito but failed to import into project expenses:",
+              projectExpenseError,
+            );
+          }
         }
       }
     } catch (error) {
@@ -155,7 +208,7 @@ export default async function ExpenseReimbursementPage({
                 required
                 type="email"
               />
-              <Field label="Event" name="event" required />
+              <EventSelector activeProjects={activeProjectOptions} />
               <Field
                 defaultValue={today}
                 label="Date"
@@ -165,6 +218,32 @@ export default async function ExpenseReimbursementPage({
               />
             </div>
           </section>
+
+          {projectOptions.length > 0 && (
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+              <h2 className="text-2xl font-semibold">Related Project (optional)</h2>
+              <p className="mt-1 text-sm text-neutral-400">
+                Associate this reimbursement with one of your accessible projects.
+                The project name, ID, and status will be sent to the Cognito form.
+              </p>
+              <label className="mt-4 block text-sm font-medium text-neutral-300">
+                Project
+                <select
+                  name="projectId"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none ring-lime-400 transition focus:ring-2 md:max-w-xl"
+                  defaultValue=""
+                >
+                  <option value="">None / Not project-related</option>
+                  {projectOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name} — {option.status}
+                      {option.targetEndDate ? ` (target: ${option.targetEndDate})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </section>
+          )}
 
           <ExpenseLines />
 
@@ -226,6 +305,7 @@ function buildReimbursementEntry(
   formData: FormData,
   fallbackEmail: string,
   uploadedReceipts: CognitoUploadedFile[],
+  project: ProjectOption | null,
 ) {
   const reportType = getReportType(formData);
   const entry: Record<string, unknown> = {
@@ -239,6 +319,10 @@ function buildReimbursementEntry(
 
   if (uploadedReceipts.length > 0) {
     entry[RECEIPT_UPLOAD_FIELD] = uploadedReceipts;
+  }
+
+  if (project) {
+    Object.assign(entry, buildCognitoProjectFields(project));
   }
 
   for (const line of EXPENSE_LINES) {

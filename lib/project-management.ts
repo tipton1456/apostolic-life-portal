@@ -43,6 +43,7 @@ import { isPortalProjectManager } from "@/lib/portal-project-roles";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { syncProjectToCognitoCatalog } from "@/lib/cognito-forms";
 
 export type ProjectStatus = "active" | "on_hold" | "completed" | "cancelled";
 export type TaskStatus = "todo" | "in_progress" | "completed" | "blocked";
@@ -301,6 +302,63 @@ export async function listProjects(): Promise<ProjectSummary[]> {
       (left, right) =>
         new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
     );
+}
+
+export type ProjectOption = {
+  id: string;
+  name: string;
+  status: ProjectStatus;
+  startDate: string | null;
+  targetEndDate: string | null;
+};
+
+/**
+ * Lightweight list of projects the current authenticated user can access.
+ * Perfect for:
+ *  - Populating <select> / project pickers in custom forms (e.g. expense or other submissions)
+ *  - Generating prefilled links or entry payloads for Cognito Forms
+ *  - Any UI that needs a simple list of {id, name, status, dates}
+ *
+ * Respects the same access rules as listProjects() (managers + project participants/members).
+ */
+export async function listProjectOptions(): Promise<ProjectOption[]> {
+  if (!(await canCurrentUserAccessProjects())) {
+    return [];
+  }
+
+  const currentUser = await getCurrentPortalUser();
+  if (!currentUser) return [];
+
+  const supabase = await createClient();
+  const projectIds = await loadAccessibleProjectIds(currentUser);
+
+  if (projectIds && projectIds.length === 0) {
+    return [];
+  }
+
+  let query = supabase
+    .from("projects")
+    .select("id, name, status, start_date, target_end_date")
+    .order("name", { ascending: true });
+
+  if (projectIds) {
+    query = query.in("id", projectIds);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("Project options load failed:", error);
+    return [];
+  }
+
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    status: row.status as ProjectStatus,
+    startDate: row.start_date ?? null,
+    targetEndDate: row.target_end_date ?? null,
+  }));
 }
 
 export async function listAccessibleProjectTasks(
@@ -824,6 +882,16 @@ export async function createProject(formData: FormData) {
     throw new Error(managerError.message);
   }
 
+  // Keep the published Cognito expense form (and any Lookup fields) up to date
+  // with the latest project names.
+  syncProjectToCognitoCatalog({
+    id: data.id,
+    name,
+    status,
+    startDate: startDate || null,
+    targetEndDate: targetEndDate || null,
+  }).catch((err) => console.error("Cognito catalog sync failed (non-fatal):", err));
+
   revalidatePath("/projects");
   redirect(`/projects/${data.id}`);
 }
@@ -866,6 +934,15 @@ export async function updateProject(formData: FormData) {
     console.error("Project update failed:", error);
     throw new Error(error.message);
   }
+
+  // Keep the published Cognito expense form in sync when project details (especially name or status) change.
+  syncProjectToCognitoCatalog({
+    id,
+    name,
+    status,
+    startDate: startDate || null,
+    targetEndDate: targetEndDate || null,
+  }).catch((err) => console.error("Cognito catalog sync failed (non-fatal):", err));
 
   revalidatePath("/projects");
   revalidatePath(`/projects/${id}`);

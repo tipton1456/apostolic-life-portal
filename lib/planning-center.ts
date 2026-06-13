@@ -310,7 +310,7 @@ export async function getUpcomingAssignmentsForPersonId(
       .filter((resource) => resource.type === "Plan")
       .map((plan) => [
         plan.id,
-        plan.attributes?.title || plan.attributes?.series_title,
+        plan.attributes?.series_title || plan.attributes?.title,
       ]),
   );
 

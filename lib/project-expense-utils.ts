@@ -21,6 +21,10 @@ export type ProjectExpense = {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  /** Cognito Forms entry ID (e.g. "3-12345") when imported from a reimbursement that specified a project. */
+  cognitoEntryId?: string | null;
+  /** 'manual' | 'cognito-reimbursement' | 'portal-reimbursement' */
+  source?: string;
 };
 
 export type ProjectExpenseStats = {

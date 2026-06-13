@@ -4,7 +4,11 @@ import {
   getCognitoFormDetail,
   getCognitoForms,
   hasCognitoFormsConfig,
+  hasCognitoProjectCatalogConfig,
+  syncAllProjectsToCognitoCatalog,
 } from "@/lib/cognito-forms";
+import { listProjects } from "@/lib/project-management";
+import { reconcileCognitoReimbursementsIntoProjectExpenses } from "@/lib/expense-reimbursements";
 import { getCurrentPortalUser } from "@/lib/portal-users";
 
 type PageProps = {
@@ -48,6 +52,32 @@ export default async function CognitoFormsAdminPage({ searchParams }: PageProps)
     ? await getCognitoFormDetail(selectedFormId)
     : null;
 
+  // Server actions for the new bidirectional project <-> Cognito wiring
+  async function handleSyncCatalog() {
+    "use server";
+    const currentUser = await getCurrentPortalUser();
+    if (!currentUser?.isAdmin) return;
+    if (!hasCognitoProjectCatalogConfig()) return;
+
+    const projects = await listProjects().catch(() => []);
+    const simple = projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      status: p.status,
+      startDate: p.startDate,
+      targetEndDate: p.targetEndDate,
+    }));
+    await syncAllProjectsToCognitoCatalog(simple);
+  }
+
+  async function handleReconcile() {
+    "use server";
+    const currentUser = await getCurrentPortalUser();
+    if (!currentUser?.isAdmin) return;
+
+    await reconcileCognitoReimbursementsIntoProjectExpenses();
+  }
+
   if (selectedFormId && !selectedForm) {
     notFound();
   }
@@ -66,6 +96,43 @@ export default async function CognitoFormsAdminPage({ searchParams }: PageProps)
             API connection status, available forms, and form schema fields.
           </p>
         </header>
+
+        {/* Bidirectional Projects ↔ Cognito expense wiring controls */}
+        <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+          <h2 className="text-xl font-semibold">Project ↔ Cognito Expense Sync (bidirectional)</h2>
+          <p className="mt-2 text-sm text-neutral-400">
+            Load portal projects into the published Cognito expense form (standalone window) by maintaining a "Projects" catalog form + Lookup in Cognito.
+            Expenses filed in either the Cognito form or the portal version are imported into the project's expense area as "committed" (outstanding).
+            When the Cognito report is approved, the expense becomes "paid".
+          </p>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <form action={handleSyncCatalog}>
+              <button
+                type="submit"
+                disabled={!hasCognitoProjectCatalogConfig()}
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-50"
+              >
+                Push current projects to Cognito catalog
+              </button>
+            </form>
+
+            <form action={handleReconcile}>
+              <button
+                type="submit"
+                className="rounded-xl border border-lime-400/30 bg-lime-400/10 px-4 py-2 text-sm font-semibold text-lime-200 transition hover:bg-lime-400/20"
+              >
+                Reconcile Cognito reimbursements → Project expenses
+              </button>
+            </form>
+          </div>
+
+          {!hasCognitoProjectCatalogConfig() && (
+            <p className="mt-3 text-xs text-amber-300">
+              Set <code>COGNITO_PROJECT_CATALOG_FORM_ID</code> to enable catalog push. See comments in <code>lib/cognito-forms.ts</code> for the exact setup steps in your Cognito builder.
+            </p>
+          )}
+        </section>
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[20rem_1fr]">
           <aside className="h-fit overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">

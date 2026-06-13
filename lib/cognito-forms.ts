@@ -74,6 +74,9 @@ export type CognitoExpenseEntry = {
   requestDate: string;
   reportType: string;
   status: string;
+  /** Project name or ID captured from the Cognito form (user must add a "Project" / "Project Name" field or Lookup to their expense form). */
+  project?: string;
+  projectId?: string;
 };
 
 const COGNITO_API_BASE_URL = "https://www.cognitoforms.com/api";
@@ -179,6 +182,20 @@ export async function listCognitoExpenseEntriesByEmail(
 
   if (!normalizedEmail) return [];
 
+  const all = await listAllCognitoExpenseEntries();
+  return all
+    .filter((entry) => entry.email.toLowerCase() === normalizedEmail)
+    .sort((firstEntry, secondEntry) =>
+      secondEntry.dateSubmitted.localeCompare(firstEntry.dateSubmitted),
+    );
+}
+
+/**
+ * Returns (recent) expense entries from the Cognito reimbursement form.
+ * Useful for reconciliation jobs that need to import all project-linked
+ * expenses, not just the ones for the current viewer.
+ */
+export async function listAllCognitoExpenseEntries(): Promise<CognitoExpenseEntry[]> {
   const result = await cognitoODataFetch<{
     value?: Record<string, unknown>[];
   }>(
@@ -188,7 +205,6 @@ export async function listCognitoExpenseEntriesByEmail(
   return (result.value ?? [])
     .map(mapExpenseEntry)
     .filter((entry): entry is CognitoExpenseEntry => Boolean(entry))
-    .filter((entry) => entry.email.toLowerCase() === normalizedEmail)
     .sort((firstEntry, secondEntry) =>
       secondEntry.dateSubmitted.localeCompare(firstEntry.dateSubmitted),
     );
@@ -288,7 +304,7 @@ function mapExpenseEntry(
 
   if (!id) return null;
 
-  return {
+  const base: CognitoExpenseEntry = {
     amountTotal: numberValue(entry.Total) ?? 0,
     dateSubmitted: stringValue(entry.Entry_DateSubmitted) ?? "",
     email: stringValue(entry.Email) ?? "",
@@ -301,6 +317,37 @@ function mapExpenseEntry(
       "",
     status: stringValue(entry.Entry_Status) ?? "Submitted",
   };
+
+  // Try to extract project context. The user must add a field (recommended name "Project"
+  // or "Project Name", ideally a Lookup against a Projects catalog form) to the Cognito
+  // expense form. The OData column name will be the internal title or the long name.
+  const projectCandidates = [
+    entry.Project,
+    entry["Project Name"],
+    entry.ProjectName,
+    entry.Project_ID,
+    entry["Project ID"],
+    entry.SelectProject,
+    entry["Project (Lookup)"],
+    // Fallback: scan any key containing "project" (case-insensitive)
+    ...Object.entries(entry)
+      .filter(([k]) => /project/i.test(k))
+      .map(([, v]) => v),
+  ];
+
+  const projectValue = projectCandidates.find((v) => typeof v === "string" && v.trim().length > 0) as string | undefined;
+
+  if (projectValue) {
+    // If the value looks like "Name (ID: uuid)" or just the name, store what we have.
+    // Later sync code can resolve by name or by ID if the form includes the ID.
+    base.project = projectValue.trim();
+    // Try to pull an explicit ID if present in the same entry under common keys
+    const idCandidates = [entry["Project ID"], entry.ProjectID, entry.Project_Id];
+    const explicitId = idCandidates.find((v) => typeof v === "string" && v.trim().length > 0) as string | undefined;
+    if (explicitId) base.projectId = explicitId.trim();
+  }
+
+  return base;
 }
 
 function mapForm(form: CognitoFormResponse): CognitoFormSummary | null {
@@ -341,4 +388,139 @@ function describePropertyType(property: JsonSchemaProperty) {
   }
 
   return [property.type, property.format].filter(Boolean).join(" / ") || "Field";
+}
+
+const COGNITO_PROJECT_CATALOG_FORM_ID = process.env.COGNITO_PROJECT_CATALOG_FORM_ID || process.env.COGNITO_PROJECTS_FORM_ID;
+
+/**
+ * Returns true if a Cognito "Project Catalog" form ID has been configured.
+ * 
+ * To make the *published* Cognito expense form (the one at cognitoforms.com, outside the portal)
+ * show a dropdown of your current projects:
+ * 
+ * 1. In Cognito Forms, create a simple auxiliary form called "Projects" (or "Project Catalog").
+ *    Recommended fields:
+ *      - Name (Text, required)          → the project name
+ *      - ProjectID (Text)               → the portal UUID (useful for exact matching)
+ *      - Status (Text or Choice)        → active / on_hold / completed / cancelled
+ * 
+ * 2. In your main Expense Reimbursement form (the one with ID 3 or whatever you use):
+ *    - Add a new field, preferably a "Lookup" field (or Choice with "Allow multiple" off).
+ *    - Configure it to look up entries from your "Projects" catalog form.
+ *    - Map the lookup to show "Name" (and optionally Status).
+ * 
+ * 3. Set the env var:
+ *      COGNITO_PROJECT_CATALOG_FORM_ID=the-form-id-of-your-projects-catalog
+ * 
+ * 4. The portal will keep the catalog roughly in sync by creating entries when
+ *    projects are created or updated (see syncProjectToCognitoCatalog).
+ * 
+ * This is the standard, reliable way to get dynamic project choices inside a
+ * standalone published Cognito form without custom JavaScript.
+ */
+export function hasCognitoProjectCatalogConfig() {
+  return Boolean(COGNITO_PROJECT_CATALOG_FORM_ID);
+}
+
+export type ProjectForCatalog = {
+  id: string;
+  name: string;
+  status: string;
+  startDate?: string | null;
+  targetEndDate?: string | null;
+};
+
+/**
+ * Push (or re-push) a project into the configured Cognito "Projects" catalog form.
+ * Call this from project create/update hooks.
+ *
+ * The entry created will have fields the user can map in the catalog form:
+ *   Name, ProjectID, Status, StartDate, TargetEndDate.
+ *
+ * Note: This always creates a *new* entry in the catalog. For a lookup source this is
+ * usually fine (lookups can be filtered to latest or active). If you want deduping,
+ * you can periodically clean the catalog form in Cognito or extend this with a query
+ * + update flow using the OData API.
+ */
+export async function syncProjectToCognitoCatalog(project: ProjectForCatalog): Promise<void> {
+  if (!hasCognitoProjectCatalogConfig()) return;
+
+  const catalogFormId = COGNITO_PROJECT_CATALOG_FORM_ID!;
+
+  const entry = {
+    Name: project.name,
+    ProjectID: project.id,
+    Status: project.status,
+    StartDate: project.startDate || "",
+    TargetEndDate: project.targetEndDate || "",
+  };
+
+  try {
+    await createCognitoFormEntry(catalogFormId, entry);
+  } catch (err) {
+    console.error("Failed to sync project to Cognito catalog:", err);
+    // Non-fatal for project operations
+  }
+}
+
+/**
+ * Convenience: sync many projects (e.g. full refresh from an admin action).
+ */
+export async function syncAllProjectsToCognitoCatalog(projects: ProjectForCatalog[]): Promise<void> {
+  if (!hasCognitoProjectCatalogConfig()) return;
+  for (const p of projects) {
+    await syncProjectToCognitoCatalog(p).catch(() => {});
+  }
+}
+
+export type ProjectContext = {
+  id?: string;
+  name: string;
+  status?: string;
+  startDate?: string | null;
+  targetEndDate?: string | null;
+};
+
+/**
+ * Returns a flat map of field values you can spread into a Cognito entry
+ * (for createCognitoFormEntry) or JSON-stringify for the official
+ * ?entry={...} prefill syntax on Cognito public links and embeds.
+ *
+ * Form builders in Cognito can map these keys (or similar) to real fields:
+ *   - Text / Choice field named "Project" or "Project Name"
+ *   - Hidden fields for "Project ID"
+ *
+ * Usage example (inside a server action, after picking a project):
+ *   const project = { id: "...", name: "Mexico Mission 2026", status: "active" };
+ *   const entry = {
+ *     Email: currentUser.email,
+ *     ...buildCognitoProjectFields(project),
+ *     Amount: "123.45",
+ *     // ... other form fields
+ *   };
+ *   await createCognitoFormEntry("YOUR-FORM-ID", entry);
+ *
+ * For a clickable prefilled link (generated while user is authenticated):
+ *   const entry = buildCognitoProjectFields(selectedProject);
+ *   const prefill = encodeURIComponent(JSON.stringify(entry));
+ *   const url = `https://www.cognitoforms.com/YourOrg/YourFormName?entry=${prefill}`;
+ */
+export function buildCognitoProjectFields(project: ProjectContext): Record<string, string> {
+  const fields: Record<string, string> = {
+    Project: project.name,
+    "Project Name": project.name,
+    "Project ID": project.id ?? "",
+  };
+
+  if (project.status) {
+    fields["Project Status"] = project.status;
+  }
+  if (project.startDate) {
+    fields["Project Start Date"] = project.startDate;
+  }
+  if (project.targetEndDate) {
+    fields["Project Target End Date"] = project.targetEndDate;
+  }
+
+  return fields;
 }
