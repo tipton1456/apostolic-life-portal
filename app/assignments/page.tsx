@@ -142,6 +142,7 @@ type CalendarAssignment = {
   name: string;
   planName: string;
   position: string;
+  seriesArtUrl?: string;
   status: string;
 };
 
@@ -290,6 +291,13 @@ function CalendarAssignmentCard({
       href={assignment.detailHref}
       className="block rounded-md border border-white/10 bg-neutral-950/60 p-2 transition hover:border-lime-400/50"
     >
+      {assignment.seriesArtUrl && (
+        <img
+          src={assignment.seriesArtUrl}
+          alt="Series artwork"
+          className="mb-1 h-8 w-8 rounded object-cover"
+        />
+      )}
       <p className="text-[11px] font-semibold leading-tight text-neutral-100">
         {assignment.planName}
       </p>
@@ -331,6 +339,13 @@ function AssignmentTable({
                   className="transition hover:bg-white/[0.06]"
                 >
                   <AssignmentCell assignment={assignment} emphasis>
+                    {assignment.seriesArtUrl && (
+                      <img
+                        src={assignment.seriesArtUrl}
+                        alt="Series artwork"
+                        className="mr-1.5 inline-block h-4 w-4 flex-shrink-0 rounded object-cover align-middle"
+                      />
+                    )}
                     {assignment.dates}
                   </AssignmentCell>
                   <AssignmentCell assignment={assignment}>
@@ -439,6 +454,13 @@ function FamilyAssignmentsList({
                       className="transition hover:bg-white/[0.06]"
                     >
                       <AssignmentCell assignment={assignment} emphasis>
+                        {assignment.seriesArtUrl && (
+                          <img
+                            src={assignment.seriesArtUrl}
+                            alt="Series artwork"
+                            className="mr-1.5 inline-block h-4 w-4 flex-shrink-0 rounded object-cover align-middle"
+                          />
+                        )}
                         {assignment.dates}
                       </AssignmentCell>
                       <AssignmentCell assignment={assignment}>
@@ -564,6 +586,7 @@ function mapCalendarAssignment(
     name,
     planName: assignment.serviceTypeName,
     position: assignment.position,
+    seriesArtUrl: assignment.seriesArtUrl,
     status: assignment.status,
   };
 }

@@ -82,6 +82,13 @@ export default async function DashboardPage() {
                             href={assignment.detailHref}
                             className="block"
                           >
+                            {assignment.seriesArtUrl && (
+                              <img
+                                src={assignment.seriesArtUrl}
+                                alt="Series artwork"
+                                className="mr-1.5 inline-block h-4 w-4 flex-shrink-0 rounded object-cover align-middle"
+                              />
+                            )}
                             {assignment.dates}
                           </Link>
                         </td>

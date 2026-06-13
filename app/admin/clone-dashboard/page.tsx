@@ -425,7 +425,16 @@ function AssignmentTable({
           {assignments.map((assignment) => (
             <tr key={assignment.id} className="transition hover:bg-white/[0.06]">
               <td className="px-5 py-4 font-semibold text-lime-300">
-                <Link href={assignment.detailHref}>{assignment.dates}</Link>
+                <Link href={assignment.detailHref}>
+                  {assignment.seriesArtUrl && (
+                    <img
+                      src={assignment.seriesArtUrl}
+                      alt="Series artwork"
+                      className="mr-1.5 inline-block h-4 w-4 flex-shrink-0 rounded object-cover align-middle"
+                    />
+                  )}
+                  {assignment.dates}
+                </Link>
               </td>
               <td className="px-5 py-4 text-neutral-100">
                 <Link href={assignment.detailHref}>

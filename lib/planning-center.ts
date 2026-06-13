@@ -137,6 +137,7 @@ export type UpcomingAssignment = {
   detailHref: string;
   planId: string;
   position: string;
+  seriesArtUrl?: string;
   serviceTypeId: string;
   serviceTypeName: string;
   sortDate?: string;
@@ -300,28 +301,77 @@ export async function getUpcomingAssignmentsForPersonId(
     `/services/v2/people/${personId}/schedules`,
     {
       filter: "future",
-      include: "plan",
+      include: "plan,plan.art",
       order: "starts_at",
       per_page: String(limit),
     },
   );
-  const plansById = new Map(
-    normalizeResources<PcoPlanAttributes>(response.included)
-      .filter((resource) => resource.type === "Plan")
-      .map((plan) => [
-        plan.id,
-        plan.attributes?.series_title || plan.attributes?.title,
-      ]),
+
+  const planResources = normalizeResources<any>(response.included).filter(
+    (resource) => resource.type === "Plan",
   );
+
+  const plansById = new Map(
+    planResources.map((plan) => [
+      plan.id,
+      plan.attributes?.title || null,
+    ]),
+  );
+
+  const seriesArtByPlanId = new Map<string, string>();
+
+  const allIncluded = normalizeResources<any>(response.included);
+  for (const plan of planResources) {
+    // Try to find art via relationship (art or series_art)
+    const artRel =
+      getRelationship(plan, "art") || getRelationship(plan, "series_art");
+    if (artRel?.id) {
+      const artRes = allIncluded.find(
+        (r: any) =>
+          r.id === artRel.id &&
+          (r.type === "Art" ||
+            r.type === "Attachment" ||
+            /art/i.test(r.type || "")),
+      );
+      if (artRes) {
+        const attrs = artRes.attributes || {};
+        const url =
+          attrs.thumbnail_url ||
+          attrs.url ||
+          attrs.download_url ||
+          attrs.artwork_url;
+        if (url) {
+          seriesArtByPlanId.set(plan.id, url);
+        }
+      }
+    }
+    // Fallback: direct attributes on plan
+    const attrs = plan.attributes || {};
+    const directArt =
+      attrs.art?.thumbnail_url ||
+      attrs.series_art?.thumbnail_url ||
+      attrs.series_art?.url ||
+      attrs.artwork?.thumbnail_url;
+    if (directArt) {
+      seriesArtByPlanId.set(plan.id, directArt);
+    }
+  }
 
   return normalizeResources(response.data)
     .map(mapSchedule)
     .filter((assignment): assignment is UpcomingAssignment => Boolean(assignment))
-    .map((assignment) => ({
-      ...assignment,
-      serviceTypeName:
-        plansById.get(assignment.planId) ?? assignment.serviceTypeName,
-    }));
+    .map((assignment) => {
+      const updated: UpcomingAssignment = { ...assignment };
+      const planTitle = plansById.get(assignment.planId);
+      if (planTitle) {
+        updated.serviceTypeName = planTitle;
+      }
+      const artUrl = seriesArtByPlanId.get(assignment.planId);
+      if (artUrl) {
+        updated.seriesArtUrl = artUrl;
+      }
+      return updated;
+    });
 }
 
 export async function getPlanningCenterPerson(

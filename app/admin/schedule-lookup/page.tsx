@@ -115,6 +115,13 @@ function AssignmentTable({
                   className="transition hover:bg-white/[0.06]"
                 >
                   <AssignmentCell assignment={assignment} emphasis>
+                    {assignment.seriesArtUrl && (
+                      <img
+                        src={assignment.seriesArtUrl}
+                        alt="Series artwork"
+                        className="mr-1.5 inline-block h-4 w-4 flex-shrink-0 rounded object-cover align-middle"
+                      />
+                    )}
                     {assignment.dates}
                   </AssignmentCell>
                   <AssignmentCell assignment={assignment}>
