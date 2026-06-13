@@ -323,7 +323,7 @@ export async function getUpcomingAssignmentsForPersonId(
   const allIncluded = normalizeResources<any>(response.included);
   for (const plan of planResources) {
     // Try to find art via relationship (art or series_art)
-    const artRel =
+    let artRel =
       getRelationship(plan, "art") || getRelationship(plan, "series_art");
     if (artRel?.id) {
       const artRes = allIncluded.find(
@@ -339,19 +339,71 @@ export async function getUpcomingAssignmentsForPersonId(
           attrs.thumbnail_url ||
           attrs.url ||
           attrs.download_url ||
-          attrs.artwork_url;
+          attrs.artwork_url ||
+          attrs.small_url ||
+          (attrs.links && (attrs.links.thumbnail || attrs.links.self)) ||
+          (artRes.links && (artRes.links.thumbnail || artRes.links.download));
         if (url) {
           seriesArtByPlanId.set(plan.id, url);
         }
       }
     }
+
+    // Also try via series relationship (common for series art)
+    const seriesRel = getRelationship(plan, "series");
+    if (seriesRel?.id) {
+      const seriesRes = allIncluded.find(
+        (r: any) => r.id === seriesRel.id && r.type === "Series",
+      );
+      if (seriesRes) {
+        const seriesArtRel =
+          getRelationship(seriesRes, "art") ||
+          getRelationship(seriesRes, "series_art");
+        if (seriesArtRel?.id) {
+          const artRes = allIncluded.find(
+            (r: any) =>
+              r.id === seriesArtRel.id &&
+              (r.type === "Art" ||
+                r.type === "Attachment" ||
+                /art/i.test(r.type || "")),
+          );
+          if (artRes) {
+            const attrs = artRes.attributes || {};
+            const url =
+              attrs.thumbnail_url ||
+              attrs.url ||
+              attrs.download_url ||
+              attrs.artwork_url ||
+              attrs.small_url ||
+              (attrs.links && (attrs.links.thumbnail || attrs.links.self)) ||
+              (artRes.links && (artRes.links.thumbnail || artRes.links.download));
+            if (url) {
+              seriesArtByPlanId.set(plan.id, url);
+            }
+          }
+        }
+        // direct on series
+        const sAttrs = seriesRes.attributes || {};
+        const sDirect =
+          sAttrs.art?.thumbnail_url ||
+          sAttrs.series_art?.thumbnail_url ||
+          sAttrs.artwork?.thumbnail_url ||
+          sAttrs.thumbnail_url;
+        if (sDirect) {
+          seriesArtByPlanId.set(plan.id, sDirect);
+        }
+      }
+    }
+
     // Fallback: direct attributes on plan
     const attrs = plan.attributes || {};
     const directArt =
       attrs.art?.thumbnail_url ||
       attrs.series_art?.thumbnail_url ||
       attrs.series_art?.url ||
-      attrs.artwork?.thumbnail_url;
+      attrs.artwork?.thumbnail_url ||
+      attrs.thumbnail_url ||
+      attrs.image_url;
     if (directArt) {
       seriesArtByPlanId.set(plan.id, directArt);
     }
