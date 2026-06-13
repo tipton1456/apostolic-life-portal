@@ -9,6 +9,7 @@ type JsonApiResource<TAttributes = Record<string, unknown>> = {
   type: string;
   attributes?: TAttributes;
   relationships?: Record<string, JsonApiRelationship>;
+  links?: Record<string, string | { href: string } | null>;
 };
 
 type JsonApiResponse<TAttributes = Record<string, unknown>> = {
@@ -341,8 +342,7 @@ export async function getUpcomingAssignmentsForPersonId(
           attrs.download_url ||
           attrs.artwork_url ||
           attrs.small_url ||
-          (attrs.links && (attrs.links.thumbnail || attrs.links.self)) ||
-          (artRes.links && (artRes.links.thumbnail || artRes.links.download));
+          (artRes.links && (artRes.links.thumbnail || artRes.links.self || artRes.links.download));
         if (url) {
           seriesArtByPlanId.set(plan.id, url);
         }
@@ -375,8 +375,7 @@ export async function getUpcomingAssignmentsForPersonId(
               attrs.download_url ||
               attrs.artwork_url ||
               attrs.small_url ||
-              (attrs.links && (attrs.links.thumbnail || attrs.links.self)) ||
-              (artRes.links && (artRes.links.thumbnail || artRes.links.download));
+              (artRes.links && (artRes.links.thumbnail || artRes.links.self || artRes.links.download));
             if (url) {
               seriesArtByPlanId.set(plan.id, url);
             }
