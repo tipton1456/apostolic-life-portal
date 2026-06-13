@@ -42,7 +42,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-apostolic-life-portal.zip
 
 # Generated reports and exports (never commit these)
 public/integrations/*.pdf
