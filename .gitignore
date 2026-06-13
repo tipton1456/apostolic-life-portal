@@ -43,3 +43,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 apostolic-life-portal.zip
+
+# Generated reports and exports (never commit these)
+public/integrations/*.pdf
+public/integrations/*.xlsx
+public/integrations/*-summary-report*
+public/integrations/*-financial*
+public/integrations/*-cost-summary*
+public/integrations/*-tasks-by-milestone*
+public/integrations/Men's Outing*
