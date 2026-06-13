@@ -61,7 +61,7 @@ export async function listProjectExpenses(
   const { data, error } = await supabase
     .from("project_expenses")
     .select(
-      "id,project_id,description,category,amount,expense_date,vendor,notes,status,created_by,created_at,updated_at,cognito_entry_id,source",
+      "id,project_id,description,category,amount,expense_date,vendor,notes,status,created_by,created_at,updated_at",
     )
     .eq("project_id", projectId)
     .order("expense_date", { ascending: false })
@@ -91,7 +91,7 @@ export async function createProjectExpense(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("project_expenses").insert({
+  const insertPayload: any = {
     project_id: projectId,
     description,
     category,
@@ -101,9 +101,15 @@ export async function createProjectExpense(formData: FormData) {
     notes,
     status,
     created_by: currentUser.id,
-    cognito_entry_id: (formData.get("cognitoEntryId") as string) || null,
-    source: (formData.get("source") as string) || "manual",
-  });
+  };
+
+  // Only include new columns if they were passed (migration may not be applied yet in some envs)
+  const cognitoEntryId = formData.get("cognitoEntryId") as string | null;
+  const source = formData.get("source") as string | null;
+  if (cognitoEntryId) insertPayload.cognito_entry_id = cognitoEntryId;
+  if (source) insertPayload.source = source;
+
+  const { error } = await supabase.from("project_expenses").insert(insertPayload);
 
   if (error) {
     console.error("Expense creation failed:", error);
@@ -346,21 +352,23 @@ export async function createProjectExpenseFromReimbursement(params: {
   // (the RLS for insert requires manager, so admin bypasses it).
   const createdBy = createdByUserId || "00000000-0000-0000-0000-000000000000"; // placeholder if unknown
 
+  const insertPayload: any = {
+    project_id: projectId,
+    description: description.trim(),
+    category,
+    amount,
+    expense_date: expenseDate,
+    vendor: vendor.trim(),
+    notes: notes.trim(),
+    status: "committed", // outstanding until the Cognito report is approved
+    created_by: createdBy,
+  };
+  if (cognitoEntryId) insertPayload.cognito_entry_id = cognitoEntryId;
+  if (source) insertPayload.source = source;
+
   const { data, error } = await supabase
     .from("project_expenses")
-    .insert({
-      project_id: projectId,
-      description: description.trim(),
-      category,
-      amount,
-      expense_date: expenseDate,
-      vendor: vendor.trim(),
-      notes: notes.trim(),
-      status: "committed", // outstanding until the Cognito report is approved
-      created_by: createdBy,
-      cognito_entry_id: cognitoEntryId || null,
-      source,
-    })
+    .insert(insertPayload)
     .select("id")
     .single();
 
