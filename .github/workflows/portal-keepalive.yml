@@ -1,0 +1,73 @@
+name: Portal Keepalive
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+    - cron: "15 9 * * *"
+    - cron: "45 21 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: portal-keepalive
+  cancel-in-progress: false
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake Supabase auth
+        env:
+          SUPABASE_URL: https://lbjjacxsisqpaekwvgoa.supabase.co
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxiamphY3hzaXNxcGFla3d2Z29hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODExMjIsImV4cCI6MjA5NjE1NzEyMn0.1xQ7pzBfVvgjfq9gODnuDP7k6vB_9iyQWI39Hqae7kc
+        run: |
+          code=$(curl -sS -o /tmp/supabase-auth.json -w "%{http_code}" \
+            "$SUPABASE_URL/auth/v1/health" \
+            -H "apikey: $SUPABASE_ANON_KEY")
+          echo "Supabase auth: HTTP $code"
+          test "$code" = "200"
+
+      - name: Wake Supabase database
+        env:
+          SUPABASE_URL: https://lbjjacxsisqpaekwvgoa.supabase.co
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxiamphY3hzaXNxcGFla3d2Z29hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODExMjIsImV4cCI6MjA5NjE1NzEyMn0.1xQ7pzBfVvgjfq9gODnuDP7k6vB_9iyQWI39Hqae7kc
+        run: |
+          for table in portal_users projects project_tasks; do
+            code=$(curl -sS -o /tmp/supabase-db.json -w "%{http_code}" \
+              "$SUPABASE_URL/rest/v1/${table}?select=id&limit=1" \
+              -H "apikey: $SUPABASE_ANON_KEY" \
+              -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+            echo "Supabase ${table}: HTTP $code"
+            test "$code" = "200"
+          done
+
+      - name: Wake Vercel deployment
+        env:
+          PORTAL_URL: https://apostolic-life-portal.vercel.app
+        run: |
+          for path in / /login /dashboard; do
+            code=$(curl -sS -o /tmp/portal.json -w "%{http_code}" -L \
+              "$PORTAL_URL$path" \
+              -H "User-Agent: ApostolicLife-Keepalive/1.0")
+            echo "Portal ${path}: HTTP $code"
+            case "$code" in
+              200|307|308) ;;
+              *) exit 1 ;;
+            esac
+          done
+
+      - name: Wake Vercel cron endpoint
+        env:
+          PORTAL_URL: https://apostolic-life-portal.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -n "$CRON_SECRET" ]; then
+            code=$(curl -sS -o /tmp/cron.json -w "%{http_code}" \
+              "$PORTAL_URL/api/cron/keepalive" \
+              -H "Authorization: Bearer $CRON_SECRET")
+            echo "Cron endpoint: HTTP $code"
+            cat /tmp/cron.json
+            test "$code" = "200"
+          else
+            echo "CRON_SECRET not configured in GitHub — skipping authenticated cron ping."
+          fi

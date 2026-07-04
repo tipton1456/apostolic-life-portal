@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:projects": "node scripts/test-project-management.mjs"
+    "test:projects": "node scripts/test-project-management.mjs",
+    "db:health": "node scripts/supabase-health.mjs",
+    "db:bootstrap": "node scripts/supabase-bootstrap.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
