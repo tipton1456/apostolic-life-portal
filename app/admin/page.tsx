@@ -52,6 +52,12 @@ const ADMIN_ITEMS: Array<{
     icon: "communications",
     label: "Communication Log",
   },
+  {
+    description: "Open The Great Van Plan silent auction: items, bidders, and printable QR flyers.",
+    href: "/van-plan",
+    icon: "resources",
+    label: "The Great Van Plan",
+  },
 ];
 
 export default async function AdminLandingPage() {

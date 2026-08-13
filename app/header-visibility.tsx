@@ -9,7 +9,12 @@ export default function HeaderVisibility({
 }) {
   const pathname = usePathname();
 
-  if (pathname === "/" || pathname === "/login" || pathname === "/change-password") {
+  if (
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/change-password" ||
+    pathname.startsWith("/van-plan")
+  ) {
     return null;
   }
 

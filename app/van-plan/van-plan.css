@@ -1,0 +1,112 @@
+.van-plan {
+  --vp-bg: #f9ede4;
+  --vp-ink: #46433c;
+  --vp-accent: #75871f;
+  --vp-card: rgba(255, 255, 255, 0.55);
+  --vp-line: rgba(70, 67, 60, 0.14);
+  min-height: 100vh;
+  background: var(--vp-bg);
+  color: var(--vp-ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.van-plan a {
+  color: inherit;
+}
+
+.vp-heading {
+  color: var(--vp-ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vp-heading-bold {
+  color: var(--vp-ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vp-subhead {
+  color: var(--vp-accent);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+
+.vp-accent {
+  color: var(--vp-accent);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 400;
+  text-transform: lowercase;
+}
+
+.vp-description {
+  color: var(--vp-ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 300;
+  text-transform: none;
+}
+
+.vp-card {
+  background: var(--vp-card);
+  border: 1px solid var(--vp-line);
+  border-radius: 1.25rem;
+}
+
+.vp-input,
+.vp-select,
+.vp-textarea {
+  width: 100%;
+  border: 1px solid var(--vp-line);
+  border-radius: 0.9rem;
+  background: #fff;
+  color: var(--vp-ink);
+  padding: 0.85rem 1rem;
+  outline: none;
+}
+
+.vp-input:focus,
+.vp-select:focus,
+.vp-textarea:focus {
+  box-shadow: 0 0 0 2px var(--vp-accent);
+}
+
+.vp-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.9rem;
+  background: var(--vp-accent);
+  color: #fff;
+  padding: 0.85rem 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vp-button:hover {
+  filter: brightness(1.05);
+}
+
+.vp-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.vp-button-secondary {
+  background: transparent;
+  border: 1px solid var(--vp-ink);
+  color: var(--vp-ink);
+}
+
+.vp-button-ghost {
+  background: transparent;
+  color: var(--vp-accent);
+  padding-inline: 0.4rem;
+}
