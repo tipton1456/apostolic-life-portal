@@ -111,9 +111,11 @@ export async function buildVanPlanItemPdf(
   cursor -= 8;
   const description = toProperCase(item.description);
   const descriptionLines = wrapText(description, contentWidth, regular, 12);
+  const qrSize = 132;
+  const qrTop = MARGIN + qrSize + 16;
 
   for (const line of descriptionLines) {
-    if (cursor < 180) break;
+    if (cursor < qrTop) break;
     page.drawText(line, {
       x: MARGIN,
       y: cursor,
@@ -136,15 +138,7 @@ export async function buildVanPlanItemPdf(
     },
   });
   const qrImage = await pdf.embedPng(qrPng);
-  const qrSize = 132;
 
-  page.drawText("scan to bid", {
-    x: MARGIN,
-    y: MARGIN + qrSize + 16,
-    size: 12,
-    font: regular,
-    color: ACCENT,
-  });
   page.drawImage(qrImage, {
     x: MARGIN,
     y: MARGIN,
