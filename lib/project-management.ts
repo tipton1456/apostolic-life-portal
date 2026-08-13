@@ -1239,6 +1239,8 @@ export async function createProjectTask(formData: FormData) {
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
+  revalidatePath("/dashboard");
+  redirect(`/projects/${projectId}?task=${createdTask.id}`);
 }
 
 export async function updateProjectTask(formData: FormData) {
