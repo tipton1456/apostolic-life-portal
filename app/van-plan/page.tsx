@@ -12,10 +12,10 @@ export default async function VanPlanCatalogPage() {
   ]);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      <p className="vp-subhead text-sm">{VAN_PLAN_SUBTITLE}</p>
-      <h1 className="vp-heading mt-2 text-4xl md:text-5xl">{VAN_PLAN_TITLE}</h1>
-      <p className="vp-description mt-4 max-w-2xl text-lg leading-7">
+    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+      <p className="vp-subhead text-xs sm:text-sm">{VAN_PLAN_SUBTITLE}</p>
+      <h1 className="vp-heading mt-2 text-3xl sm:text-4xl md:text-5xl">{VAN_PLAN_TITLE}</h1>
+      <p className="vp-description mt-3 hidden max-w-2xl text-lg leading-7 sm:mt-4 sm:block">
         Browse the silent auction items and place your bid. Each listing has its
         own page, current high bid, and a printable flyer with a QR code.
         You can look around without signing in.
@@ -59,7 +59,7 @@ export default async function VanPlanCatalogPage() {
           </p>
         </div>
       ) : (
-        <section className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="mt-6 grid grid-cols-2 gap-3 sm:mt-10 sm:gap-6 md:grid-cols-3">
           {items.map((item) => {
             const image = primaryItemImage(item);
             const current = item.highestBid?.amountCents ?? item.startingPriceCents;
@@ -70,7 +70,7 @@ export default async function VanPlanCatalogPage() {
                 href={`${VAN_PLAN_BASE_PATH}/items/${item.slug}`}
                 className="vp-card overflow-hidden transition hover:-translate-y-0.5"
               >
-                <div className="aspect-[4/3] bg-white/40">
+                <div className="aspect-square bg-white/40 sm:aspect-[4/3]">
                   {image ? (
                     // Dynamic auction images are served by the module route.
                     // eslint-disable-next-line @next/next/no-img-element
@@ -81,20 +81,20 @@ export default async function VanPlanCatalogPage() {
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center">
-                      <p className="vp-accent text-sm">no photo yet</p>
+                      <p className="vp-accent text-[11px] sm:text-sm">no photo yet</p>
                     </div>
                   )}
                 </div>
-                <div className="p-5">
-                  <p className="vp-accent text-xs">{item.status}</p>
-                  <h2 className="vp-heading-bold mt-2 text-xl leading-7">
+                <div className="p-2.5 sm:p-5">
+                  <p className="vp-accent text-[10px] sm:text-xs">{item.status}</p>
+                  <h2 className="vp-heading-bold mt-1 line-clamp-2 text-[13px] leading-4 sm:mt-2 sm:text-xl sm:leading-7">
                     {item.name}
                   </h2>
-                  <p className="vp-description mt-3 line-clamp-3 text-sm leading-6">
+                  <p className="vp-description mt-3 hidden line-clamp-3 text-sm leading-6 sm:block">
                     {toProperCase(item.description)}
                   </p>
-                  <p className="vp-subhead mt-4 text-sm">
-                    current high bid {formatUsd(current)}
+                  <p className="vp-subhead mt-2 text-[11px] leading-4 sm:mt-4 sm:text-sm">
+                    {formatUsd(current)}
                   </p>
                 </div>
               </Link>
