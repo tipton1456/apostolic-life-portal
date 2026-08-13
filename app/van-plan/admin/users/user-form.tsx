@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import VanPlanActionMessage from "@/app/van-plan/components/action-message";
+import VanPlanAddressFields from "@/app/van-plan/components/address-fields";
 import VanPlanFormButton from "@/app/van-plan/components/form-button";
 import { createVanPlanUserAction } from "@/lib/van-plan/actions";
 import { VAN_PLAN_PERMISSIONS } from "@/lib/van-plan/constants";
@@ -43,6 +44,8 @@ export default function VanPlanUserForm() {
           className="vp-input mt-2"
         />
       </label>
+
+      <VanPlanAddressFields />
 
       <label className="vp-subhead block text-sm">
         permission

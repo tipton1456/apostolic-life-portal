@@ -39,7 +39,7 @@ export default async function VanPlanLayout({
     );
   }
 
-  const user = await getCurrentVanPlanUser();
+  const user = await getCurrentVanPlanUser().catch(() => null);
 
   return (
     <div className="van-plan">

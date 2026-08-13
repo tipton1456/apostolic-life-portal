@@ -1,7 +1,10 @@
 import { VAN_PLAN_MIN_BID_INCREMENT_CENTS } from "@/lib/van-plan/constants";
 import { VanPlanError, vanPlanDb } from "@/lib/van-plan/db";
-import { getVanPlanItemById } from "@/lib/van-plan/items";
-import type { VanPlanUser } from "@/lib/van-plan/types";
+import { formatUsd } from "@/lib/van-plan/format";
+import { getVanPlanItemById, listItemBids } from "@/lib/van-plan/items";
+import { getPortalBaseUrl } from "@/lib/portal-url";
+import { appendSmsOptOut, getRecipientPhone, sendTwilioSms } from "@/lib/twilio-sms";
+import type { VanPlanItem, VanPlanUser } from "@/lib/van-plan/types";
 
 export function minimumNextBidCents(item: {
   startingPriceCents: number;
@@ -37,6 +40,7 @@ export async function placeVanPlanBid({
     );
   }
 
+  const previousBids = await listItemBids(itemId);
   const db = vanPlanDb();
   const { error } = await db.from("van_plan_bids").insert({
     item_id: itemId,
@@ -48,4 +52,57 @@ export async function placeVanPlanBid({
     console.error("Van Plan bid insert failed:", error);
     throw new VanPlanError("Unable to place that bid.", 500);
   }
+
+  await notifyPreviousBidders({
+    item,
+    amountCents,
+    currentBidderId: bidder.id,
+    previousBids,
+  });
+}
+
+async function notifyPreviousBidders({
+  item,
+  amountCents,
+  currentBidderId,
+  previousBids,
+}: {
+  item: VanPlanItem;
+  amountCents: number;
+  currentBidderId: string;
+  previousBids: Awaited<ReturnType<typeof listItemBids>>;
+}) {
+  const recipients = new Map<string, { name: string; phone: string }>();
+
+  for (const bid of previousBids) {
+    if (bid.userId === currentBidderId || recipients.has(bid.userId)) continue;
+    recipients.set(bid.userId, { name: bid.bidderName, phone: bid.bidderPhone });
+  }
+
+  if (recipients.size === 0) return;
+
+  const itemUrl = `${getPortalBaseUrl()}/van-plan/items/${item.slug}`;
+  const body = appendSmsOptOut(
+    `The Great Van Plan: there's a new high bid of ${formatUsd(amountCents)} on ${item.name}.\n\nBid now: ${itemUrl}`,
+  );
+
+  await Promise.all(
+    Array.from(recipients.values()).map(async (recipient) => {
+      const phone = getRecipientPhone(recipient.phone);
+
+      if (!phone) return;
+
+      const sent = await sendTwilioSms({
+        to: phone.number,
+        body,
+      });
+
+      if (!sent.ok) {
+        console.error("Van Plan bid notice failed:", {
+          name: recipient.name,
+          message: sent.failureMessage,
+        });
+      }
+    }),
+  );
 }

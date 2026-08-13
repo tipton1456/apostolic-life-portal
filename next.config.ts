@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
     },
   },
   reactCompiler: true,
+  serverExternalPackages: ["sharp"],
 };
 
 export default nextConfig;

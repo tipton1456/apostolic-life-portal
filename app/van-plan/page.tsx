@@ -5,7 +5,7 @@ import { listVanPlanItems, primaryItemImage } from "@/lib/van-plan/items";
 import { formatUsd, toProperCase } from "@/lib/van-plan/format";
 
 export default async function VanPlanCatalogPage() {
-  const user = await getCurrentVanPlanUser();
+  const user = await getCurrentVanPlanUser().catch(() => null);
   const [userCount, items] = await Promise.all([
     countVanPlanUsers().catch(() => -1),
     listVanPlanItems(user).catch(() => []),
@@ -18,7 +18,16 @@ export default async function VanPlanCatalogPage() {
       <p className="vp-description mt-4 max-w-2xl text-lg leading-7">
         Browse the silent auction items and place your bid. Each listing has its
         own page, current high bid, and a printable flyer with a QR code.
+        You can look around without signing in.
       </p>
+
+      {!user ? (
+        <p className="mt-6">
+          <Link href={`${VAN_PLAN_BASE_PATH}/register`} className="vp-button">
+            Create an account to bid
+          </Link>
+        </p>
+      ) : null}
 
       {userCount < 0 ? (
         <div className="vp-card mt-8 p-6">
@@ -42,14 +51,14 @@ export default async function VanPlanCatalogPage() {
         </div>
       ) : null}
 
-      {userCount > 0 && items.length === 0 ? (
+      {items.length === 0 ? (
         <div className="vp-card mt-10 p-8">
           <p className="vp-heading-bold text-xl">No items yet</p>
           <p className="vp-description mt-3">
             Auction items will appear here once an admin or auctioneer adds them.
           </p>
         </div>
-      ) : items.length > 0 ? (
+      ) : (
         <section className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => {
             const image = primaryItemImage(item);
@@ -92,7 +101,7 @@ export default async function VanPlanCatalogPage() {
             );
           })}
         </section>
-      ) : null}
+      )}
     </main>
   );
 }

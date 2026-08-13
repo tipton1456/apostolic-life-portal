@@ -4,17 +4,17 @@ import { useActionState } from "react";
 import VanPlanActionMessage from "@/app/van-plan/components/action-message";
 import VanPlanAddressFields from "@/app/van-plan/components/address-fields";
 import VanPlanFormButton from "@/app/van-plan/components/form-button";
-import { bootstrapVanPlanAdminAction } from "@/lib/van-plan/actions";
+import { registerVanPlanUserAction } from "@/lib/van-plan/actions";
 import { idleVanPlanActionState } from "@/lib/van-plan/types";
 
-export default function VanPlanSetupForm() {
+export default function VanPlanRegisterForm() {
   const [state, formAction] = useActionState(
-    bootstrapVanPlanAdminAction,
+    registerVanPlanUserAction,
     idleVanPlanActionState,
   );
 
   return (
-    <form action={formAction} className="mt-8 space-y-5">
+    <form action={formAction} className="mt-8 grid gap-4">
       <input type="hidden" name="version" value={state.version} />
 
       <label className="vp-subhead block text-sm">
@@ -28,7 +28,7 @@ export default function VanPlanSetupForm() {
           name="email"
           type="email"
           required
-          autoComplete="email"
+          autoComplete="username"
           className="vp-input mt-2"
         />
       </label>
@@ -74,8 +74,8 @@ export default function VanPlanSetupForm() {
         special character
       </p>
 
-      <VanPlanFormButton pendingLabel="Creating admin...">
-        Create admin
+      <VanPlanFormButton pendingLabel="Creating account...">
+        Create account
       </VanPlanFormButton>
       <VanPlanActionMessage state={state} />
     </form>

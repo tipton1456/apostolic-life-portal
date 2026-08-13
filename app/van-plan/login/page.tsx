@@ -34,7 +34,10 @@ export default async function VanPlanLoginPage({
       </p>
       <VanPlanLoginForm nextPath={nextPath} />
       <p className="vp-accent mt-8 text-sm">
-        need an account? ask an auction admin to add you.
+        need an account?{" "}
+        <Link href={`${VAN_PLAN_BASE_PATH}/register`} className="underline">
+          create one
+        </Link>
       </p>
       <Link href={VAN_PLAN_BASE_PATH} className="vp-subhead mt-4 text-sm">
         back to the auction

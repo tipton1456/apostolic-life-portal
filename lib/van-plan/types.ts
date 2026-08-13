@@ -15,6 +15,11 @@ export type VanPlanUser = {
   phoneDigits: string;
   permission: VanPlanPermission;
   mustResetPassword: boolean;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  zip: string;
   createdAt: string;
 };
 

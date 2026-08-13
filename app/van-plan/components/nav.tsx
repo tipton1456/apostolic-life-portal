@@ -41,6 +41,12 @@ export default function VanPlanNav({ user }: { user: VanPlanUser | null }) {
             <>
               <p className="vp-accent text-sm">{user.name}</p>
               <Link
+                href={`${VAN_PLAN_BASE_PATH}/account`}
+                className="vp-subhead text-sm"
+              >
+                account
+              </Link>
+              <Link
                 href={`${VAN_PLAN_BASE_PATH}/change-password`}
                 className="vp-subhead text-sm"
               >
@@ -53,9 +59,14 @@ export default function VanPlanNav({ user }: { user: VanPlanUser | null }) {
               </form>
             </>
           ) : (
-            <Link href={`${VAN_PLAN_BASE_PATH}/login`} className="vp-subhead text-sm">
-              sign in
-            </Link>
+            <>
+              <Link href={`${VAN_PLAN_BASE_PATH}/register`} className="vp-subhead text-sm">
+                create account
+              </Link>
+              <Link href={`${VAN_PLAN_BASE_PATH}/login`} className="vp-subhead text-sm">
+                sign in
+              </Link>
+            </>
           )}
         </div>
       </div>

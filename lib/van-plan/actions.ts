@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
+import { lookupVanPlanAddress, readVanPlanAddress } from "@/lib/van-plan/address";
 import {
   VAN_PLAN_BASE_PATH,
   VAN_PLAN_ITEM_STATUSES,
@@ -44,7 +45,11 @@ import {
   sanitizeNextPathSafe,
 } from "@/lib/van-plan/security";
 import type { VanPlanActionState } from "@/lib/van-plan/types";
-import { createVanPlanUser, updateVanPlanUserPermission } from "@/lib/van-plan/users";
+import {
+  createVanPlanUser,
+  updateVanPlanUserPermission,
+  updateVanPlanUserProfile,
+} from "@/lib/van-plan/users";
 import { getPortalBaseUrl } from "@/lib/portal-url";
 import { appendSmsOptOut, getRecipientPhone, sendTwilioSms } from "@/lib/twilio-sms";
 
@@ -117,6 +122,7 @@ export async function bootstrapVanPlanAdminAction(
       permission: "admin",
       password: String(formData.get("password") ?? ""),
       confirmPassword: String(formData.get("confirmPassword") ?? ""),
+      address: readVanPlanAddress(formData),
     });
 
     await createVanPlanSession(user.id);
@@ -142,6 +148,7 @@ export async function createVanPlanUserAction(
       permission: parsePermission(formData.get("permission")),
       password: String(formData.get("password") ?? ""),
       confirmPassword: String(formData.get("confirmPassword") ?? ""),
+      address: readVanPlanAddress(formData),
     });
     revalidateAuction([`${VAN_PLAN_BASE_PATH}/admin/users`]);
     return nextActionState("success", "User added.", version);
@@ -515,6 +522,67 @@ export async function requestVanPlanPasswordResetAction(
   } catch (error) {
     return actionError(error, version);
   }
+}
+
+export async function registerVanPlanUserAction(
+  _prev: VanPlanActionState,
+  formData: FormData,
+): Promise<VanPlanActionState> {
+  const version = Number(formData.get("version") ?? 0);
+
+  try {
+    const user = await createVanPlanUser({
+      name: String(formData.get("name") ?? ""),
+      email: String(formData.get("email") ?? ""),
+      phone: String(formData.get("phone") ?? ""),
+      permission: "user",
+      password: String(formData.get("password") ?? ""),
+      confirmPassword: String(formData.get("confirmPassword") ?? ""),
+      address: readVanPlanAddress(formData),
+    });
+
+    await createVanPlanSession(user.id);
+  } catch (error) {
+    return actionError(error, version);
+  }
+
+  redirect(VAN_PLAN_BASE_PATH);
+}
+
+export async function updateVanPlanAccountAction(
+  _prev: VanPlanActionState,
+  formData: FormData,
+): Promise<VanPlanActionState> {
+  const version = Number(formData.get("version") ?? 0);
+
+  try {
+    const user = await getCurrentVanPlanUser();
+
+    if (!user) {
+      throw new VanPlanError("Sign in to update your account.");
+    }
+
+    await updateVanPlanUserProfile({
+      userId: user.id,
+      name: String(formData.get("name") ?? ""),
+      phone: String(formData.get("phone") ?? ""),
+      address: readVanPlanAddress(formData),
+    });
+    revalidateAuction([`${VAN_PLAN_BASE_PATH}/account`]);
+    return nextActionState("success", "Account updated.", version);
+  } catch (error) {
+    return actionError(error, version);
+  }
+}
+
+export async function lookupVanPlanAddressAction(address: {
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  zip: string;
+}) {
+  return lookupVanPlanAddress(address);
 }
 
 

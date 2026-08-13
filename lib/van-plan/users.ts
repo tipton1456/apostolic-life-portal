@@ -1,3 +1,7 @@
+import {
+  assertVanPlanAddress,
+  type VanPlanAddress,
+} from "@/lib/van-plan/address";
 import { mapVanPlanUser } from "@/lib/van-plan/auth";
 import { VanPlanError, vanPlanDb } from "@/lib/van-plan/db";
 import {
@@ -21,11 +25,16 @@ type UserRow = {
   phone_digits: string;
   permission: VanPlanPermission;
   must_reset_password: boolean | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
   created_at: string;
 };
 
 const USER_SELECT =
-  "id, name, email, phone, phone_digits, permission, must_reset_password, created_at";
+  "id, name, email, phone, phone_digits, permission, must_reset_password, address_line1, address_line2, city, state, zip, created_at";
 
 export async function listVanPlanUsers(): Promise<VanPlanUser[]> {
   const db = vanPlanDb();
@@ -49,6 +58,7 @@ export async function createVanPlanUser({
   permission,
   password,
   confirmPassword,
+  address,
   mustResetPassword = false,
 }: {
   name: string;
@@ -57,6 +67,7 @@ export async function createVanPlanUser({
   permission: VanPlanPermission;
   password: string;
   confirmPassword: string;
+  address: VanPlanAddress;
   mustResetPassword?: boolean;
 }) {
   const trimmedName = name.trim();
@@ -78,6 +89,7 @@ export async function createVanPlanUser({
 
   assertPasswordsMatch(password, confirmPassword);
   assertPasswordComplexity(password);
+  assertVanPlanAddress(address);
 
   const db = vanPlanDb();
   const { data, error } = await db
@@ -90,6 +102,11 @@ export async function createVanPlanUser({
       permission,
       password_hash: await hashPassword(password),
       must_reset_password: mustResetPassword,
+      address_line1: address.addressLine1,
+      address_line2: address.addressLine2,
+      city: address.city,
+      state: address.state,
+      zip: address.zip,
     })
     .select(USER_SELECT)
     .single<UserRow>();
@@ -129,5 +146,54 @@ export async function updateVanPlanUserPermission({
 
   if (error) {
     throw new VanPlanError("Unable to update that user's permission.", 500);
+  }
+}
+
+export async function updateVanPlanUserProfile({
+  userId,
+  name,
+  phone,
+  address,
+}: {
+  userId: string;
+  name: string;
+  phone: string;
+  address: VanPlanAddress;
+}) {
+  const trimmedName = name.trim();
+  const trimmedPhone = phone.trim();
+  const phoneDigits = comparablePhone(trimmedPhone);
+
+  if (trimmedName.length < 2) {
+    throw new VanPlanError("Enter your full name.");
+  }
+
+  if (!isValidPhone(trimmedPhone)) {
+    throw new VanPlanError("Enter a valid 10-digit phone number.");
+  }
+
+  assertVanPlanAddress(address);
+
+  const db = vanPlanDb();
+  const { error } = await db
+    .from("van_plan_users")
+    .update({
+      name: trimmedName,
+      phone: trimmedPhone,
+      phone_digits: phoneDigits,
+      address_line1: address.addressLine1,
+      address_line2: address.addressLine2,
+      city: address.city,
+      state: address.state,
+      zip: address.zip,
+    })
+    .eq("id", userId);
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new VanPlanError("That phone number is already used by another account.");
+    }
+
+    throw new VanPlanError("Unable to update that account.", 500);
   }
 }

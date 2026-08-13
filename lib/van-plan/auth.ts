@@ -24,6 +24,11 @@ type UserRow = {
   phone_digits: string;
   permission: VanPlanPermission;
   must_reset_password: boolean | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
   created_at: string;
 };
 
@@ -36,6 +41,11 @@ export function mapVanPlanUser(row: UserRow): VanPlanUser {
     phoneDigits: row.phone_digits,
     permission: row.permission,
     mustResetPassword: Boolean(row.must_reset_password),
+    addressLine1: row.address_line1 ?? "",
+    addressLine2: row.address_line2 ?? "",
+    city: row.city ?? "",
+    state: row.state ?? "",
+    zip: row.zip ?? "",
     createdAt: row.created_at,
   };
 }
@@ -93,7 +103,7 @@ export async function getCurrentVanPlanUser() {
   const { data, error } = await db
     .from("van_plan_sessions")
     .select(
-      "id, expires_at, van_plan_users (id, name, email, phone, phone_digits, permission, must_reset_password, created_at)",
+      "id, expires_at, van_plan_users (id, name, email, phone, phone_digits, permission, must_reset_password, address_line1, address_line2, city, state, zip, created_at)",
     )
     .eq("token_hash", tokenHash)
     .gt("expires_at", now)
@@ -228,7 +238,7 @@ export async function authenticateVanPlanUser({
   const { data, error } = await db
     .from("van_plan_users")
     .select(
-      "id, name, email, phone, phone_digits, permission, must_reset_password, created_at, password_hash",
+      "id, name, email, phone, phone_digits, permission, must_reset_password, address_line1, address_line2, city, state, zip, created_at, password_hash",
     )
     .eq("email", normalizedEmail)
     .maybeSingle<UserRow & { password_hash: string | null }>();

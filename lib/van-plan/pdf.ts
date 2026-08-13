@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import QRCode from "qrcode";
+import sharp from "sharp";
 import { VAN_PLAN_TITLE } from "@/lib/van-plan/constants";
 import { VanPlanError } from "@/lib/van-plan/db";
 import { getVanPlanImageRecord, readVanPlanImage } from "@/lib/van-plan/images";
@@ -76,10 +77,11 @@ export async function buildVanPlanItemPdf(
     try {
       const imageRecord = await getVanPlanImageRecord(mainImage.id);
       const bytes = await readVanPlanImage(imageRecord.storagePath);
-      const embedded =
-        imageRecord.mimeType.includes("png")
-          ? await pdf.embedPng(bytes)
-          : await pdf.embedJpg(bytes);
+      const embedded = await embedAuctionImage(
+        pdf,
+        bytes,
+        imageRecord.mimeType,
+      );
       const maxHeight = 280;
       const scaled = embedded.scaleToFit(contentWidth, maxHeight);
       cursor -= scaled.height;
@@ -150,4 +152,51 @@ export async function buildVanPlanItemPdf(
   const buffer = await pdf.save();
 
   return { buffer, fileName };
+}
+
+async function embedAuctionImage(
+  pdf: PDFDocument,
+  bytes: Buffer,
+  mimeType: string,
+) {
+  const kind = detectImageKind(bytes, mimeType);
+
+  if (kind === "png") {
+    try {
+      return await pdf.embedPng(bytes);
+    } catch {
+      // Convert below.
+    }
+  }
+
+  if (kind === "jpg") {
+    try {
+      return await pdf.embedJpg(bytes);
+    } catch {
+      // Convert below.
+    }
+  }
+
+  const jpeg = await sharp(bytes).jpeg({ quality: 90 }).toBuffer();
+  return pdf.embedJpg(jpeg);
+}
+
+function detectImageKind(bytes: Buffer, mimeType: string) {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "jpg";
+  }
+
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47
+  ) {
+    return "png";
+  }
+
+  if (mimeType.includes("png")) return "png";
+  if (mimeType.includes("jpeg") || mimeType.includes("jpg")) return "jpg";
+  return "other";
 }
