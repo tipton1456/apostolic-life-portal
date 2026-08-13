@@ -2,7 +2,7 @@ import Link from "next/link";
 import { countVanPlanUsers, getCurrentVanPlanUser } from "@/lib/van-plan/auth";
 import { VAN_PLAN_BASE_PATH, VAN_PLAN_SUBTITLE, VAN_PLAN_TITLE } from "@/lib/van-plan/constants";
 import { listVanPlanItems, primaryItemImage } from "@/lib/van-plan/items";
-import { formatUsd, toProperCase } from "@/lib/van-plan/security";
+import { formatUsd, toProperCase } from "@/lib/van-plan/format";
 
 export default async function VanPlanCatalogPage() {
   const user = await getCurrentVanPlanUser();

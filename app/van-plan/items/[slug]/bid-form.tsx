@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import VanPlanActionMessage from "@/app/van-plan/components/action-message";
 import VanPlanFormButton from "@/app/van-plan/components/form-button";
 import { placeVanPlanBidAction } from "@/lib/van-plan/actions";
-import { formatUsd } from "@/lib/van-plan/security";
+import { formatUsd } from "@/lib/van-plan/format";
 import { idleVanPlanActionState } from "@/lib/van-plan/types";
 
 export default function VanPlanBidForm({

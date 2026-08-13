@@ -1,5 +1,4 @@
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
-import { headers } from "next/headers";
 import {
   VAN_PLAN_LOGIN_WINDOW_MINUTES,
   VAN_PLAN_MAX_FAILED_LOGINS,
@@ -61,25 +60,6 @@ export function safeEqual(left: string, right: string) {
   }
 
   return timingSafeEqual(leftBuffer, rightBuffer);
-}
-
-export function toProperCase(value: string) {
-  return value
-    .trim()
-    .split(/\s+/)
-    .map((word) => {
-      if (!word) return word;
-      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    })
-    .join(" ");
-}
-
-export async function getRequestIp() {
-  const requestHeaders = await headers();
-  const forwarded = requestHeaders.get("x-forwarded-for") ?? "";
-  const realIp = requestHeaders.get("x-real-ip") ?? "";
-
-  return forwarded.split(",")[0]?.trim() || realIp.trim() || "unknown";
 }
 
 export function sanitizeNextPathSafe(value: string) {
@@ -148,13 +128,6 @@ export function dollarsToCents(value: string) {
 
   const [dollars, cents = ""] = trimmed.split(".");
   return Number(dollars) * 100 + Number(cents.padEnd(2, "0"));
-}
-
-export function formatUsd(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(cents / 100);
 }
 
 export function slugifyItemName(name: string) {

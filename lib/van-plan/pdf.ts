@@ -5,7 +5,7 @@ import { VanPlanError } from "@/lib/van-plan/db";
 import { getVanPlanImageRecord, readVanPlanImage } from "@/lib/van-plan/images";
 import { getVanPlanItemBySlug, primaryItemImage } from "@/lib/van-plan/items";
 import { getPortalBaseUrl } from "@/lib/portal-url";
-import { toProperCase } from "@/lib/van-plan/security";
+import { toProperCase } from "@/lib/van-plan/format";
 import type { VanPlanUser } from "@/lib/van-plan/types";
 
 const PAGE_WIDTH = 612;

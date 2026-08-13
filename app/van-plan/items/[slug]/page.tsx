@@ -9,7 +9,7 @@ import {
 import { minimumNextBidCents } from "@/lib/van-plan/bids";
 import { VAN_PLAN_BASE_PATH, VAN_PLAN_TITLE } from "@/lib/van-plan/constants";
 import { getVanPlanItemBySlug, listItemBids } from "@/lib/van-plan/items";
-import { formatUsd, toProperCase } from "@/lib/van-plan/security";
+import { formatUsd, toProperCase } from "@/lib/van-plan/format";
 import { listItemInvoices } from "@/lib/van-plan/stripe";
 import VanPlanBidForm from "./bid-form";
 import VanPlanItemGallery from "./gallery";

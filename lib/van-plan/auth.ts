@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   VAN_PLAN_BASE_PATH,
@@ -9,7 +9,6 @@ import { VanPlanError, vanPlanDb } from "@/lib/van-plan/db";
 import {
   comparablePhone,
   createSessionToken,
-  getRequestIp,
   hashToken,
   isValidEmail,
   isValidPhone,
@@ -55,6 +54,14 @@ export function canViewAllBids(user: VanPlanUser | null) {
 
 export function canBid(user: VanPlanUser | null) {
   return Boolean(user);
+}
+
+async function getRequestIp() {
+  const requestHeaders = await headers();
+  const forwarded = requestHeaders.get("x-forwarded-for") ?? "";
+  const realIp = requestHeaders.get("x-real-ip") ?? "";
+
+  return forwarded.split(",")[0]?.trim() || realIp.trim() || "unknown";
 }
 
 export async function countVanPlanUsers() {

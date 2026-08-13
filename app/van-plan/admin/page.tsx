@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { canManageItems, getCurrentVanPlanUser } from "@/lib/van-plan/auth";
 import { VAN_PLAN_BASE_PATH } from "@/lib/van-plan/constants";
 import { listVanPlanItems, primaryItemImage } from "@/lib/van-plan/items";
-import { formatUsd } from "@/lib/van-plan/security";
+import { formatUsd } from "@/lib/van-plan/format";
 import { hasStripeConfig } from "@/lib/van-plan/stripe";
 
 export default async function VanPlanAdminPage() {
