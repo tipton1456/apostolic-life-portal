@@ -6,15 +6,13 @@ import {
   VAN_PLAN_SESSION_DAYS,
 } from "@/lib/van-plan/constants";
 import { VanPlanError, vanPlanDb } from "@/lib/van-plan/db";
+import { verifyPassword } from "@/lib/van-plan/passwords";
 import {
-  comparablePhone,
   createSessionToken,
   hashToken,
   isValidEmail,
-  isValidPhone,
   normalizeEmail,
   recordLoginAttempt,
-  safeEqual,
 } from "@/lib/van-plan/security";
 import type { VanPlanPermission, VanPlanUser } from "@/lib/van-plan/types";
 
@@ -25,6 +23,7 @@ type UserRow = {
   phone: string;
   phone_digits: string;
   permission: VanPlanPermission;
+  must_reset_password: boolean | null;
   created_at: string;
 };
 
@@ -36,6 +35,7 @@ export function mapVanPlanUser(row: UserRow): VanPlanUser {
     phone: row.phone,
     phoneDigits: row.phone_digits,
     permission: row.permission,
+    mustResetPassword: Boolean(row.must_reset_password),
     createdAt: row.created_at,
   };
 }
@@ -56,7 +56,7 @@ export function canBid(user: VanPlanUser | null) {
   return Boolean(user);
 }
 
-async function getRequestIp() {
+export async function getRequestIp() {
   const requestHeaders = await headers();
   const forwarded = requestHeaders.get("x-forwarded-for") ?? "";
   const realIp = requestHeaders.get("x-real-ip") ?? "";
@@ -93,7 +93,7 @@ export async function getCurrentVanPlanUser() {
   const { data, error } = await db
     .from("van_plan_sessions")
     .select(
-      "id, expires_at, van_plan_users (id, name, email, phone, phone_digits, permission, created_at)",
+      "id, expires_at, van_plan_users (id, name, email, phone, phone_digits, permission, must_reset_password, created_at)",
     )
     .eq("token_hash", tokenHash)
     .gt("expires_at", now)
@@ -176,6 +176,11 @@ export async function createVanPlanSession(userId: string) {
   });
 }
 
+export async function destroyAllVanPlanSessions(userId: string) {
+  const db = vanPlanDb();
+  await db.from("van_plan_sessions").delete().eq("user_id", userId);
+}
+
 export async function destroyVanPlanSession() {
   const cookieStore = await cookies();
   const token = cookieStore.get(VAN_PLAN_SESSION_COOKIE)?.value;
@@ -199,22 +204,21 @@ export async function destroyVanPlanSession() {
 
 export async function authenticateVanPlanUser({
   email,
-  phone,
+  password,
 }: {
   email: string;
-  phone: string;
+  password: string;
 }) {
   const normalizedEmail = normalizeEmail(email);
-  const phoneDigits = comparablePhone(phone);
   const ipAddress = await getRequestIp();
 
-  if (!isValidEmail(normalizedEmail) || !isValidPhone(phone)) {
+  if (!isValidEmail(normalizedEmail) || !password) {
     await recordLoginAttempt({
       email: normalizedEmail,
       ipAddress,
       success: false,
     });
-    throw new VanPlanError("Email or phone number is not recognized.");
+    throw new VanPlanError("Email or password is not recognized.");
   }
 
   const { assertLoginNotLocked } = await import("@/lib/van-plan/security");
@@ -223,21 +227,25 @@ export async function authenticateVanPlanUser({
   const db = vanPlanDb();
   const { data, error } = await db
     .from("van_plan_users")
-    .select("id, name, email, phone, phone_digits, permission, created_at")
+    .select(
+      "id, name, email, phone, phone_digits, permission, must_reset_password, created_at, password_hash",
+    )
     .eq("email", normalizedEmail)
-    .maybeSingle<UserRow>();
+    .maybeSingle<UserRow & { password_hash: string | null }>();
 
   if (error) {
     throw new VanPlanError("Unable to sign in right now.", 500);
   }
 
-  if (!data || !safeEqual(phoneDigits, data.phone_digits)) {
+  const passwordMatches = await verifyPassword(password, data?.password_hash);
+
+  if (!data || !passwordMatches) {
     await recordLoginAttempt({
       email: normalizedEmail,
       ipAddress,
       success: false,
     });
-    throw new VanPlanError("Email or phone number is not recognized.");
+    throw new VanPlanError("Email or password is not recognized.");
   }
 
   await recordLoginAttempt({

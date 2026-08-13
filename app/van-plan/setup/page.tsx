@@ -16,8 +16,8 @@ export default async function VanPlanSetupPage() {
       <h1 className="vp-heading mt-2 text-4xl">Create the admin</h1>
       <p className="vp-description mt-4 leading-7">
         This auction has its own sign-in. Create the first {VAN_PLAN_TITLE} admin
-        with a name, email, and phone number. That person can then add
-        auctioneers and bidders.
+        with a name, email, phone number, and a strong password. That person
+        can then add auctioneers and bidders.
       </p>
       <VanPlanSetupForm />
     </main>

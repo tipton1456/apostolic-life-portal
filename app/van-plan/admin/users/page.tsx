@@ -25,10 +25,10 @@ export default async function VanPlanUsersPage() {
       <p className="vp-subhead text-sm">auction desk</p>
       <h1 className="vp-heading mt-2 text-4xl">Add users</h1>
       <p className="vp-description mt-4 max-w-2xl leading-7">
-        Create auction accounts with a name, email, phone number, and
-        permission. People sign in with their email and phone number. Admins
-        can add users and items. Auctioneers can add items and update status.
-        Users can bid.
+        Create auction accounts with a name, email, phone number, password, and
+        permission. People sign in with their email and password. Admins can
+        add users and items. Auctioneers can add items and update status. Users
+        can bid.
       </p>
 
       <div className="vp-card mt-8 p-6">

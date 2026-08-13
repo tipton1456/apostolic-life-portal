@@ -3,12 +3,16 @@
 import { useActionState } from "react";
 import VanPlanActionMessage from "@/app/van-plan/components/action-message";
 import VanPlanFormButton from "@/app/van-plan/components/form-button";
-import { bootstrapVanPlanAdminAction } from "@/lib/van-plan/actions";
+import { changeVanPlanPasswordAction } from "@/lib/van-plan/actions";
 import { idleVanPlanActionState } from "@/lib/van-plan/types";
 
-export default function VanPlanSetupForm() {
+export default function VanPlanChangePasswordForm({
+  mustReset,
+}: {
+  mustReset: boolean;
+}) {
   const [state, formAction] = useActionState(
-    bootstrapVanPlanAdminAction,
+    changeVanPlanPasswordAction,
     idleVanPlanActionState,
   );
 
@@ -17,34 +21,18 @@ export default function VanPlanSetupForm() {
       <input type="hidden" name="version" value={state.version} />
 
       <label className="vp-subhead block text-sm">
-        name
-        <input name="name" required autoComplete="name" className="vp-input mt-2" />
-      </label>
-
-      <label className="vp-subhead block text-sm">
-        email
+        {mustReset ? "temporary password" : "current password"}
         <input
-          name="email"
-          type="email"
+          name="currentPassword"
+          type="password"
           required
-          autoComplete="email"
+          autoComplete="current-password"
           className="vp-input mt-2"
         />
       </label>
 
       <label className="vp-subhead block text-sm">
-        phone number
-        <input
-          name="phone"
-          type="tel"
-          required
-          autoComplete="tel"
-          className="vp-input mt-2"
-        />
-      </label>
-
-      <label className="vp-subhead block text-sm">
-        password
+        new password
         <input
           name="password"
           type="password"
@@ -56,7 +44,7 @@ export default function VanPlanSetupForm() {
       </label>
 
       <label className="vp-subhead block text-sm">
-        confirm password
+        confirm new password
         <input
           name="confirmPassword"
           type="password"
@@ -71,8 +59,8 @@ export default function VanPlanSetupForm() {
         special character
       </p>
 
-      <VanPlanFormButton pendingLabel="Creating admin...">
-        Create admin
+      <VanPlanFormButton pendingLabel="Saving...">
+        Update password
       </VanPlanFormButton>
       <VanPlanActionMessage state={state} />
     </form>

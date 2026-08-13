@@ -9,13 +9,16 @@ import {
 import {
   authenticateVanPlanUser,
   countVanPlanUsers,
+  createVanPlanSession,
+  destroyAllVanPlanSessions,
   destroyVanPlanSession,
   getCurrentVanPlanUser,
+  getRequestIp,
   requireItemManager,
   requireVanPlanAdmin,
 } from "@/lib/van-plan/auth";
 import { placeVanPlanBid } from "@/lib/van-plan/bids";
-import { VanPlanError, isVanPlanError, nextActionState } from "@/lib/van-plan/db";
+import { VanPlanError, isVanPlanError, nextActionState, vanPlanDb } from "@/lib/van-plan/db";
 import {
   addImagesToItem,
   createVanPlanItem,
@@ -24,11 +27,26 @@ import {
   setPrimaryItemImage,
   updateVanPlanItem,
 } from "@/lib/van-plan/items";
+import {
+  assertPasswordComplexity,
+  assertPasswordsMatch,
+  generateTemporaryPassword,
+  hashPassword,
+  verifyPassword,
+} from "@/lib/van-plan/passwords";
 import { markItemSoldAndInvoice, retryStripeInvoice } from "@/lib/van-plan/stripe";
-import { dollarsToCents, parsePermission, sanitizeNextPathSafe } from "@/lib/van-plan/security";
+import {
+  assertLoginNotLocked,
+  dollarsToCents,
+  normalizeEmail,
+  parsePermission,
+  recordLoginAttempt,
+  sanitizeNextPathSafe,
+} from "@/lib/van-plan/security";
 import type { VanPlanActionState } from "@/lib/van-plan/types";
 import { createVanPlanUser, updateVanPlanUserPermission } from "@/lib/van-plan/users";
-import { vanPlanDb } from "@/lib/van-plan/db";
+import { getPortalBaseUrl } from "@/lib/portal-url";
+import { appendSmsOptOut, getRecipientPhone, sendTwilioSms } from "@/lib/twilio-sms";
 
 function revalidateAuction(paths: string[] = []) {
   revalidatePath(VAN_PLAN_BASE_PATH);
@@ -59,10 +77,14 @@ export async function loginVanPlanUserAction(
   );
 
   try {
-    await authenticateVanPlanUser({
+    const user = await authenticateVanPlanUser({
       email: String(formData.get("email") ?? ""),
-      phone: String(formData.get("phone") ?? ""),
+      password: String(formData.get("password") ?? ""),
     });
+
+    if (user.mustResetPassword) {
+      redirect(`${VAN_PLAN_BASE_PATH}/change-password`);
+    }
   } catch (error) {
     return actionError(error, version);
   }
@@ -93,9 +115,10 @@ export async function bootstrapVanPlanAdminAction(
       email: String(formData.get("email") ?? ""),
       phone: String(formData.get("phone") ?? ""),
       permission: "admin",
+      password: String(formData.get("password") ?? ""),
+      confirmPassword: String(formData.get("confirmPassword") ?? ""),
     });
 
-    const { createVanPlanSession } = await import("@/lib/van-plan/auth");
     await createVanPlanSession(user.id);
   } catch (error) {
     return actionError(error, version);
@@ -117,6 +140,8 @@ export async function createVanPlanUserAction(
       email: String(formData.get("email") ?? ""),
       phone: String(formData.get("phone") ?? ""),
       permission: parsePermission(formData.get("permission")),
+      password: String(formData.get("password") ?? ""),
+      confirmPassword: String(formData.get("confirmPassword") ?? ""),
     });
     revalidateAuction([`${VAN_PLAN_BASE_PATH}/admin/users`]);
     return nextActionState("success", "User added.", version);
@@ -325,6 +350,10 @@ export async function placeVanPlanBidAction(
       throw new VanPlanError("Sign in to place a bid.");
     }
 
+    if (user.mustResetPassword) {
+      throw new VanPlanError("Change your temporary password before bidding.");
+    }
+
     await placeVanPlanBid({
       itemId,
       amountCents: dollarsToCents(String(formData.get("amount") ?? "")),
@@ -334,6 +363,155 @@ export async function placeVanPlanBidAction(
     const item = await getVanPlanItemById(itemId);
     revalidateAuction([`${VAN_PLAN_BASE_PATH}/items/${item.slug}`]);
     return nextActionState("success", "Bid placed.", version);
+  } catch (error) {
+    return actionError(error, version);
+  }
+}
+
+export async function changeVanPlanPasswordAction(
+  _prev: VanPlanActionState,
+  formData: FormData,
+): Promise<VanPlanActionState> {
+  const version = Number(formData.get("version") ?? 0);
+
+  try {
+    const user = await getCurrentVanPlanUser();
+
+    if (!user) {
+      throw new VanPlanError("Sign in to change your password.");
+    }
+
+    const currentPassword = String(formData.get("currentPassword") ?? "");
+    const password = String(formData.get("password") ?? "");
+    const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+    const db = vanPlanDb();
+    const { data, error } = await db
+      .from("van_plan_users")
+      .select("password_hash")
+      .eq("id", user.id)
+      .maybeSingle<{ password_hash: string | null }>();
+
+    if (error || !data) {
+      throw new VanPlanError("Unable to update that password.", 500);
+    }
+
+    const currentMatches = await verifyPassword(currentPassword, data.password_hash);
+
+    if (!currentMatches) {
+      throw new VanPlanError("Current password is not correct.");
+    }
+
+    assertPasswordsMatch(password, confirmPassword);
+    assertPasswordComplexity(password);
+
+    if (await verifyPassword(password, data.password_hash)) {
+      throw new VanPlanError("Choose a new password that is different from the current one.");
+    }
+
+    const { error: updateError } = await db
+      .from("van_plan_users")
+      .update({
+        password_hash: await hashPassword(password),
+        must_reset_password: false,
+      })
+      .eq("id", user.id);
+
+    if (updateError) {
+      throw new VanPlanError("Unable to update that password.", 500);
+    }
+
+    await destroyAllVanPlanSessions(user.id);
+    await createVanPlanSession(user.id);
+    revalidateAuction([`${VAN_PLAN_BASE_PATH}/change-password`]);
+    return nextActionState("success", "Password updated.", version);
+  } catch (error) {
+    return actionError(error, version);
+  }
+}
+
+export async function requestVanPlanPasswordResetAction(
+  _prev: VanPlanActionState,
+  formData: FormData,
+): Promise<VanPlanActionState> {
+  const version = Number(formData.get("version") ?? 0);
+  const genericMessage =
+    "If that account exists, a text message was sent with a temporary password.";
+
+  try {
+    const email = normalizeEmail(String(formData.get("email") ?? ""));
+
+    if (!email) {
+      return nextActionState("success", genericMessage, version);
+    }
+
+    await assertLoginNotLocked(`reset:${email}`);
+
+    const db = vanPlanDb();
+    const { data, error } = await db
+      .from("van_plan_users")
+      .select("id, email, phone")
+      .eq("email", email)
+      .maybeSingle<{ id: string; email: string; phone: string }>();
+
+    if (error) {
+      throw new VanPlanError("Unable to start a password reset right now.", 500);
+    }
+
+    const ipAddress = await getRequestIp();
+
+    if (!data) {
+      await recordLoginAttempt({
+        email: `reset:${email}`,
+        ipAddress,
+        success: false,
+      });
+      return nextActionState("success", genericMessage, version);
+    }
+
+    const recipient = getRecipientPhone(data.phone);
+
+    if (!recipient) {
+      throw new VanPlanError("That account does not have a valid phone number for text messages.");
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    const resetUrl = `${getPortalBaseUrl()}${VAN_PLAN_BASE_PATH}/change-password`;
+    const sent = await sendTwilioSms({
+      to: recipient.number,
+      body: appendSmsOptOut(
+        `The Great Van Plan: your temporary password is ${temporaryPassword}\n\nSign in, then set a new password: ${resetUrl}`,
+      ),
+    });
+
+    if (!sent.ok) {
+      throw new VanPlanError(
+        "Unable to send the reset text. Check Twilio and try again.",
+        500,
+      );
+    }
+
+    const { error: updateError } = await db
+      .from("van_plan_users")
+      .update({
+        password_hash: await hashPassword(temporaryPassword),
+        must_reset_password: true,
+      })
+      .eq("id", data.id);
+
+    if (updateError) {
+      throw new VanPlanError("Unable to reset that password.", 500);
+    }
+
+    await destroyAllVanPlanSessions(data.id);
+
+    await recordLoginAttempt({
+      email: `reset:${email}`,
+      ipAddress,
+      success: true,
+    });
+
+    return nextActionState("success", genericMessage, version);
   } catch (error) {
     return actionError(error, version);
   }

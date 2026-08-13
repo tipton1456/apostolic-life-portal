@@ -1,6 +1,11 @@
 import { mapVanPlanUser } from "@/lib/van-plan/auth";
 import { VanPlanError, vanPlanDb } from "@/lib/van-plan/db";
 import {
+  assertPasswordComplexity,
+  assertPasswordsMatch,
+  hashPassword,
+} from "@/lib/van-plan/passwords";
+import {
   comparablePhone,
   isValidEmail,
   isValidPhone,
@@ -15,11 +20,12 @@ type UserRow = {
   phone: string;
   phone_digits: string;
   permission: VanPlanPermission;
+  must_reset_password: boolean | null;
   created_at: string;
 };
 
 const USER_SELECT =
-  "id, name, email, phone, phone_digits, permission, created_at";
+  "id, name, email, phone, phone_digits, permission, must_reset_password, created_at";
 
 export async function listVanPlanUsers(): Promise<VanPlanUser[]> {
   const db = vanPlanDb();
@@ -41,11 +47,17 @@ export async function createVanPlanUser({
   email,
   phone,
   permission,
+  password,
+  confirmPassword,
+  mustResetPassword = false,
 }: {
   name: string;
   email: string;
   phone: string;
   permission: VanPlanPermission;
+  password: string;
+  confirmPassword: string;
+  mustResetPassword?: boolean;
 }) {
   const trimmedName = name.trim();
   const normalizedEmail = normalizeEmail(email);
@@ -64,6 +76,9 @@ export async function createVanPlanUser({
     throw new VanPlanError("Enter a valid 10-digit phone number.");
   }
 
+  assertPasswordsMatch(password, confirmPassword);
+  assertPasswordComplexity(password);
+
   const db = vanPlanDb();
   const { data, error } = await db
     .from("van_plan_users")
@@ -73,6 +88,8 @@ export async function createVanPlanUser({
       phone: trimmedPhone,
       phone_digits: phoneDigits,
       permission,
+      password_hash: await hashPassword(password),
+      must_reset_password: mustResetPassword,
     })
     .select(USER_SELECT)
     .single<UserRow>();

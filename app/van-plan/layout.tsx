@@ -3,6 +3,7 @@ import { getCurrentVanPlanUser } from "@/lib/van-plan/auth";
 import { VAN_PLAN_SUBTITLE, VAN_PLAN_TITLE } from "@/lib/van-plan/constants";
 import { hasAdminClientConfig } from "@/lib/supabase/admin";
 import VanPlanHeader from "./components/header";
+import VanPlanMustResetGate from "./components/must-reset-gate";
 import VanPlanNav from "./components/nav";
 import "./van-plan.css";
 
@@ -44,6 +45,7 @@ export default async function VanPlanLayout({
     <div className="van-plan">
       <VanPlanHeader />
       <VanPlanNav user={user} />
+      <VanPlanMustResetGate required={Boolean(user?.mustResetPassword)} />
       {children}
     </div>
   );

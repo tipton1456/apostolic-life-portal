@@ -29,8 +29,8 @@ export default async function VanPlanLoginPage({
       <p className="vp-subhead text-sm">welcome</p>
       <h1 className="vp-heading mt-2 text-4xl">Sign in</h1>
       <p className="vp-description mt-4 leading-7">
-        Use the name on file with your email and phone number to enter{" "}
-        {VAN_PLAN_TITLE}.
+        Sign in with the email on your auction account and your password to
+        enter {VAN_PLAN_TITLE}.
       </p>
       <VanPlanLoginForm nextPath={nextPath} />
       <p className="vp-accent mt-8 text-sm">

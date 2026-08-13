@@ -40,6 +40,12 @@ export default function VanPlanNav({ user }: { user: VanPlanUser | null }) {
           {user ? (
             <>
               <p className="vp-accent text-sm">{user.name}</p>
+              <Link
+                href={`${VAN_PLAN_BASE_PATH}/change-password`}
+                className="vp-subhead text-sm"
+              >
+                password
+              </Link>
               <form action={logoutVanPlanUserAction}>
                 <VanPlanFormButton pendingLabel="Signing out..." variant="ghost">
                   Sign out

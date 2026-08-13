@@ -55,6 +55,34 @@ export default function VanPlanUserForm() {
         </select>
       </label>
 
+      <label className="vp-subhead block text-sm">
+        password
+        <input
+          name="password"
+          type="password"
+          required
+          minLength={8}
+          autoComplete="new-password"
+          className="vp-input mt-2"
+        />
+      </label>
+
+      <label className="vp-subhead block text-sm">
+        confirm password
+        <input
+          name="confirmPassword"
+          type="password"
+          required
+          minLength={8}
+          autoComplete="new-password"
+          className="vp-input mt-2"
+        />
+      </label>
+      <p className="vp-accent text-sm md:col-span-2">
+        at least 8 characters, with one capital letter, one number, and one
+        special character
+      </p>
+
       <div className="md:col-span-2">
         <VanPlanFormButton pendingLabel="Adding...">Add user</VanPlanFormButton>
       </div>
