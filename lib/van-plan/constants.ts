@@ -2,6 +2,11 @@ export const VAN_PLAN_TITLE = "The Great Van Plan";
 export const VAN_PLAN_SUBTITLE = "Silent Auction";
 export const VAN_PLAN_PAYMENT_MEMO = "The Great Van Plan";
 export const VAN_PLAN_BASE_PATH = "/van-plan";
+/** Saturday, August 29, 2026, 9:00 a.m. America/Chicago (CDT). */
+export const VAN_PLAN_AUCTION_OPENS_AT = "2026-08-29T14:00:00.000Z";
+/** Saturday, August 29, 2026, 1:00 p.m. America/Chicago (CDT). */
+export const VAN_PLAN_AUCTION_CLOSES_AT = "2026-08-29T18:00:00.000Z";
+export const VAN_PLAN_AUCTION_TIME_ZONE = "America/Chicago";
 export const VAN_PLAN_SESSION_COOKIE = "van_plan_session";
 export const VAN_PLAN_SESSION_DAYS = 14;
 export const VAN_PLAN_MIN_BID_INCREMENT_CENTS = 100;

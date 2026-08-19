@@ -10,8 +10,9 @@ import { minimumNextBidCents } from "@/lib/van-plan/bids";
 import { VAN_PLAN_BASE_PATH, VAN_PLAN_TITLE } from "@/lib/van-plan/constants";
 import { getVanPlanItemBySlug, listItemBids } from "@/lib/van-plan/items";
 import { formatUsd, toProperCase } from "@/lib/van-plan/format";
+import { getVanPlanAuctionSchedule } from "@/lib/van-plan/schedule";
 import { listItemInvoices } from "@/lib/van-plan/stripe";
-import VanPlanBidForm from "./bid-form";
+import VanPlanBiddingPanel from "./bidding-panel";
 import VanPlanItemGallery from "./gallery";
 import VanPlanInvoiceRetryForm from "./invoice-retry-form";
 import VanPlanStatusForm from "./status-form";
@@ -54,6 +55,8 @@ export default async function VanPlanItemPage({
   const invoices = staff ? await listItemInvoices(item.id) : [];
   const currentHigh = item.highestBid?.amountCents ?? item.startingPriceCents;
   const nextBid = minimumNextBidCents(item);
+  const schedule = getVanPlanAuctionSchedule();
+  const showingStartingPrice = !item.highestBid || schedule.phase === "preview";
   const loginHref = `${VAN_PLAN_BASE_PATH}/login?next=${encodeURIComponent(
     `${VAN_PLAN_BASE_PATH}/items/${item.slug}`,
   )}`;
@@ -74,30 +77,27 @@ export default async function VanPlanItemPage({
           </p>
 
           <div className="vp-card mt-8 p-6">
-            <p className="vp-subhead text-sm">current high bid</p>
+            <p className="vp-subhead text-sm">
+              {showingStartingPrice ? "starting bid" : "current high bid"}
+            </p>
             <p className="vp-heading-bold mt-2 text-4xl">{formatUsd(currentHigh)}</p>
             <p className="vp-description mt-2 text-sm">
               Starting price {formatUsd(item.startingPriceCents)}
-              {item.highestBid ? ` · ${item.bidCount} bid${item.bidCount === 1 ? "" : "s"}` : ""}
+              {item.highestBid && schedule.phase !== "preview"
+                ? ` · ${item.bidCount} bid${item.bidCount === 1 ? "" : "s"}`
+                : ""}
             </p>
 
-            {item.status === "open" && user ? (
-              <VanPlanBidForm itemId={item.id} minimumCents={nextBid} />
-            ) : null}
-
-            {item.status === "open" && !user ? (
-              <p className="mt-5">
-                <Link href={loginHref} className="vp-button">
-                  Sign in to bid
-                </Link>
-              </p>
-            ) : null}
-
-            {item.status !== "open" ? (
-              <p className="vp-accent mt-5 text-sm">
-                bidding is {item.status === "sold" ? "closed, this item is sold" : `currently ${item.status}`}
-              </p>
-            ) : null}
+            <VanPlanBiddingPanel
+              itemId={item.id}
+              itemStatus={item.status}
+              minimumCents={nextBid}
+              signedIn={Boolean(user)}
+              loginHref={loginHref}
+              opensAt={schedule.opensAt}
+              closesAt={schedule.closesAt}
+              serverNow={schedule.now}
+            />
           </div>
 
           <div className="mt-6">

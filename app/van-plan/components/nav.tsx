@@ -2,10 +2,14 @@ import Link from "next/link";
 import { logoutVanPlanUserAction } from "@/lib/van-plan/actions";
 import { canManageItems, canManageUsers } from "@/lib/van-plan/auth";
 import { VAN_PLAN_BASE_PATH } from "@/lib/van-plan/constants";
+import { getVanPlanAuctionSchedule } from "@/lib/van-plan/schedule";
 import type { VanPlanUser } from "@/lib/van-plan/types";
+import VanPlanCountdown from "./countdown";
 import VanPlanFormButton from "./form-button";
 
 export default function VanPlanNav({ user }: { user: VanPlanUser | null }) {
+  const schedule = getVanPlanAuctionSchedule();
+
   return (
     <nav className="border-b border-[rgba(70,67,60,0.14)] bg-[#F9EDE4]">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
@@ -36,7 +40,12 @@ export default function VanPlanNav({ user }: { user: VanPlanUser | null }) {
           ) : null}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+          <VanPlanCountdown
+            opensAt={schedule.opensAt}
+            closesAt={schedule.closesAt}
+            serverNow={schedule.now}
+          />
           {user ? (
             <>
               <p className="vp-accent text-sm">{user.name}</p>

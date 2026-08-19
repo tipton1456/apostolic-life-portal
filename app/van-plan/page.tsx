@@ -3,28 +3,34 @@ import { countVanPlanUsers, getCurrentVanPlanUser } from "@/lib/van-plan/auth";
 import { VAN_PLAN_BASE_PATH, VAN_PLAN_SUBTITLE, VAN_PLAN_TITLE } from "@/lib/van-plan/constants";
 import { listVanPlanItems, primaryItemImage } from "@/lib/van-plan/items";
 import { formatUsd, toProperCase } from "@/lib/van-plan/format";
+import { formatAuctionClock, getVanPlanAuctionSchedule } from "@/lib/van-plan/schedule";
 
 export default async function VanPlanCatalogPage() {
   const user = await getCurrentVanPlanUser().catch(() => null);
+  const schedule = getVanPlanAuctionSchedule();
   const [userCount, items] = await Promise.all([
     countVanPlanUsers().catch(() => -1),
     listVanPlanItems(user).catch(() => []),
   ]);
+  const intro =
+    schedule.phase === "preview"
+      ? `Browse the silent auction items and set up your account. Official bidding opens ${formatAuctionClock(schedule.opensAt)} and closes ${formatAuctionClock(schedule.closesAt)}. You can look around without signing in.`
+      : schedule.phase === "live"
+        ? `Browse the silent auction items and place your bid. Bidding closes ${formatAuctionClock(schedule.closesAt)}. Each listing has its own page, current high bid, and a printable flyer with a QR code.`
+        : `Bidding closed ${formatAuctionClock(schedule.closesAt)}. You can still browse the items and print flyers.`;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
       <p className="vp-subhead text-xs sm:text-sm">{VAN_PLAN_SUBTITLE}</p>
       <h1 className="vp-heading mt-2 text-3xl sm:text-4xl md:text-5xl">{VAN_PLAN_TITLE}</h1>
       <p className="vp-description mt-3 hidden max-w-2xl text-lg leading-7 sm:mt-4 sm:block">
-        Browse the silent auction items and place your bid. Each listing has its
-        own page, current high bid, and a printable flyer with a QR code.
-        You can look around without signing in.
+        {intro}
       </p>
 
-      {!user ? (
+      {!user && schedule.phase !== "closed" ? (
         <p className="mt-6">
           <Link href={`${VAN_PLAN_BASE_PATH}/register`} className="vp-button">
-            Create an account to bid
+            {schedule.phase === "preview" ? "Create an account" : "Create an account to bid"}
           </Link>
         </p>
       ) : null}
@@ -86,7 +92,13 @@ export default async function VanPlanCatalogPage() {
                   )}
                 </div>
                 <div className="p-2.5 sm:p-5">
-                  <p className="vp-accent text-[10px] sm:text-xs">{item.status}</p>
+                  <p className="vp-accent text-[10px] sm:text-xs">
+                    {schedule.phase === "preview" && item.status === "open"
+                      ? "opens aug 29"
+                      : schedule.phase === "closed" && item.status === "open"
+                        ? "closed"
+                        : item.status}
+                  </p>
                   <h2 className="vp-heading-bold mt-1 line-clamp-2 text-[13px] leading-4 sm:mt-2 sm:text-xl sm:leading-7">
                     {item.name}
                   </h2>

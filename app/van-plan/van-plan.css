@@ -110,3 +110,33 @@
   color: var(--vp-accent);
   padding-inline: 0.4rem;
 }
+
+.vp-countdown {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.7rem;
+  color: var(--vp-accent);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.vp-countdown-label {
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  font-size: 0.75rem;
+}
+
+.vp-countdown-units {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  font-size: 0.85rem;
+}
+
+.vp-countdown-units strong {
+  font-weight: 700;
+  color: var(--vp-ink);
+}
