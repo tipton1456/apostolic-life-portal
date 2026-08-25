@@ -12,6 +12,7 @@ export default function VanPlanBiddingPanel({
   itemStatus,
   minimumCents,
   signedIn,
+  allowPreviewBidding = false,
   loginHref,
   opensAt,
   closesAt,
@@ -21,6 +22,7 @@ export default function VanPlanBiddingPanel({
   itemStatus: VanPlanItemStatus;
   minimumCents: number;
   signedIn: boolean;
+  allowPreviewBidding?: boolean;
   loginHref: string;
   opensAt: string;
   closesAt: string;
@@ -36,7 +38,7 @@ export default function VanPlanBiddingPanel({
     );
   }
 
-  if (phase === "preview") {
+  if (phase === "preview" && !(allowPreviewBidding && signedIn)) {
     return (
       <div className="mt-5 space-y-3">
         <p className="vp-accent text-sm">
@@ -75,5 +77,15 @@ export default function VanPlanBiddingPanel({
     );
   }
 
-  return <VanPlanBidForm itemId={itemId} minimumCents={minimumCents} />;
+  return (
+    <div className="mt-5">
+      {phase === "preview" ? (
+        <p className="vp-accent mb-3 text-sm">
+          public bidding still opens {formatAuctionClock(opensAt).toLowerCase()}.
+          admins can place a bid now.
+        </p>
+      ) : null}
+      <VanPlanBidForm itemId={itemId} minimumCents={minimumCents} />
+    </div>
+  );
 }

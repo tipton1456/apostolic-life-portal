@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import VanPlanDeleteItemForm from "@/app/van-plan/components/delete-item-form";
+import VanPlanDuplicateItemForm from "@/app/van-plan/components/duplicate-item-form";
 import { canManageItems, getCurrentVanPlanUser } from "@/lib/van-plan/auth";
 import { VAN_PLAN_BASE_PATH } from "@/lib/van-plan/constants";
 import { listVanPlanItems, primaryItemImage } from "@/lib/van-plan/items";
 import { formatUsd } from "@/lib/van-plan/format";
-import { hasStripeConfig } from "@/lib/van-plan/stripe";
+import { hasStripeConfig, hasStripeWebhookConfig } from "@/lib/van-plan/stripe";
 
 export default async function VanPlanAdminPage() {
   const user = await getCurrentVanPlanUser();
@@ -25,9 +26,11 @@ export default async function VanPlanAdminPage() {
       <p className="vp-subhead text-sm">auction desk</p>
       <h1 className="vp-heading mt-2 text-4xl">Manage items</h1>
       <p className="vp-description mt-4 max-w-2xl leading-7">
-        Add, edit, or delete items, update their status, and print QR flyers.
-        Marking an item sold sends a Stripe invoice to the highest bidder with
-        a memo of &quot;The Great Van Plan&quot;.
+        Add, edit, duplicate, or delete items, update their status, and print QR
+        flyers. Duplicate copies the description, photos, and starting price so
+        you can list more than one of the same item. Marking an item sold sends
+        a Stripe invoice to the highest bidder with a memo of &quot;The Great Van
+        Plan&quot;.
       </p>
 
       {!hasStripeConfig() ? (
@@ -35,7 +38,20 @@ export default async function VanPlanAdminPage() {
           Stripe is not configured yet. Add <code>STRIPE_SECRET_KEY</code> so
           sold items can send invoices.
         </p>
-      ) : null}
+      ) : (
+        <p className="vp-card mt-6 p-4 text-sm">
+          Stripe invoices are enabled. Marking an item sold emails a 14-day
+          invoice to the highest bidder with a memo of &quot;The Great Van
+          Plan&quot;.
+          {!hasStripeWebhookConfig() ? (
+            <>
+              {" "}
+              Add <code>STRIPE_WEBHOOK_SECRET</code> so paid invoices update
+              here automatically.
+            </>
+          ) : null}
+        </p>
+      )}
 
       <div className="mt-8 flex flex-wrap gap-3">
         <Link href={`${VAN_PLAN_BASE_PATH}/admin/items/new`} className="vp-button">
@@ -52,7 +68,7 @@ export default async function VanPlanAdminPage() {
       </div>
 
       <section className="mt-10 overflow-x-auto">
-        <table className="w-full min-w-[48rem] text-left">
+        <table className="w-full min-w-[54rem] text-left">
           <thead>
             <tr className="vp-subhead text-sm">
               <th className="pb-3 font-normal">item</th>
@@ -118,11 +134,15 @@ export default async function VanPlanAdminPage() {
                       >
                         pdf
                       </Link>
+                      <VanPlanDuplicateItemForm
+                        itemId={item.id}
+                        itemName={item.name}
+                      />
                       <VanPlanDeleteItemForm
                         itemId={item.id}
                         itemName={item.name}
                         bidCount={item.bidCount}
-                        variant="ghost"
+                        variant="link"
                         label="delete"
                       />
                     </div>

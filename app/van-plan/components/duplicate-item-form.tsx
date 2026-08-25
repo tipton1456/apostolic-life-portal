@@ -3,24 +3,18 @@
 import { useActionState } from "react";
 import VanPlanActionMessage from "@/app/van-plan/components/action-message";
 import VanPlanFormButton from "@/app/van-plan/components/form-button";
-import { deleteVanPlanItemAction } from "@/lib/van-plan/actions";
+import { duplicateVanPlanItemAction } from "@/lib/van-plan/actions";
 import { idleVanPlanActionState } from "@/lib/van-plan/types";
 
-export default function VanPlanDeleteItemForm({
+export default function VanPlanDuplicateItemForm({
   itemId,
   itemName,
-  bidCount = 0,
-  variant = "danger",
-  label = "Delete item",
 }: {
   itemId: string;
   itemName: string;
-  bidCount?: number;
-  variant?: "primary" | "secondary" | "ghost" | "danger" | "link";
-  label?: string;
 }) {
   const [state, formAction] = useActionState(
-    deleteVanPlanItemAction,
+    duplicateVanPlanItemAction,
     idleVanPlanActionState,
   );
 
@@ -29,14 +23,9 @@ export default function VanPlanDeleteItemForm({
       action={formAction}
       className="inline-flex flex-col items-start gap-2"
       onSubmit={(event) => {
-        const extra =
-          bidCount > 0
-            ? ` This will also remove ${bidCount} bid${bidCount === 1 ? "" : "s"}.`
-            : "";
-
         if (
           !window.confirm(
-            `Delete “${itemName}”?${extra} This cannot be undone.`,
+            `Duplicate “${itemName}”? A new listing will be created with the same description, photos, and starting price.`,
           )
         ) {
           event.preventDefault();
@@ -45,8 +34,8 @@ export default function VanPlanDeleteItemForm({
     >
       <input type="hidden" name="itemId" value={itemId} />
       <input type="hidden" name="version" value={state.version} />
-      <VanPlanFormButton pendingLabel="Deleting..." variant={variant}>
-        {label}
+      <VanPlanFormButton pendingLabel="Duplicating..." variant="link">
+        duplicate
       </VanPlanFormButton>
       <VanPlanActionMessage state={state} />
     </form>

@@ -87,25 +87,26 @@ export function sanitizeImageFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80) || "image";
 }
 
-export async function storeVanPlanImage({
+async function writeVanPlanImageContents({
   itemId,
-  file,
+  fileName,
+  mimeType,
+  contents,
 }: {
   itemId: string;
-  file: File;
+  fileName: string;
+  mimeType: string;
+  contents: Buffer;
 }) {
-  assertVanPlanImageFile(file);
-
-  const safeName = sanitizeImageFileName(file.name);
+  const safeName = sanitizeImageFileName(fileName);
   const relativePath = `${itemId}/${Date.now()}-${randomUUID()}-${safeName}`;
-  const contents = Buffer.from(await file.arrayBuffer());
   const db = vanPlanDb();
 
   const { error } = await db.storage.from(VAN_PLAN_IMAGES_BUCKET).upload(
     relativePath,
     contents,
     {
-      contentType: file.type,
+      contentType: mimeType,
       upsert: false,
     },
   );
@@ -123,9 +124,47 @@ export async function storeVanPlanImage({
 
   return {
     relativePath,
+    fileName,
+    mimeType,
+  };
+}
+
+export async function storeVanPlanImage({
+  itemId,
+  file,
+}: {
+  itemId: string;
+  file: File;
+}) {
+  assertVanPlanImageFile(file);
+
+  return writeVanPlanImageContents({
+    itemId,
     fileName: file.name,
     mimeType: file.type,
-  };
+    contents: Buffer.from(await file.arrayBuffer()),
+  });
+}
+
+export async function copyVanPlanImageFile({
+  sourcePath,
+  itemId,
+  fileName,
+  mimeType,
+}: {
+  sourcePath: string;
+  itemId: string;
+  fileName: string;
+  mimeType: string;
+}) {
+  const contents = await readVanPlanImage(sourcePath);
+
+  return writeVanPlanImageContents({
+    itemId,
+    fileName,
+    mimeType,
+    contents,
+  });
 }
 
 export async function readVanPlanImage(relativePath: string) {

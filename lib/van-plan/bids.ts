@@ -3,7 +3,12 @@ import { VanPlanError, vanPlanDb } from "@/lib/van-plan/db";
 import { formatUsd } from "@/lib/van-plan/format";
 import { getVanPlanItemById, listItemBids } from "@/lib/van-plan/items";
 import { getPortalBaseUrl } from "@/lib/portal-url";
-import { auctionBiddingClosedMessage, isAuctionBiddingOpen } from "@/lib/van-plan/schedule";
+import { canBidDuringPreview } from "@/lib/van-plan/auth";
+import {
+  auctionBiddingClosedMessage,
+  getVanPlanAuctionSchedule,
+  isAuctionBiddingOpen,
+} from "@/lib/van-plan/schedule";
 import { appendSmsOptOut, getRecipientPhone, sendTwilioSms } from "@/lib/twilio-sms";
 import type { VanPlanItem, VanPlanUser } from "@/lib/van-plan/types";
 
@@ -30,7 +35,11 @@ export async function placeVanPlanBid({
   const item = await getVanPlanItemById(itemId);
 
   if (!isAuctionBiddingOpen()) {
-    throw new VanPlanError(auctionBiddingClosedMessage());
+    const schedule = getVanPlanAuctionSchedule();
+
+    if (schedule.phase !== "preview" || !canBidDuringPreview(bidder)) {
+      throw new VanPlanError(auctionBiddingClosedMessage());
+    }
   }
 
   if (item.status !== "open") {

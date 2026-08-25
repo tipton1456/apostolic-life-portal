@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  canBidDuringPreview,
   canManageItems,
   canViewAllBids,
   getCurrentVanPlanUser,
@@ -11,7 +12,7 @@ import { VAN_PLAN_BASE_PATH, VAN_PLAN_TITLE } from "@/lib/van-plan/constants";
 import { getVanPlanItemBySlug, listItemBids } from "@/lib/van-plan/items";
 import { formatUsd, toProperCase } from "@/lib/van-plan/format";
 import { getVanPlanAuctionSchedule } from "@/lib/van-plan/schedule";
-import { listItemInvoices } from "@/lib/van-plan/stripe";
+import { canRetryVanPlanInvoice, listItemInvoices } from "@/lib/van-plan/stripe";
 import VanPlanDeleteItemForm from "@/app/van-plan/components/delete-item-form";
 import VanPlanBiddingPanel from "./bidding-panel";
 import VanPlanItemGallery from "./gallery";
@@ -51,13 +52,15 @@ export default async function VanPlanItemPage({
   }
 
   const staff = canManageItems(user);
+  const allowPreviewBidding = canBidDuringPreview(user);
   const showBidHistory = canViewAllBids(user);
   const bids = showBidHistory ? await listItemBids(item.id) : [];
   const invoices = staff ? await listItemInvoices(item.id) : [];
   const currentHigh = item.highestBid?.amountCents ?? item.startingPriceCents;
   const nextBid = minimumNextBidCents(item);
   const schedule = getVanPlanAuctionSchedule();
-  const showingStartingPrice = !item.highestBid || schedule.phase === "preview";
+  const showingStartingPrice =
+    !item.highestBid || (schedule.phase === "preview" && !allowPreviewBidding);
   const loginHref = `${VAN_PLAN_BASE_PATH}/login?next=${encodeURIComponent(
     `${VAN_PLAN_BASE_PATH}/items/${item.slug}`,
   )}`;
@@ -84,7 +87,7 @@ export default async function VanPlanItemPage({
             <p className="vp-heading-bold mt-2 text-4xl">{formatUsd(currentHigh)}</p>
             <p className="vp-description mt-2 text-sm">
               Starting price {formatUsd(item.startingPriceCents)}
-              {item.highestBid && schedule.phase !== "preview"
+              {item.highestBid && (schedule.phase !== "preview" || allowPreviewBidding)
                 ? ` · ${item.bidCount} bid${item.bidCount === 1 ? "" : "s"}`
                 : ""}
             </p>
@@ -94,6 +97,7 @@ export default async function VanPlanItemPage({
               itemStatus={item.status}
               minimumCents={nextBid}
               signedIn={Boolean(user)}
+              allowPreviewBidding={allowPreviewBidding}
               loginHref={loginHref}
               opensAt={schedule.opensAt}
               closesAt={schedule.closesAt}
@@ -152,7 +156,7 @@ export default async function VanPlanItemPage({
                   {invoice.errorMessage ? (
                     <p className="mt-2 text-sm text-red-800">{invoice.errorMessage}</p>
                   ) : null}
-                  {invoice.status !== "sent" ? (
+                  {canRetryVanPlanInvoice(invoice) ? (
                     <VanPlanInvoiceRetryForm invoiceId={invoice.id} />
                   ) : null}
                 </div>

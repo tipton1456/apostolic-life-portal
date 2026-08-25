@@ -66,6 +66,10 @@ export function canBid(user: VanPlanUser | null) {
   return Boolean(user);
 }
 
+export function canBidDuringPreview(user: VanPlanUser | null) {
+  return user?.permission === "admin";
+}
+
 export async function getRequestIp() {
   const requestHeaders = await headers();
   const forwarded = requestHeaders.get("x-forwarded-for") ?? "";

@@ -11,7 +11,7 @@ export default function VanPlanFormButton({
 }: {
   children: ReactNode;
   pendingLabel: string;
-  variant?: "primary" | "secondary" | "ghost" | "danger";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "link";
   className?: string;
 }) {
   const { pending } = useFormStatus();
@@ -22,7 +22,9 @@ export default function VanPlanFormButton({
         ? "vp-button vp-button-ghost"
         : variant === "danger"
           ? "vp-button vp-button-danger"
-          : "vp-button";
+          : variant === "link"
+            ? "vp-subhead cursor-pointer border-0 bg-transparent p-0 text-sm disabled:cursor-wait disabled:opacity-60"
+            : "vp-button";
 
   return (
     <button

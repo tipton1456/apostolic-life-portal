@@ -5,7 +5,13 @@ import type {
 
 export type VanPlanPermission = (typeof VAN_PLAN_PERMISSIONS)[number];
 export type VanPlanItemStatus = (typeof VAN_PLAN_ITEM_STATUSES)[number];
-export type VanPlanInvoiceStatus = "pending" | "sent" | "failed";
+export type VanPlanInvoiceStatus =
+  | "pending"
+  | "sent"
+  | "failed"
+  | "paid"
+  | "voided"
+  | "uncollectible";
 
 export type VanPlanUser = {
   id: string;

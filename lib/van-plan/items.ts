@@ -1,6 +1,7 @@
 import { VAN_PLAN_ITEM_STATUSES, VAN_PLAN_MAX_IMAGES_PER_ITEM } from "@/lib/van-plan/constants";
 import { VanPlanError, vanPlanDb } from "@/lib/van-plan/db";
 import {
+  copyVanPlanImageFile,
   deleteVanPlanImageFile,
   mapItemImage,
   storeVanPlanImage,
@@ -466,6 +467,59 @@ export async function deleteVanPlanItem(itemId: string) {
   }
 
   return item;
+}
+
+export async function duplicateVanPlanItem({
+  itemId,
+  createdBy,
+}: {
+  itemId: string;
+  createdBy: string;
+}) {
+  const source = await getVanPlanItemById(itemId);
+  const copiedStatus =
+    source.status === "sold" || source.status === "closed" ? "draft" : source.status;
+
+  const copy = await createVanPlanItem({
+    name: source.name,
+    description: source.description,
+    startingPriceCents: source.startingPriceCents,
+    status: copiedStatus,
+    createdBy,
+    images: [],
+  });
+
+  try {
+    const images = [...source.images].sort((left, right) => left.sortOrder - right.sortOrder);
+    const db = vanPlanDb();
+
+    for (const image of images) {
+      const stored = await copyVanPlanImageFile({
+        sourcePath: image.storagePath,
+        itemId: copy.id,
+        fileName: image.fileName,
+        mimeType: image.mimeType,
+      });
+      const { error } = await db.from("van_plan_item_images").insert({
+        item_id: copy.id,
+        storage_path: stored.relativePath,
+        file_name: stored.fileName,
+        mime_type: stored.mimeType,
+        is_primary: image.isPrimary,
+        sort_order: image.sortOrder,
+      });
+
+      if (error) {
+        console.error("Van Plan duplicated image insert failed:", error);
+        throw new VanPlanError("Unable to copy one of the photos.", 500);
+      }
+    }
+  } catch (error) {
+    await deleteVanPlanItem(copy.id);
+    throw error;
+  }
+
+  return getVanPlanItemById(copy.id);
 }
 
 async function hydrateItems(items: ItemRow[]): Promise<VanPlanItem[]> {

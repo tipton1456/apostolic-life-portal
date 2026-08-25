@@ -25,6 +25,7 @@ import {
   createVanPlanItem,
   deleteVanPlanItem,
   deleteVanPlanItemImage,
+  duplicateVanPlanItem,
   getVanPlanItemById,
   parseItemStatus,
   setPrimaryItemImage,
@@ -282,6 +283,30 @@ export async function deleteVanPlanItemAction(
       `${VAN_PLAN_BASE_PATH}/admin`,
       `${VAN_PLAN_BASE_PATH}/admin/items/${item.id}`,
       `${VAN_PLAN_BASE_PATH}/items/${item.slug}`,
+    ]);
+  } catch (error) {
+    return actionError(error, version);
+  }
+
+  redirect(`${VAN_PLAN_BASE_PATH}/admin`);
+}
+
+export async function duplicateVanPlanItemAction(
+  _prev: VanPlanActionState,
+  formData: FormData,
+): Promise<VanPlanActionState> {
+  const version = Number(formData.get("version") ?? 0);
+
+  try {
+    const user = await requireItemManager(`${VAN_PLAN_BASE_PATH}/admin`);
+    const copy = await duplicateVanPlanItem({
+      itemId: String(formData.get("itemId") ?? ""),
+      createdBy: user.id,
+    });
+    revalidateAuction([
+      `${VAN_PLAN_BASE_PATH}/admin`,
+      `${VAN_PLAN_BASE_PATH}/admin/items/${copy.id}`,
+      `${VAN_PLAN_BASE_PATH}/items/${copy.slug}`,
     ]);
   } catch (error) {
     return actionError(error, version);
