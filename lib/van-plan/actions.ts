@@ -23,6 +23,8 @@ import { VanPlanError, isVanPlanError, nextActionState, vanPlanDb } from "@/lib/
 import {
   addImagesToItem,
   createVanPlanItem,
+  deleteVanPlanItem,
+  deleteVanPlanItemImage,
   getVanPlanItemById,
   parseItemStatus,
   setPrimaryItemImage,
@@ -252,6 +254,40 @@ export async function setPrimaryItemImageAction(formData: FormData) {
     `${VAN_PLAN_BASE_PATH}/admin/items/${item.id}`,
     `${VAN_PLAN_BASE_PATH}/items/${item.slug}`,
   ]);
+}
+
+export async function deleteVanPlanItemImageAction(formData: FormData) {
+  await requireItemManager(`${VAN_PLAN_BASE_PATH}/admin`);
+  const itemId = String(formData.get("itemId") ?? "");
+  const imageId = String(formData.get("imageId") ?? "");
+  await deleteVanPlanItemImage({ itemId, imageId });
+  const item = await getVanPlanItemById(itemId);
+  revalidateAuction([
+    `${VAN_PLAN_BASE_PATH}/admin`,
+    `${VAN_PLAN_BASE_PATH}/admin/items/${item.id}`,
+    `${VAN_PLAN_BASE_PATH}/items/${item.slug}`,
+  ]);
+}
+
+export async function deleteVanPlanItemAction(
+  _prev: VanPlanActionState,
+  formData: FormData,
+): Promise<VanPlanActionState> {
+  const version = Number(formData.get("version") ?? 0);
+
+  try {
+    await requireItemManager(`${VAN_PLAN_BASE_PATH}/admin`);
+    const item = await deleteVanPlanItem(String(formData.get("itemId") ?? ""));
+    revalidateAuction([
+      `${VAN_PLAN_BASE_PATH}/admin`,
+      `${VAN_PLAN_BASE_PATH}/admin/items/${item.id}`,
+      `${VAN_PLAN_BASE_PATH}/items/${item.slug}`,
+    ]);
+  } catch (error) {
+    return actionError(error, version);
+  }
+
+  redirect(`${VAN_PLAN_BASE_PATH}/admin`);
 }
 
 export async function updateVanPlanItemStatusAction(

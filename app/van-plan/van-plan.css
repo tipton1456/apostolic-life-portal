@@ -111,6 +111,12 @@
   padding-inline: 0.4rem;
 }
 
+.vp-button-danger {
+  background: transparent;
+  border: 1px solid #9b1c1c;
+  color: #9b1c1c;
+}
+
 .vp-countdown {
   display: flex;
   flex-wrap: wrap;

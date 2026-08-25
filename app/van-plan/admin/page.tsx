@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import VanPlanDeleteItemForm from "@/app/van-plan/components/delete-item-form";
 import { canManageItems, getCurrentVanPlanUser } from "@/lib/van-plan/auth";
 import { VAN_PLAN_BASE_PATH } from "@/lib/van-plan/constants";
 import { listVanPlanItems, primaryItemImage } from "@/lib/van-plan/items";
@@ -24,9 +25,9 @@ export default async function VanPlanAdminPage() {
       <p className="vp-subhead text-sm">auction desk</p>
       <h1 className="vp-heading mt-2 text-4xl">Manage items</h1>
       <p className="vp-description mt-4 max-w-2xl leading-7">
-        Add items, update their status, and print QR flyers. Marking an item
-        sold sends a Stripe invoice to the highest bidder with a memo of
-        &quot;The Great Van Plan&quot;.
+        Add, edit, or delete items, update their status, and print QR flyers.
+        Marking an item sold sends a Stripe invoice to the highest bidder with
+        a memo of &quot;The Great Van Plan&quot;.
       </p>
 
       {!hasStripeConfig() ? (
@@ -63,6 +64,13 @@ export default async function VanPlanAdminPage() {
             </tr>
           </thead>
           <tbody>
+            {items.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="vp-description py-8">
+                  No auction items yet.
+                </td>
+              </tr>
+            ) : null}
             {items.map((item) => {
               const image = primaryItemImage(item);
 
@@ -110,6 +118,13 @@ export default async function VanPlanAdminPage() {
                       >
                         pdf
                       </Link>
+                      <VanPlanDeleteItemForm
+                        itemId={item.id}
+                        itemName={item.name}
+                        bidCount={item.bidCount}
+                        variant="ghost"
+                        label="delete"
+                      />
                     </div>
                   </td>
                 </tr>

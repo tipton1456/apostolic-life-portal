@@ -1,6 +1,10 @@
 import { VAN_PLAN_ITEM_STATUSES, VAN_PLAN_MAX_IMAGES_PER_ITEM } from "@/lib/van-plan/constants";
 import { VanPlanError, vanPlanDb } from "@/lib/van-plan/db";
-import { mapItemImage, storeVanPlanImage } from "@/lib/van-plan/images";
+import {
+  deleteVanPlanImageFile,
+  mapItemImage,
+  storeVanPlanImage,
+} from "@/lib/van-plan/images";
 import { slugifyItemName } from "@/lib/van-plan/security";
 import type {
   VanPlanBid,
@@ -383,6 +387,85 @@ export async function setPrimaryItemImage(itemId: string, imageId: string) {
   if (error) {
     throw new VanPlanError("Unable to update the main picture.", 500);
   }
+}
+
+export async function deleteVanPlanItemImage({
+  itemId,
+  imageId,
+}: {
+  itemId: string;
+  imageId: string;
+}) {
+  const db = vanPlanDb();
+  const { data, error } = await db
+    .from("van_plan_item_images")
+    .select("id, item_id, storage_path, is_primary")
+    .eq("id", imageId)
+    .eq("item_id", itemId)
+    .maybeSingle<{
+      id: string;
+      item_id: string;
+      storage_path: string;
+      is_primary: boolean;
+    }>();
+
+  if (error || !data) {
+    throw new VanPlanError("Photo not found.", 404);
+  }
+
+  const { error: deleteError } = await db
+    .from("van_plan_item_images")
+    .delete()
+    .eq("id", imageId)
+    .eq("item_id", itemId);
+
+  if (deleteError) {
+    throw new VanPlanError("Unable to delete that photo.", 500);
+  }
+
+  try {
+    await deleteVanPlanImageFile(data.storage_path);
+  } catch (fileError) {
+    console.error("Van Plan image file delete failed:", fileError);
+  }
+
+  if (!data.is_primary) return;
+
+  const { data: remaining, error: remainingError } = await db
+    .from("van_plan_item_images")
+    .select("id")
+    .eq("item_id", itemId)
+    .order("sort_order", { ascending: true })
+    .limit(1)
+    .returns<{ id: string }[]>();
+
+  if (remainingError) {
+    throw new VanPlanError("Unable to update the main picture.", 500);
+  }
+
+  if (remaining?.[0]) {
+    await setPrimaryItemImage(itemId, remaining[0].id);
+  }
+}
+
+export async function deleteVanPlanItem(itemId: string) {
+  const item = await getVanPlanItemById(itemId);
+  const db = vanPlanDb();
+  const { error } = await db.from("van_plan_items").delete().eq("id", itemId);
+
+  if (error) {
+    throw new VanPlanError("Unable to delete that item.", 500);
+  }
+
+  for (const image of item.images) {
+    try {
+      await deleteVanPlanImageFile(image.storagePath);
+    } catch (fileError) {
+      console.error("Van Plan image file delete failed:", fileError);
+    }
+  }
+
+  return item;
 }
 
 async function hydrateItems(items: ItemRow[]): Promise<VanPlanItem[]> {

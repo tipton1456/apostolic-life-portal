@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import VanPlanDeleteImageForm from "@/app/van-plan/components/delete-image-form";
+import VanPlanDeleteItemForm from "@/app/van-plan/components/delete-item-form";
+import VanPlanFormButton from "@/app/van-plan/components/form-button";
 import { canManageItems, getCurrentVanPlanUser } from "@/lib/van-plan/auth";
 import { setPrimaryItemImageAction } from "@/lib/van-plan/actions";
 import { VAN_PLAN_BASE_PATH } from "@/lib/van-plan/constants";
 import { getVanPlanItemById } from "@/lib/van-plan/items";
-import VanPlanFormButton from "@/app/van-plan/components/form-button";
 import VanPlanItemForm from "../item-form";
 
 export default async function EditVanPlanItemPage({
@@ -52,7 +54,7 @@ export default async function EditVanPlanItemPage({
               <div key={image.id} className="vp-card overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={image.url} alt="" className="aspect-square w-full object-cover" />
-                <div className="p-3">
+                <div className="space-y-2 p-3">
                   {image.isPrimary ? (
                     <p className="vp-accent text-sm">main picture</p>
                   ) : (
@@ -64,12 +66,28 @@ export default async function EditVanPlanItemPage({
                       </VanPlanFormButton>
                     </form>
                   )}
+                  <VanPlanDeleteImageForm itemId={item.id} imageId={image.id} />
                 </div>
               </div>
             ))}
           </div>
         </section>
       ) : null}
+
+      <section className="vp-card mt-10 p-6">
+        <h2 className="vp-heading text-2xl">Delete item</h2>
+        <p className="vp-description mt-3 leading-7">
+          This removes the listing, photos, bids, and invoice records from the
+          auction. Use this for leftover test items before going live.
+        </p>
+        <div className="mt-5">
+          <VanPlanDeleteItemForm
+            itemId={item.id}
+            itemName={item.name}
+            bidCount={item.bidCount}
+          />
+        </div>
+      </section>
     </main>
   );
 }

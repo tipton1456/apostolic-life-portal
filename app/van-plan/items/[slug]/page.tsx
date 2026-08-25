@@ -12,6 +12,7 @@ import { getVanPlanItemBySlug, listItemBids } from "@/lib/van-plan/items";
 import { formatUsd, toProperCase } from "@/lib/van-plan/format";
 import { getVanPlanAuctionSchedule } from "@/lib/van-plan/schedule";
 import { listItemInvoices } from "@/lib/van-plan/stripe";
+import VanPlanDeleteItemForm from "@/app/van-plan/components/delete-item-form";
 import VanPlanBiddingPanel from "./bidding-panel";
 import VanPlanItemGallery from "./gallery";
 import VanPlanInvoiceRetryForm from "./invoice-retry-form";
@@ -113,13 +114,18 @@ export default async function VanPlanItemPage({
             <div className="vp-card mt-6 p-6">
               <h2 className="vp-heading text-2xl">Staff controls</h2>
               <VanPlanStatusForm itemId={item.id} currentStatus={item.status} />
-              <div className="mt-5">
+              <div className="mt-5 flex flex-wrap items-center gap-3">
                 <Link
                   href={`${VAN_PLAN_BASE_PATH}/admin/items/${item.id}`}
                   className="vp-button vp-button-secondary"
                 >
                   Edit item
                 </Link>
+                <VanPlanDeleteItemForm
+                  itemId={item.id}
+                  itemName={item.name}
+                  bidCount={item.bidCount}
+                />
               </div>
             </div>
           ) : null}
