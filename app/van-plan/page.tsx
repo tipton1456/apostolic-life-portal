@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { countVanPlanUsers, getCurrentVanPlanUser } from "@/lib/van-plan/auth";
 import { VAN_PLAN_BASE_PATH, VAN_PLAN_SUBTITLE, VAN_PLAN_TITLE } from "@/lib/van-plan/constants";
-import { listVanPlanItems, primaryItemImage } from "@/lib/van-plan/items";
-import { formatUsd, toProperCase } from "@/lib/van-plan/format";
+import VanPlanItemCard from "@/app/van-plan/components/item-card";
+import { listVanPlanItems } from "@/lib/van-plan/items";
 import { formatAuctionClock, getVanPlanAuctionSchedule } from "@/lib/van-plan/schedule";
 
 export default async function VanPlanCatalogPage() {
@@ -65,53 +65,20 @@ export default async function VanPlanCatalogPage() {
           </p>
         </div>
       ) : (
-        <section className="mt-6 grid grid-cols-2 gap-3 sm:mt-10 sm:gap-6 md:grid-cols-3">
-          {items.map((item) => {
-            const image = primaryItemImage(item);
-            const current = item.highestBid?.amountCents ?? item.startingPriceCents;
-
-            return (
-              <Link
-                key={item.id}
-                href={`${VAN_PLAN_BASE_PATH}/items/${item.slug}`}
-                className="vp-card overflow-hidden transition hover:-translate-y-0.5"
-              >
-                <div className="aspect-square bg-white/40 sm:aspect-[4/3]">
-                  {image ? (
-                    // Dynamic auction images are served by the module route.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={image.url}
-                      alt={item.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <p className="vp-accent text-[11px] sm:text-sm">no photo yet</p>
-                    </div>
-                  )}
-                </div>
-                <div className="p-2.5 sm:p-5">
-                  <p className="vp-accent text-[10px] sm:text-xs">
-                    {schedule.phase === "preview" && item.status === "open"
-                      ? "opens aug 29"
-                      : schedule.phase === "closed" && item.status === "open"
-                        ? "closed"
-                        : item.status}
-                  </p>
-                  <h2 className="vp-heading-bold mt-1 line-clamp-2 text-[13px] leading-4 sm:mt-2 sm:text-xl sm:leading-7">
-                    {item.name}
-                  </h2>
-                  <p className="vp-description mt-3 hidden line-clamp-3 text-sm leading-6 sm:block">
-                    {toProperCase(item.description)}
-                  </p>
-                  <p className="vp-subhead mt-2 text-[11px] leading-4 sm:mt-4 sm:text-sm">
-                    {formatUsd(current)}
-                  </p>
-                </div>
-              </Link>
-            );
-          })}
+        <section className="mt-6 grid grid-cols-2 items-stretch gap-3 sm:mt-10 sm:gap-6 md:grid-cols-3">
+          {items.map((item) => (
+            <VanPlanItemCard
+              key={item.id}
+              item={item}
+              statusLabel={
+                schedule.phase === "preview" && item.status === "open"
+                  ? "opens aug 29"
+                  : schedule.phase === "closed" && item.status === "open"
+                    ? "closed"
+                    : item.status
+              }
+            />
+          ))}
         </section>
       )}
     </main>
