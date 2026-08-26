@@ -48,7 +48,16 @@ export type VanPlanBid = {
   bidderEmail: string;
   bidderPhone: string;
   amountCents: number;
+  isAuto: boolean;
   createdAt: string;
+};
+
+export type VanPlanBidProxy = {
+  itemId: string;
+  userId: string;
+  maxBidCents: number;
+  incrementCents: number;
+  enabled: boolean;
 };
 
 export type VanPlanInvoice = {

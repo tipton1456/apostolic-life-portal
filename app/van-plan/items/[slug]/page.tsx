@@ -7,7 +7,7 @@ import {
   canViewAllBids,
   getCurrentVanPlanUser,
 } from "@/lib/van-plan/auth";
-import { minimumNextBidCents } from "@/lib/van-plan/bids";
+import { getVanPlanBidProxy } from "@/lib/van-plan/bids";
 import { VAN_PLAN_BASE_PATH, VAN_PLAN_TITLE } from "@/lib/van-plan/constants";
 import { getVanPlanItemBySlug, listItemBids } from "@/lib/van-plan/items";
 import { formatUsd, toProperCase } from "@/lib/van-plan/format";
@@ -54,10 +54,12 @@ export default async function VanPlanItemPage({
   const staff = canManageItems(user);
   const allowPreviewBidding = canBidDuringPreview(user);
   const showBidHistory = canViewAllBids(user);
-  const bids = showBidHistory ? await listItemBids(item.id) : [];
-  const invoices = staff ? await listItemInvoices(item.id) : [];
+  const [bids, invoices, proxy] = await Promise.all([
+    showBidHistory ? listItemBids(item.id) : Promise.resolve([]),
+    staff ? listItemInvoices(item.id) : Promise.resolve([]),
+    user ? getVanPlanBidProxy(item.id, user.id) : Promise.resolve(null),
+  ]);
   const currentHigh = item.highestBid?.amountCents ?? item.startingPriceCents;
-  const nextBid = minimumNextBidCents(item);
   const schedule = getVanPlanAuctionSchedule();
   const showingStartingPrice =
     !item.highestBid || (schedule.phase === "preview" && !allowPreviewBidding);
@@ -95,7 +97,9 @@ export default async function VanPlanItemPage({
             <VanPlanBiddingPanel
               itemId={item.id}
               itemStatus={item.status}
-              minimumCents={nextBid}
+              currentHighCents={item.highestBid?.amountCents ?? null}
+              isHighBidder={Boolean(user && item.highestBid?.userId === user.id)}
+              proxy={proxy}
               signedIn={Boolean(user)}
               allowPreviewBidding={allowPreviewBidding}
               loginHref={loginHref}
@@ -180,6 +184,7 @@ export default async function VanPlanItemPage({
                     <th className="pb-3 font-normal">email</th>
                     <th className="pb-3 font-normal">phone</th>
                     <th className="pb-3 font-normal">amount</th>
+                    <th className="pb-3 font-normal">type</th>
                     <th className="pb-3 font-normal">time</th>
                   </tr>
                 </thead>
@@ -190,6 +195,7 @@ export default async function VanPlanItemPage({
                       <td className="py-3">{bid.bidderEmail}</td>
                       <td className="py-3">{bid.bidderPhone}</td>
                       <td className="py-3">{formatUsd(bid.amountCents)}</td>
+                      <td className="py-3">{bid.isAuto ? "auto" : "bid"}</td>
                       <td className="py-3">
                         {new Date(bid.createdAt).toLocaleString()}
                       </td>

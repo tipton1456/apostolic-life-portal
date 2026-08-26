@@ -422,15 +422,36 @@ export async function placeVanPlanBidAction(
       throw new VanPlanError("Change your temporary password before bidding.");
     }
 
-    await placeVanPlanBid({
+    const maxBidEnabled = formData.get("maxBidEnabled") === "true";
+    const result = await placeVanPlanBid({
       itemId,
       amountCents: dollarsToCents(String(formData.get("amount") ?? "")),
       bidder: user,
+      maxBidEnabled,
+      maxBidCents: maxBidEnabled
+        ? dollarsToCents(String(formData.get("maxBid") ?? ""))
+        : null,
+      incrementCents: maxBidEnabled
+        ? dollarsToCents(String(formData.get("increment") ?? ""))
+        : null,
     });
 
     const item = await getVanPlanItemById(itemId);
     revalidateAuction([`${VAN_PLAN_BASE_PATH}/items/${item.slug}`]);
-    return nextActionState("success", "Bid placed.", version);
+
+    if (!result.placedBid) {
+      return nextActionState("success", "Max bid settings updated.", version);
+    }
+
+    if (result.highUserId !== user.id) {
+      return nextActionState(
+        "success",
+        "Bid placed, but there is a higher bid now. Place a new bid to stay in the running, and you can set a new max and increment.",
+        version,
+      );
+    }
+
+    return nextActionState("success", "Bid placed. You are the current high bidder.", version);
   } catch (error) {
     return actionError(error, version);
   }

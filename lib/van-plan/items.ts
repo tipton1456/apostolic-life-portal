@@ -44,6 +44,7 @@ type BidRow = {
   item_id: string;
   user_id: string;
   amount_cents: number;
+  is_auto?: boolean | null;
   created_at: string;
   van_plan_users: {
     name: string;
@@ -59,6 +60,18 @@ type BidRow = {
 const ITEM_SELECT =
   "id, slug, name, description, starting_price_cents, status, created_by, sold_to_user_id, sold_at, created_at, updated_at";
 
+const BID_SELECT_WITH_AUTO =
+  "id, item_id, user_id, amount_cents, is_auto, created_at, van_plan_users (name, email, phone)";
+
+const BID_SELECT_LEGACY =
+  "id, item_id, user_id, amount_cents, created_at, van_plan_users (name, email, phone)";
+
+let bidSelect = BID_SELECT_WITH_AUTO;
+
+function shouldFallbackBidSelect(message: string | undefined) {
+  return bidSelect === BID_SELECT_WITH_AUTO && /is_auto/i.test(message ?? "");
+}
+
 function mapBid(row: BidRow): VanPlanBid {
   const bidder = Array.isArray(row.van_plan_users)
     ? row.van_plan_users[0]
@@ -72,6 +85,7 @@ function mapBid(row: BidRow): VanPlanBid {
     bidderEmail: bidder?.email ?? "",
     bidderPhone: bidder?.phone ?? "",
     amountCents: row.amount_cents,
+    isAuto: Boolean(row.is_auto),
     createdAt: row.created_at,
   };
 }
@@ -207,15 +221,24 @@ export async function getVanPlanItemById(itemId: string) {
 
 export async function listItemBids(itemId: string) {
   const db = vanPlanDb();
-  const { data, error } = await db
+  let { data, error } = await db
     .from("van_plan_bids")
-    .select(
-      "id, item_id, user_id, amount_cents, created_at, van_plan_users (name, email, phone)",
-    )
+    .select(bidSelect)
     .eq("item_id", itemId)
     .order("amount_cents", { ascending: false })
     .order("created_at", { ascending: true })
     .returns<BidRow[]>();
+
+  if (error && shouldFallbackBidSelect(error.message)) {
+    bidSelect = BID_SELECT_LEGACY;
+    ({ data, error } = await db
+      .from("van_plan_bids")
+      .select(bidSelect)
+      .eq("item_id", itemId)
+      .order("amount_cents", { ascending: false })
+      .order("created_at", { ascending: true })
+      .returns<BidRow[]>());
+  }
 
   if (error) {
     throw new VanPlanError("Unable to load bids.", 500);
@@ -528,23 +551,31 @@ async function hydrateItems(items: ItemRow[]): Promise<VanPlanItem[]> {
   const db = vanPlanDb();
   const itemIds = items.map((item) => item.id);
 
-  const [{ data: images, error: imageError }, { data: bids, error: bidError }] =
-    await Promise.all([
-      db
-        .from("van_plan_item_images")
-        .select(
-          "id, item_id, storage_path, file_name, mime_type, is_primary, sort_order",
-        )
-        .in("item_id", itemIds)
-        .returns<ImageRow[]>(),
-      db
-        .from("van_plan_bids")
-        .select(
-          "id, item_id, user_id, amount_cents, created_at, van_plan_users (name, email, phone)",
-        )
-        .in("item_id", itemIds)
-        .returns<BidRow[]>(),
-    ]);
+  const [{ data: images, error: imageError }, bidResult] = await Promise.all([
+    db
+      .from("van_plan_item_images")
+      .select(
+        "id, item_id, storage_path, file_name, mime_type, is_primary, sort_order",
+      )
+      .in("item_id", itemIds)
+      .returns<ImageRow[]>(),
+    db
+      .from("van_plan_bids")
+      .select(bidSelect)
+      .in("item_id", itemIds)
+      .returns<BidRow[]>(),
+  ]);
+
+  let { data: bids, error: bidError } = bidResult;
+
+  if (bidError && shouldFallbackBidSelect(bidError.message)) {
+    bidSelect = BID_SELECT_LEGACY;
+    ({ data: bids, error: bidError } = await db
+      .from("van_plan_bids")
+      .select(bidSelect)
+      .in("item_id", itemIds)
+      .returns<BidRow[]>());
+  }
 
   if (imageError || bidError) {
     throw new VanPlanError("Unable to load auction item details.", 500);

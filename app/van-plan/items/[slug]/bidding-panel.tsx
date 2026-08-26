@@ -4,13 +4,15 @@ import Link from "next/link";
 import { useAuctionClock } from "@/app/van-plan/components/use-auction-clock";
 import { VAN_PLAN_BASE_PATH } from "@/lib/van-plan/constants";
 import { formatAuctionClock } from "@/lib/van-plan/schedule";
-import type { VanPlanItemStatus } from "@/lib/van-plan/types";
+import type { VanPlanBidProxy, VanPlanItemStatus } from "@/lib/van-plan/types";
 import VanPlanBidForm from "./bid-form";
 
 export default function VanPlanBiddingPanel({
   itemId,
   itemStatus,
-  minimumCents,
+  currentHighCents,
+  isHighBidder,
+  proxy,
   signedIn,
   allowPreviewBidding = false,
   loginHref,
@@ -20,7 +22,9 @@ export default function VanPlanBiddingPanel({
 }: {
   itemId: string;
   itemStatus: VanPlanItemStatus;
-  minimumCents: number;
+  currentHighCents: number | null;
+  isHighBidder: boolean;
+  proxy: VanPlanBidProxy | null;
   signedIn: boolean;
   allowPreviewBidding?: boolean;
   loginHref: string;
@@ -85,7 +89,13 @@ export default function VanPlanBiddingPanel({
           admins can place a bid now.
         </p>
       ) : null}
-      <VanPlanBidForm itemId={itemId} minimumCents={minimumCents} />
+      <VanPlanBidForm
+        key={`${currentHighCents ?? 0}-${isHighBidder ? 1 : 0}-${proxy?.enabled ? 1 : 0}-${proxy?.maxBidCents ?? 0}`}
+        itemId={itemId}
+        currentHighCents={currentHighCents}
+        isHighBidder={isHighBidder}
+        proxy={proxy}
+      />
     </div>
   );
 }
