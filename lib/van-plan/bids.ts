@@ -65,6 +65,80 @@ export async function getVanPlanBidProxy(itemId: string, userId: string) {
   return data ? mapBidProxy(data) : null;
 }
 
+export async function deleteVanPlanBid(bidId: string) {
+  const db = vanPlanDb();
+  const { data, error } = await db
+    .from("van_plan_bids")
+    .select("id, item_id, user_id, amount_cents")
+    .eq("id", bidId)
+    .maybeSingle<{
+      id: string;
+      item_id: string;
+      user_id: string;
+      amount_cents: number;
+    }>();
+
+  if (error || !data) {
+    throw new VanPlanError("Bid not found.", 404);
+  }
+
+  const item = await getVanPlanItemById(data.item_id);
+
+  if (item.status === "sold") {
+    throw new VanPlanError("This item is sold. Change the status before deleting bids.");
+  }
+
+  const { error: deleteError } = await db.from("van_plan_bids").delete().eq("id", bidId);
+
+  if (deleteError) {
+    console.error("Van Plan bid delete failed:", deleteError);
+    throw new VanPlanError("Unable to delete that bid.", 500);
+  }
+
+  const remaining = await listItemBids(data.item_id);
+
+  if (!remaining.some((bid) => bid.userId === data.user_id)) {
+    const { error: proxyError } = await db
+      .from("van_plan_bid_proxies")
+      .delete()
+      .eq("item_id", data.item_id)
+      .eq("user_id", data.user_id);
+
+    if (proxyError && !/van_plan_bid_proxies|schema cache/i.test(proxyError.message)) {
+      console.error("Van Plan max bid cleanup failed:", proxyError);
+    }
+  }
+
+  return item;
+}
+
+export async function deleteAllVanPlanItemBids(itemId: string) {
+  const item = await getVanPlanItemById(itemId);
+
+  if (item.status === "sold") {
+    throw new VanPlanError("This item is sold. Change the status before deleting bids.");
+  }
+
+  const db = vanPlanDb();
+  const { error } = await db.from("van_plan_bids").delete().eq("item_id", itemId);
+
+  if (error) {
+    console.error("Van Plan bid clear failed:", error);
+    throw new VanPlanError("Unable to delete those bids.", 500);
+  }
+
+  const { error: proxyError } = await db
+    .from("van_plan_bid_proxies")
+    .delete()
+    .eq("item_id", itemId);
+
+  if (proxyError && !/van_plan_bid_proxies|schema cache/i.test(proxyError.message)) {
+    console.error("Van Plan max bid clear failed:", proxyError);
+  }
+
+  return item;
+}
+
 export async function placeVanPlanBid({
   itemId,
   amountCents,

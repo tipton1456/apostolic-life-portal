@@ -18,7 +18,11 @@ import {
   requireItemManager,
   requireVanPlanAdmin,
 } from "@/lib/van-plan/auth";
-import { placeVanPlanBid } from "@/lib/van-plan/bids";
+import {
+  deleteAllVanPlanItemBids,
+  deleteVanPlanBid,
+  placeVanPlanBid,
+} from "@/lib/van-plan/bids";
 import { VanPlanError, isVanPlanError, nextActionState, vanPlanDb } from "@/lib/van-plan/db";
 import {
   addImagesToItem,
@@ -452,6 +456,46 @@ export async function placeVanPlanBidAction(
     }
 
     return nextActionState("success", "Bid placed. You are the current high bidder.", version);
+  } catch (error) {
+    return actionError(error, version);
+  }
+}
+
+export async function deleteVanPlanBidAction(
+  _prev: VanPlanActionState,
+  formData: FormData,
+): Promise<VanPlanActionState> {
+  const version = Number(formData.get("version") ?? 0);
+
+  try {
+    await requireItemManager(`${VAN_PLAN_BASE_PATH}/admin`);
+    const item = await deleteVanPlanBid(String(formData.get("bidId") ?? ""));
+    revalidateAuction([
+      VAN_PLAN_BASE_PATH,
+      `${VAN_PLAN_BASE_PATH}/admin`,
+      `${VAN_PLAN_BASE_PATH}/items/${item.slug}`,
+    ]);
+    return nextActionState("success", "Bid deleted.", version);
+  } catch (error) {
+    return actionError(error, version);
+  }
+}
+
+export async function clearVanPlanItemBidsAction(
+  _prev: VanPlanActionState,
+  formData: FormData,
+): Promise<VanPlanActionState> {
+  const version = Number(formData.get("version") ?? 0);
+
+  try {
+    await requireItemManager(`${VAN_PLAN_BASE_PATH}/admin`);
+    const item = await deleteAllVanPlanItemBids(String(formData.get("itemId") ?? ""));
+    revalidateAuction([
+      VAN_PLAN_BASE_PATH,
+      `${VAN_PLAN_BASE_PATH}/admin`,
+      `${VAN_PLAN_BASE_PATH}/items/${item.slug}`,
+    ]);
+    return nextActionState("success", "All bids on this item were deleted.", version);
   } catch (error) {
     return actionError(error, version);
   }

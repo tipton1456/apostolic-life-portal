@@ -123,6 +123,12 @@ export default async function VanPlanAdminPage() {
                         open
                       </Link>
                       <Link
+                        href={`${VAN_PLAN_BASE_PATH}/items/${item.slug}?bids=1`}
+                        className="vp-subhead text-sm"
+                      >
+                        bids
+                      </Link>
+                      <Link
                         href={`${VAN_PLAN_BASE_PATH}/admin/items/${item.id}`}
                         className="vp-subhead text-sm"
                       >

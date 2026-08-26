@@ -14,6 +14,7 @@ import { formatUsd, toProperCase } from "@/lib/van-plan/format";
 import { getVanPlanAuctionSchedule } from "@/lib/van-plan/schedule";
 import { canRetryVanPlanInvoice, listItemInvoices } from "@/lib/van-plan/stripe";
 import VanPlanDeleteItemForm from "@/app/van-plan/components/delete-item-form";
+import VanPlanBidHistoryPanel from "./bid-history-panel";
 import VanPlanBiddingPanel from "./bidding-panel";
 import VanPlanItemGallery from "./gallery";
 import VanPlanInvoiceRetryForm from "./invoice-retry-form";
@@ -40,10 +41,14 @@ export async function generateMetadata({
 
 export default async function VanPlanItemPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ bids?: string | string[] }>;
 }) {
   const { slug } = await params;
+  const query = searchParams ? await searchParams : {};
+  const openBidHistory = query.bids === "1" || query.bids === "true";
   const user = await getCurrentVanPlanUser();
   const item = await getVanPlanItemBySlug(slug, user);
 
@@ -123,6 +128,13 @@ export default async function VanPlanItemPage({
               <h2 className="vp-heading text-2xl">Staff controls</h2>
               <VanPlanStatusForm itemId={item.id} currentStatus={item.status} />
               <div className="mt-5 flex flex-wrap items-center gap-3">
+                <VanPlanBidHistoryPanel
+                  itemId={item.id}
+                  itemName={item.name}
+                  itemStatus={item.status}
+                  bids={bids}
+                  openOnLoad={openBidHistory}
+                />
                 <Link
                   href={`${VAN_PLAN_BASE_PATH}/admin/items/${item.id}`}
                   className="vp-button vp-button-secondary"
@@ -169,44 +181,6 @@ export default async function VanPlanItemPage({
           ) : null}
         </section>
       </div>
-
-      {showBidHistory ? (
-        <section className="vp-card mt-10 p-6">
-          <h2 className="vp-heading text-3xl">Bid history</h2>
-          {bids.length === 0 ? (
-            <p className="vp-description mt-4">No bids yet.</p>
-          ) : (
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[32rem] text-left">
-                <thead>
-                  <tr className="vp-subhead text-sm">
-                    <th className="pb-3 font-normal">bidder</th>
-                    <th className="pb-3 font-normal">email</th>
-                    <th className="pb-3 font-normal">phone</th>
-                    <th className="pb-3 font-normal">amount</th>
-                    <th className="pb-3 font-normal">type</th>
-                    <th className="pb-3 font-normal">time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bids.map((bid) => (
-                    <tr key={bid.id} className="border-t border-[rgba(70,67,60,0.12)]">
-                      <td className="py-3">{bid.bidderName}</td>
-                      <td className="py-3">{bid.bidderEmail}</td>
-                      <td className="py-3">{bid.bidderPhone}</td>
-                      <td className="py-3">{formatUsd(bid.amountCents)}</td>
-                      <td className="py-3">{bid.isAuto ? "auto" : "bid"}</td>
-                      <td className="py-3">
-                        {new Date(bid.createdAt).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      ) : null}
     </main>
   );
 }

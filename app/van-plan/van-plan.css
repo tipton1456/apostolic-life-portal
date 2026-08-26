@@ -132,6 +132,37 @@
   accent-color: var(--vp-accent);
 }
 
+.vp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.25rem;
+  overflow: auto;
+}
+
+.vp-overlay-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(70, 67, 60, 0.4);
+}
+
+.vp-dialog {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 52rem;
+  margin-top: 3rem;
+  margin-bottom: 3rem;
+  padding: 1.5rem;
+  background: var(--vp-bg);
+  border: 1px solid var(--vp-line);
+  border-radius: 1.25rem;
+}
+
 .vp-countdown {
   display: flex;
   flex-wrap: wrap;
