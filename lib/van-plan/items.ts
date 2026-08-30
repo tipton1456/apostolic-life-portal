@@ -1,4 +1,8 @@
-import { VAN_PLAN_ITEM_STATUSES, VAN_PLAN_MAX_IMAGES_PER_ITEM } from "@/lib/van-plan/constants";
+import {
+  VAN_PLAN_AUCTION_SETTINGS_SLUG,
+  VAN_PLAN_ITEM_STATUSES,
+  VAN_PLAN_MAX_IMAGES_PER_ITEM,
+} from "@/lib/van-plan/constants";
 import { VanPlanError, vanPlanDb } from "@/lib/van-plan/db";
 import {
   copyVanPlanImageFile,
@@ -167,7 +171,9 @@ export async function listVanPlanItems(viewer: VanPlanUser | null) {
     throw new VanPlanError("Unable to load auction items.", 500);
   }
 
-  const items = data ?? [];
+  const items = (data ?? []).filter(
+    (item) => item.slug !== VAN_PLAN_AUCTION_SETTINGS_SLUG,
+  );
   const visible = viewer && (viewer.permission === "admin" || viewer.permission === "auctioneer")
     ? items
     : items.filter((item) => itemIsPublic(item.status));
@@ -190,7 +196,7 @@ export async function getVanPlanItemBySlug(
     throw new VanPlanError("Unable to load that item.", 500);
   }
 
-  if (!data) return null;
+  if (!data || data.slug === VAN_PLAN_AUCTION_SETTINGS_SLUG) return null;
 
   if (
     !itemIsPublic(data.status) &&

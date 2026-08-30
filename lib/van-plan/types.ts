@@ -1,10 +1,12 @@
 import type {
+  VAN_PLAN_AUCTION_STATUSES,
   VAN_PLAN_ITEM_STATUSES,
   VAN_PLAN_PERMISSIONS,
 } from "@/lib/van-plan/constants";
 
 export type VanPlanPermission = (typeof VAN_PLAN_PERMISSIONS)[number];
 export type VanPlanItemStatus = (typeof VAN_PLAN_ITEM_STATUSES)[number];
+export type AuctionStatusOverride = (typeof VAN_PLAN_AUCTION_STATUSES)[number];
 export type VanPlanInvoiceStatus =
   | "pending"
   | "sent"

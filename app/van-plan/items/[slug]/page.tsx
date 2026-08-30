@@ -11,7 +11,7 @@ import { getVanPlanBidProxy } from "@/lib/van-plan/bids";
 import { VAN_PLAN_BASE_PATH, VAN_PLAN_TITLE } from "@/lib/van-plan/constants";
 import { getVanPlanItemBySlug, listItemBids } from "@/lib/van-plan/items";
 import { formatUsd, toProperCase } from "@/lib/van-plan/format";
-import { getVanPlanAuctionSchedule } from "@/lib/van-plan/schedule";
+import { getVanPlanAuctionSchedule } from "@/lib/van-plan/settings";
 import { canRetryVanPlanInvoice, listItemInvoices } from "@/lib/van-plan/stripe";
 import VanPlanDeleteItemForm from "@/app/van-plan/components/delete-item-form";
 import VanPlanBidHistoryPanel from "./bid-history-panel";
@@ -65,7 +65,7 @@ export default async function VanPlanItemPage({
     user ? getVanPlanBidProxy(item.id, user.id) : Promise.resolve(null),
   ]);
   const currentHigh = item.highestBid?.amountCents ?? item.startingPriceCents;
-  const schedule = getVanPlanAuctionSchedule();
+  const schedule = await getVanPlanAuctionSchedule();
   const showingStartingPrice =
     !item.highestBid || (schedule.phase === "preview" && !allowPreviewBidding);
   const loginHref = `${VAN_PLAN_BASE_PATH}/login?next=${encodeURIComponent(
@@ -111,6 +111,7 @@ export default async function VanPlanItemPage({
               opensAt={schedule.opensAt}
               closesAt={schedule.closesAt}
               serverNow={schedule.now}
+              statusOverride={schedule.statusOverride}
             />
           </div>
 

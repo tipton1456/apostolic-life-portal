@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentVanPlanUser } from "@/lib/van-plan/auth";
 import { VAN_PLAN_BASE_PATH, VAN_PLAN_TITLE } from "@/lib/van-plan/constants";
-import { formatAuctionClock, getVanPlanAuctionSchedule } from "@/lib/van-plan/schedule";
+import { formatAuctionClock } from "@/lib/van-plan/schedule";
+import { getVanPlanAuctionSchedule } from "@/lib/van-plan/settings";
 import VanPlanRegisterForm from "./register-form";
 
 export default async function VanPlanRegisterPage() {
@@ -12,7 +13,7 @@ export default async function VanPlanRegisterPage() {
     redirect(VAN_PLAN_BASE_PATH);
   }
 
-  const schedule = getVanPlanAuctionSchedule();
+  const schedule = await getVanPlanAuctionSchedule();
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">

@@ -1,36 +1,49 @@
 "use client";
 
 import { padAuctionUnit } from "@/lib/van-plan/schedule";
+import type { AuctionStatusOverride } from "@/lib/van-plan/types";
 import { useAuctionClock } from "./use-auction-clock";
 
 export default function VanPlanCountdown({
   opensAt,
   closesAt,
   serverNow,
+  statusOverride = "scheduled",
 }: {
   opensAt: string;
   closesAt: string;
   serverNow: string;
+  statusOverride?: AuctionStatusOverride;
 }) {
-  const { phase, remaining } = useAuctionClock(opensAt, closesAt, serverNow);
+  const { phase, remaining } = useAuctionClock(
+    opensAt,
+    closesAt,
+    serverNow,
+    statusOverride,
+  );
+  const showUnits = phase !== "closed" && remaining.totalMs > 0;
   const label =
     phase === "preview"
       ? "auction live in"
-      : phase === "live"
+      : phase === "live" && remaining.totalMs > 0
         ? "auction closes in"
-        : "auction closed";
+        : phase === "live"
+          ? "auction open"
+          : "auction closed";
 
   return (
     <p
       className="vp-countdown"
       aria-label={
-        phase === "closed"
-          ? "Auction closed"
-          : `${label} ${remaining.days} days, ${remaining.hours} hours, ${remaining.minutes} minutes, ${remaining.seconds} seconds`
+        showUnits
+          ? `${label} ${remaining.days} days, ${remaining.hours} hours, ${remaining.minutes} minutes, ${remaining.seconds} seconds`
+          : phase === "live"
+            ? "Auction open"
+            : "Auction closed"
       }
     >
       <span className="vp-countdown-label">{label}</span>
-      {phase === "closed" ? null : (
+      {showUnits ? (
         <span className="vp-countdown-units" suppressHydrationWarning>
           <span>
             <strong>{remaining.days}</strong>d
@@ -45,7 +58,7 @@ export default function VanPlanCountdown({
             <strong>{padAuctionUnit(remaining.seconds)}</strong>s
           </span>
         </span>
-      )}
+      ) : null}
     </p>
   );
 }

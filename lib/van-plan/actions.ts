@@ -51,6 +51,10 @@ import {
   recordLoginAttempt,
   sanitizeNextPathSafe,
 } from "@/lib/van-plan/security";
+import {
+  parseAuctionStatusOverride,
+  setVanPlanAuctionStatusOverride,
+} from "@/lib/van-plan/settings";
 import type { VanPlanActionState } from "@/lib/van-plan/types";
 import {
   createVanPlanUser,
@@ -138,6 +142,35 @@ export async function bootstrapVanPlanAdminAction(
   }
 
   redirect(`${VAN_PLAN_BASE_PATH}/admin`);
+}
+
+export async function setVanPlanAuctionStatusAction(
+  _prev: VanPlanActionState,
+  formData: FormData,
+): Promise<VanPlanActionState> {
+  const version = Number(formData.get("version") ?? 0);
+
+  try {
+    const user = await requireItemManager(`${VAN_PLAN_BASE_PATH}/admin`);
+    const status = parseAuctionStatusOverride(formData.get("status"));
+    await setVanPlanAuctionStatusOverride({
+      status,
+      updatedBy: user.id,
+    });
+    revalidatePath(VAN_PLAN_BASE_PATH, "layout");
+    revalidateAuction([`${VAN_PLAN_BASE_PATH}/admin`]);
+
+    const message =
+      status === "open"
+        ? "Auction is open. Bidding is live."
+        : status === "closed"
+          ? "Auction is closed. Bidding has stopped."
+          : "Auction is following the official schedule.";
+
+    return nextActionState("success", message, version);
+  } catch (error) {
+    return actionError(error, version);
+  }
 }
 
 export async function createVanPlanUserAction(

@@ -3,12 +3,16 @@ import { countVanPlanUsers, getCurrentVanPlanUser } from "@/lib/van-plan/auth";
 import { VAN_PLAN_BASE_PATH, VAN_PLAN_SUBTITLE, VAN_PLAN_TITLE } from "@/lib/van-plan/constants";
 import VanPlanItemCard from "@/app/van-plan/components/item-card";
 import { listVanPlanItems } from "@/lib/van-plan/items";
-import { formatAuctionClock, getVanPlanAuctionSchedule } from "@/lib/van-plan/schedule";
+import {
+  formatAuctionClock,
+  formatAuctionShortDate,
+} from "@/lib/van-plan/schedule";
+import { getVanPlanAuctionSchedule } from "@/lib/van-plan/settings";
 
 export default async function VanPlanCatalogPage() {
   const user = await getCurrentVanPlanUser().catch(() => null);
-  const schedule = getVanPlanAuctionSchedule();
-  const [userCount, items] = await Promise.all([
+  const [schedule, userCount, items] = await Promise.all([
+    getVanPlanAuctionSchedule(),
     countVanPlanUsers().catch(() => -1),
     listVanPlanItems(user).catch(() => []),
   ]);
@@ -17,7 +21,9 @@ export default async function VanPlanCatalogPage() {
       ? `Browse the silent auction items and set up your account. Official bidding opens ${formatAuctionClock(schedule.opensAt)} and closes ${formatAuctionClock(schedule.closesAt)}. You can look around without signing in.`
       : schedule.phase === "live"
         ? `Browse the silent auction items and place your bid. Bidding closes ${formatAuctionClock(schedule.closesAt)}. Each listing has its own page, current high bid, and a printable flyer with a QR code.`
-        : `Bidding closed ${formatAuctionClock(schedule.closesAt)}. You can still browse the items and print flyers.`;
+        : schedule.statusOverride === "closed"
+          ? "Bidding is closed. You can still browse the items and print flyers."
+          : `Bidding closed ${formatAuctionClock(schedule.closesAt)}. You can still browse the items and print flyers.`;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
@@ -72,7 +78,7 @@ export default async function VanPlanCatalogPage() {
               item={item}
               statusLabel={
                 schedule.phase === "preview" && item.status === "open"
-                  ? "opens aug 29"
+                  ? `opens ${formatAuctionShortDate(schedule.opensAt)}`
                   : schedule.phase === "closed" && item.status === "open"
                     ? "closed"
                     : item.status

@@ -3,8 +3,10 @@ import {
   VAN_PLAN_AUCTION_OPENS_AT,
   VAN_PLAN_AUCTION_TIME_ZONE,
 } from "@/lib/van-plan/constants";
+import type { AuctionStatusOverride } from "@/lib/van-plan/types";
 
 export type AuctionPhase = "preview" | "live" | "closed";
+export type { AuctionStatusOverride };
 
 export type AuctionRemaining = {
   days: number;
@@ -19,13 +21,17 @@ export type AuctionSchedule = {
   closesAt: string;
   now: string;
   phase: AuctionPhase;
+  statusOverride: AuctionStatusOverride;
 };
 
 export function getAuctionPhase(
   nowMs: number,
   opensAtMs: number,
   closesAtMs: number,
+  statusOverride: AuctionStatusOverride = "scheduled",
 ): AuctionPhase {
+  if (statusOverride === "open") return "live";
+  if (statusOverride === "closed") return "closed";
   if (nowMs < opensAtMs) return "preview";
   if (nowMs < closesAtMs) return "live";
   return "closed";
@@ -35,8 +41,9 @@ export function getAuctionRemainingParts(
   nowMs: number,
   opensAtMs: number,
   closesAtMs: number,
+  statusOverride: AuctionStatusOverride = "scheduled",
 ): AuctionRemaining {
-  const phase = getAuctionPhase(nowMs, opensAtMs, closesAtMs);
+  const phase = getAuctionPhase(nowMs, opensAtMs, closesAtMs, statusOverride);
   const targetMs = phase === "preview" ? opensAtMs : closesAtMs;
   const totalMs = Math.max(0, targetMs - nowMs);
   const totalSeconds = Math.floor(totalMs / 1000);
@@ -48,7 +55,10 @@ export function getAuctionRemainingParts(
   return { days, hours, minutes, seconds, totalMs };
 }
 
-export function getVanPlanAuctionSchedule(now = new Date()): AuctionSchedule {
+export function buildVanPlanAuctionSchedule(
+  statusOverride: AuctionStatusOverride = "scheduled",
+  now = new Date(),
+): AuctionSchedule {
   const opensAt = VAN_PLAN_AUCTION_OPENS_AT;
   const closesAt = VAN_PLAN_AUCTION_CLOSES_AT;
 
@@ -56,22 +66,14 @@ export function getVanPlanAuctionSchedule(now = new Date()): AuctionSchedule {
     opensAt,
     closesAt,
     now: now.toISOString(),
-    phase: getAuctionPhase(now.getTime(), Date.parse(opensAt), Date.parse(closesAt)),
+    statusOverride,
+    phase: getAuctionPhase(
+      now.getTime(),
+      Date.parse(opensAt),
+      Date.parse(closesAt),
+      statusOverride,
+    ),
   };
-}
-
-export function isAuctionBiddingOpen(now = new Date()) {
-  return getVanPlanAuctionSchedule(now).phase === "live";
-}
-
-export function auctionBiddingClosedMessage(now = new Date()) {
-  const schedule = getVanPlanAuctionSchedule(now);
-
-  if (schedule.phase === "preview") {
-    return `Official bidding opens ${formatAuctionClock(schedule.opensAt)}. You can register, set up your account, and browse items now.`;
-  }
-
-  return `Bidding closed at ${formatAuctionClock(schedule.closesAt)}.`;
 }
 
 export function formatAuctionClock(iso: string) {
@@ -85,6 +87,16 @@ export function formatAuctionClock(iso: string) {
     minute: "2-digit",
     timeZoneName: "short",
   }).format(new Date(iso));
+}
+
+export function formatAuctionShortDate(iso: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: VAN_PLAN_AUCTION_TIME_ZONE,
+    month: "short",
+    day: "numeric",
+  })
+    .format(new Date(iso))
+    .toLowerCase();
 }
 
 export function padAuctionUnit(value: number) {

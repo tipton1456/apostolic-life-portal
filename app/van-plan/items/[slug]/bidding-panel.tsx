@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useAuctionClock } from "@/app/van-plan/components/use-auction-clock";
 import { VAN_PLAN_BASE_PATH } from "@/lib/van-plan/constants";
 import { formatAuctionClock } from "@/lib/van-plan/schedule";
-import type { VanPlanBidProxy, VanPlanItemStatus } from "@/lib/van-plan/types";
+import type {
+  AuctionStatusOverride,
+  VanPlanBidProxy,
+  VanPlanItemStatus,
+} from "@/lib/van-plan/types";
 import VanPlanBidForm from "./bid-form";
 
 export default function VanPlanBiddingPanel({
@@ -19,6 +23,7 @@ export default function VanPlanBiddingPanel({
   opensAt,
   closesAt,
   serverNow,
+  statusOverride = "scheduled",
 }: {
   itemId: string;
   itemStatus: VanPlanItemStatus;
@@ -31,8 +36,14 @@ export default function VanPlanBiddingPanel({
   opensAt: string;
   closesAt: string;
   serverNow: string;
+  statusOverride?: AuctionStatusOverride;
 }) {
-  const { phase } = useAuctionClock(opensAt, closesAt, serverNow);
+  const { phase } = useAuctionClock(
+    opensAt,
+    closesAt,
+    serverNow,
+    statusOverride,
+  );
 
   if (itemStatus !== "open") {
     return (
@@ -66,7 +77,9 @@ export default function VanPlanBiddingPanel({
   if (phase === "closed") {
     return (
       <p className="vp-accent mt-5 text-sm">
-        bidding closed at {formatAuctionClock(closesAt).toLowerCase()}
+        {statusOverride === "closed"
+          ? "bidding is closed"
+          : `bidding closed at ${formatAuctionClock(closesAt).toLowerCase()}`}
       </p>
     );
   }

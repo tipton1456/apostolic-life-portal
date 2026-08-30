@@ -7,11 +7,13 @@ import {
   type AuctionPhase,
   type AuctionRemaining,
 } from "@/lib/van-plan/schedule";
+import type { AuctionStatusOverride } from "@/lib/van-plan/types";
 
 export function useAuctionClock(
   opensAt: string,
   closesAt: string,
   serverNow: string,
+  statusOverride: AuctionStatusOverride = "scheduled",
 ) {
   const [nowMs, setNowMs] = useState(() => Date.parse(serverNow));
 
@@ -26,11 +28,17 @@ export function useAuctionClock(
 
   const opensAtMs = Date.parse(opensAt);
   const closesAtMs = Date.parse(closesAt);
-  const phase: AuctionPhase = getAuctionPhase(nowMs, opensAtMs, closesAtMs);
+  const phase: AuctionPhase = getAuctionPhase(
+    nowMs,
+    opensAtMs,
+    closesAtMs,
+    statusOverride,
+  );
   const remaining: AuctionRemaining = getAuctionRemainingParts(
     nowMs,
     opensAtMs,
     closesAtMs,
+    statusOverride,
   );
 
   return { phase, remaining, nowMs };

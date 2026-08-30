@@ -7,7 +7,7 @@ import {
   auctionBiddingClosedMessage,
   getVanPlanAuctionSchedule,
   isAuctionBiddingOpen,
-} from "@/lib/van-plan/schedule";
+} from "@/lib/van-plan/settings";
 import { appendSmsOptOut, getRecipientPhone, sendTwilioSms } from "@/lib/twilio-sms";
 import type { VanPlanBidProxy, VanPlanItem, VanPlanUser } from "@/lib/van-plan/types";
 
@@ -156,11 +156,11 @@ export async function placeVanPlanBid({
 }) {
   const item = await getVanPlanItemById(itemId);
 
-  if (!isAuctionBiddingOpen()) {
-    const schedule = getVanPlanAuctionSchedule();
+  if (!(await isAuctionBiddingOpen())) {
+    const schedule = await getVanPlanAuctionSchedule();
 
     if (schedule.phase !== "preview" || !canBidDuringPreview(bidder)) {
-      throw new VanPlanError(auctionBiddingClosedMessage());
+      throw new VanPlanError(await auctionBiddingClosedMessage());
     }
   }
 

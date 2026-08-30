@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import VanPlanAuctionStatusForm from "@/app/van-plan/admin/auction-status-form";
 import VanPlanDeleteItemForm from "@/app/van-plan/components/delete-item-form";
 import VanPlanDuplicateItemForm from "@/app/van-plan/components/duplicate-item-form";
 import { canManageItems, getCurrentVanPlanUser } from "@/lib/van-plan/auth";
 import { VAN_PLAN_BASE_PATH } from "@/lib/van-plan/constants";
 import { listVanPlanItems, primaryItemImage } from "@/lib/van-plan/items";
 import { formatUsd } from "@/lib/van-plan/format";
+import { formatAuctionClock } from "@/lib/van-plan/schedule";
+import { getVanPlanAuctionSchedule } from "@/lib/van-plan/settings";
 import { hasStripeConfig, hasStripeWebhookConfig } from "@/lib/van-plan/stripe";
 
 export default async function VanPlanAdminPage() {
@@ -19,7 +22,10 @@ export default async function VanPlanAdminPage() {
     redirect(VAN_PLAN_BASE_PATH);
   }
 
-  const items = await listVanPlanItems(user);
+  const [items, schedule] = await Promise.all([
+    listVanPlanItems(user),
+    getVanPlanAuctionSchedule(),
+  ]);
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
@@ -52,6 +58,13 @@ export default async function VanPlanAdminPage() {
           ) : null}
         </p>
       )}
+
+      <VanPlanAuctionStatusForm
+        phase={schedule.phase}
+        statusOverride={schedule.statusOverride}
+        opensAtLabel={formatAuctionClock(schedule.opensAt)}
+        closesAtLabel={formatAuctionClock(schedule.closesAt)}
+      />
 
       <div className="mt-8 flex flex-wrap gap-3">
         <Link href={`${VAN_PLAN_BASE_PATH}/admin/items/new`} className="vp-button">
