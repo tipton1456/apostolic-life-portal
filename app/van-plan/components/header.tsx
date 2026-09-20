@@ -9,8 +9,8 @@ export default function VanPlanHeader() {
         <Image
           src="/NewestVanPlanHeader.jpg"
           alt="The Great Van Plan Silent Auction"
-          width={2658}
-          height={984}
+          width={2061}
+          height={763}
           unoptimized
           preload
           className="h-auto w-full"

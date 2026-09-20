@@ -4,8 +4,8 @@ export const VAN_PLAN_PAYMENT_MEMO = "The Great Van Plan";
 export const VAN_PLAN_BASE_PATH = "/van-plan";
 /** Saturday, August 29, 2026, 9:00 a.m. America/Chicago (CDT). */
 export const VAN_PLAN_AUCTION_OPENS_AT = "2026-08-29T14:00:00.000Z";
-/** Sunday, September 20, 2026, 12:30 p.m. America/Chicago (CDT). */
-export const VAN_PLAN_AUCTION_CLOSES_AT = "2026-09-20T17:30:00.000Z";
+/** Sunday, October 11, 2026, 12:30 p.m. America/Chicago (CDT). */
+export const VAN_PLAN_AUCTION_CLOSES_AT = "2026-10-11T17:30:00.000Z";
 export const VAN_PLAN_AUCTION_TIME_ZONE = "America/Chicago";
 export const VAN_PLAN_AUCTION_STATUSES = ["scheduled", "open", "closed"] as const;
 export const VAN_PLAN_AUCTION_SETTINGS_SLUG = "__auction-status";
