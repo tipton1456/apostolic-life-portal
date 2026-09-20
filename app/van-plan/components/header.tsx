@@ -7,7 +7,7 @@ export default function VanPlanHeader() {
     <header className="overflow-hidden bg-[#F9EDE4]">
       <Link href={VAN_PLAN_BASE_PATH} className="block">
         <Image
-          src="/NewestVanPlanHeader.jpg"
+          src="/NewestVanPlanHeader.jpg?v=oct11"
           alt="The Great Van Plan Silent Auction"
           width={2061}
           height={763}
